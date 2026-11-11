@@ -7,8 +7,9 @@ import type {
 } from '../components/widgets/tile-controllers.js';
 import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
-import { Badge, Card, ErrorBoundary, Text } from '../ui/index.js';
+import { Badge, Card, ErrorBoundary, Icon, Text } from '../ui/index.js';
 import { ActionLog } from './tiles/actionlog-body.js';
+import { AddEntrySheet, addEntryFor } from './tiles/add-entry.js';
 import { type Ctx, Events, Todos } from './tiles/bodies.js';
 import { Bookmarks } from './tiles/bookmarks-body.js';
 import { Budget } from './tiles/budget-body.js';
@@ -33,8 +34,12 @@ export interface TileProps {
   onCreateFile?: (path: string, content: string) => Promise<void>;
   /** Opens a repository file in the editor. */
   onOpenFile?: (path: string) => void;
-  /** Opened from a tile's ＋: the body starts with its add form showing. */
-  startAdding?: boolean;
+  /**
+   * Whether the ＋ sheet is open, for a screen that puts the ＋ in its navigation header.
+   * Without `onAddingChange` the card shows its own ＋ and keeps this state itself.
+   */
+  adding?: boolean;
+  onAddingChange?: (open: boolean) => void;
 }
 
 /** Friendly heading and glyph per tile kind; the file name stays as a mono caption. */
@@ -87,11 +92,22 @@ function TileCard({
   onWrite,
   onCreateFile,
   onOpenFile,
-  startAdding,
+  adding,
+  onAddingChange,
 }: TileProps) {
   const [error, setError] = useState<string | null>(null);
-  const { spacing } = useTheme();
+  const [ownAdding, setOwnAdding] = useState(false);
+  const { colors, spacing } = useTheme();
   const meta = TILE_META[tile.kind];
+  const entry = addEntryFor(tile.kind, content, now);
+  const controlled = onAddingChange !== undefined;
+  const addOpen = entry !== null && (controlled ? adding === true : ownAdding);
+  const setAddOpen = (open: boolean) => {
+    // A stale error from an earlier attempt would otherwise greet the fresh sheet.
+    if (open) setError(null);
+    if (controlled) onAddingChange(open);
+    else setOwnAdding(open);
+  };
   // Returns whether the write went through, so bodies only fire success feedback then.
   const apply = (result: string | TileResult): boolean => {
     if (typeof result === 'string') {
@@ -115,7 +131,6 @@ function TileCard({
     path,
     ...(onCreateFile && { createFile: onCreateFile }),
     ...(onOpenFile && { openFile: onOpenFile }),
-    ...(startAdding && { startAdding }),
   };
   return (
     <Card>
@@ -145,10 +160,24 @@ function TileCard({
             )}
           </View>
           <HeaderBadge tile={tile} />
+          {entry && !controlled ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={entry.label}
+              testID="tile-add"
+              hitSlop={8}
+              onPress={() => setAddOpen(true)}
+            >
+              <Icon name="add" size={22} color={colors.accent} />
+            </Pressable>
+          ) : null}
         </View>
         <TileBody tile={tile} ctx={ctx} />
         <Err error={error} />
       </View>
+      {entry && addOpen ? (
+        <AddEntrySheet entry={entry} ctx={ctx} onClose={() => setAddOpen(false)} />
+      ) : null}
     </Card>
   );
 }

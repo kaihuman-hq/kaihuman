@@ -5,6 +5,16 @@
 - iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.
 - Test: `src/targets.test.ts` checks no deployment target stays below 17 in the real-project fixture.
 
+## 2026-11-11 — Mobile: one ＋ add sheet for every tile, calm RSS tile
+
+- Tile detail views had their add form at the bottom, so adding meant scrolling past every entry. Now one pattern: a ＋ in the detail header (top right) opens a keyboard-safe bottom sheet (`TileSheet`) with that kind's add form. The bottom inline forms are gone.
+- Registry `src/views/tiles/add-entry.tsx` (`ADD_ENTRIES`, `addEntryFor`, `AddEntrySheet`): todos, events, action log, world clocks, read later, bookmarks, budget, stocks, consumption (reading/meter switch; meter only when the file has none), data collection (only with input columns), prompts, commands, RSS, travel. Habit and timer act with one tap; board overview and palette settings have no entries. Each body exports its form as `XAddForm({ ctx, onDone })`; shared `FormButtons` and `FieldAddForm` in `parts.tsx`.
+- `Tile` takes `adding`/`onAddingChange`: the detail screen owns the header ＋; without them (file viewer) the card header shows its own ＋. `?add=1` from a dashboard tile opens the sheet at once (replaces `Ctx.startAdding`). Todos detail keeps its full-height add screen and drops its bottom "New todo" button.
+- Not changed: kanban (parallel work), idea detail log and knowledge notes (not tiles; their add fields are at the top), full action log view (add field already at the top).
+- Sheets sat too high over the keyboard: React context reaches into a `Modal`, so `KeyboardLift` added the header height there too. `KeyboardLift inModal` (helper `liftOffset`) for `TileSheet`, the todos sheet, the CSV table sheet and the dashboard editor sheet.
+- RSS dashboard tile: only the unread count, no item title. Rows: feeds, unread new today, newest item age, top feed by unread. No animation.
+- Tests: `tiles/add-entry.test.tsx`, `glance/lists.test.ts`, body and tile tests updated to the sheet.
+
 ## 2026-11-11 — Mobile: German Siri phrases
 
 - No Siri phrase worked on a German-Siri iPhone (TestFlight). Cause: App Shortcut phrases were English only; Siri matches only phrases in the Siri language. The Swift sources were already compiled into the app target (checked; the test against a real pbxproj covers it).

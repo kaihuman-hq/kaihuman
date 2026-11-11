@@ -1,5 +1,4 @@
 import { openBrowserAsync } from 'expo-web-browser';
-import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import {
   addReadLaterUrl,
@@ -11,8 +10,8 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
 import { Button, haptics, Text } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { CheckCircle, EmptyLine, ItemRow, QuickAdd, Rows } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { CheckCircle, EmptyLine, FieldAddForm, ItemRow, Rows } from './parts.js';
 
 type Item = ReadLaterView['unread'][number];
 
@@ -26,15 +25,28 @@ const hostOf = (url: string) => {
 
 const subtitleOf = (i: Item) => [hostOf(i.url), ...i.tags.map((t) => `#${t}`)].join(' · ');
 
+export function ReadLaterAddForm({ ctx, onDone }: AddFormProps) {
+  return (
+    <FieldAddForm
+      label="Page URL"
+      placeholder="https://"
+      keyboardType="url"
+      saveLabel="Save page"
+      onCancel={onDone}
+      onSave={(url) => {
+        const ok = ctx.apply(addReadLaterUrl(ctx.content, url, ctx.now));
+        if (ok) {
+          haptics.success();
+          onDone();
+        } else haptics.error();
+        return ok;
+      }}
+    />
+  );
+}
+
 export function ReadLater({ view, ctx }: { view: ReadLaterView; ctx: Ctx }) {
-  const [url, setUrl] = useState('');
   const { metrics } = useTheme();
-  const save = () => {
-    if (ctx.apply(addReadLaterUrl(ctx.content, url, ctx.now))) {
-      haptics.success();
-      setUrl('');
-    } else haptics.error();
-  };
   const open = (i: Item) => void openBrowserAsync(i.url).catch(() => {});
   const toggle = (i: Item) => {
     const result =
@@ -119,15 +131,6 @@ export function ReadLater({ view, ctx }: { view: ReadLaterView; ctx: Ctx }) {
           <Rows>{view.read.map(row)}</Rows>
         </View>
       ) : null}
-      <QuickAdd
-        label="Page URL"
-        placeholder="https://"
-        keyboardType="url"
-        value={url}
-        onChangeText={setUrl}
-        onSubmit={save}
-        addLabel="Save page"
-      />
       {view.read.length > 0 ? (
         <Button
           label="Clear read"

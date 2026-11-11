@@ -21,7 +21,6 @@ const FILE = `- [ ] late
 
 const mount = (content = FILE) => {
   const onWrite = vi.fn();
-  const onAdd = vi.fn();
   const onOpenTodo = vi.fn();
   render(
     <TodosDetailView
@@ -29,12 +28,11 @@ const mount = (content = FILE) => {
       content={content}
       now={NOW}
       onWrite={onWrite}
-      onAdd={onAdd}
       onOpenTodo={onOpenTodo}
     />,
   );
   const written = () => parseTodos(onWrite.mock.calls.at(-1)?.[1] ?? '').items;
-  return { onWrite, onAdd, onOpenTodo, written };
+  return { onWrite, onOpenTodo, written };
 };
 
 const segment = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
@@ -101,11 +99,10 @@ describe('TodosDetailView', () => {
     expect(written()[4]?.status).toBe('backlog');
   });
 
-  it('opens a todo and the add sheet', () => {
-    const { onOpenTodo, onAdd } = mount();
+  it('opens a todo; adding lives in the header ＋, not at the bottom', () => {
+    const { onOpenTodo } = mount();
     fireEvent.click(screen.getByTestId('todo-1'));
     expect(onOpenTodo).toHaveBeenCalledWith(1);
-    fireEvent.click(screen.getByRole('button', { name: 'New todo' }));
-    expect(onAdd).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'New todo' })).toBeNull();
   });
 });

@@ -30,8 +30,8 @@ import {
 } from '../../components/widgets/travel-tile.js';
 import { useTheme } from '../../theme/theme.js';
 import { Badge, Button, Chip, haptics, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, Err, ItemRow, Rows, useDisclosure } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, Err, FormButtons, ItemRow, Rows } from './parts.js';
 import { confirmDestructive, TileSheet } from './tile-sheet.js';
 
 const TRIP_TONE: Record<TripRow['status'], 'success' | 'accent' | 'neutral'> = {
@@ -40,14 +40,11 @@ const TRIP_TONE: Record<TripRow['status'], 'success' | 'accent' | 'neutral'> = {
   past: 'neutral',
 };
 
-export function Travel({ view, ctx }: { view: TravelView; ctx: Ctx }) {
-  const { colors, spacing, shape } = useTheme();
+export function TripAddForm({ ctx, onDone }: AddFormProps) {
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
-  const [editing, setEditing] = useState<string | null>(null);
-  const form = useDisclosure();
   const save = () => {
     const result = addTravelTrip(
       ctx.content,
@@ -56,13 +53,50 @@ export function Travel({ view, ctx }: { view: TravelView; ctx: Ctx }) {
     );
     if (ctx.apply(result)) {
       haptics.success();
-      setName('');
-      setDestination('');
-      setStart('');
-      setEnd('');
-      form.hide();
+      onDone();
     } else haptics.error();
   };
+  return (
+    <>
+      <TextField
+        label="Trip name"
+        value={name}
+        onChangeText={setName}
+        autoFocus
+        returnKeyType="next"
+      />
+      <TextField
+        label="Destination"
+        value={destination}
+        onChangeText={setDestination}
+        autoCapitalize="words"
+        returnKeyType="next"
+      />
+      <TextField
+        label="Start (YYYY-MM-DD)"
+        value={start}
+        onChangeText={setStart}
+        placeholder="2026-12-24"
+        keyboardType="numbers-and-punctuation"
+        returnKeyType="next"
+      />
+      <TextField
+        label="End (YYYY-MM-DD)"
+        value={end}
+        onChangeText={setEnd}
+        placeholder="2026-12-31"
+        keyboardType="numbers-and-punctuation"
+        returnKeyType="done"
+        onSubmitEditing={save}
+      />
+      <FormButtons saveLabel="Save trip" onSave={save} onCancel={onDone} />
+    </>
+  );
+}
+
+export function Travel({ view, ctx }: { view: TravelView; ctx: Ctx }) {
+  const { colors, spacing, shape } = useTheme();
+  const [editing, setEditing] = useState<string | null>(null);
   const askDelete = (row: TripRow) =>
     confirmDestructive(
       'Delete trip?',
@@ -135,41 +169,6 @@ export function Travel({ view, ctx }: { view: TravelView; ctx: Ctx }) {
           {`Total ${view.totalLabel}`}
         </Text>
       ) : null}
-      {form.open ? (
-        <>
-          <TextField label="Trip name" value={name} onChangeText={setName} returnKeyType="next" />
-          <TextField
-            label="Destination"
-            value={destination}
-            onChangeText={setDestination}
-            autoCapitalize="words"
-            returnKeyType="next"
-          />
-          <TextField
-            label="Start (YYYY-MM-DD)"
-            value={start}
-            onChangeText={setStart}
-            placeholder="2026-12-24"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="next"
-          />
-          <TextField
-            label="End (YYYY-MM-DD)"
-            value={end}
-            onChangeText={setEnd}
-            placeholder="2026-12-31"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="done"
-            onSubmitEditing={save}
-          />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button label="Save trip" size="medium" onPress={save} />
-            <Button label="Cancel" size="medium" variant="plain" onPress={form.hide} />
-          </View>
-        </>
-      ) : (
-        <Button label="Add trip" icon="add" size="medium" variant="tinted" onPress={form.show} />
-      )}
       {editing ? (
         <TripSheet
           key={editing}

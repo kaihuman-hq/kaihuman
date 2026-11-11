@@ -18,14 +18,44 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
 import { Button, Chip, haptics, SegmentedControl, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
+import type { AddFormProps, Ctx } from './bodies.js';
 import { LineChart, Swatch } from './chart-parts.js';
 import { EmptyLine, ItemRow, Meter, Rows } from './parts.js';
 
 const fmt = (n: number) =>
   Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1);
 
-function AddReadingForm({ ctx, onDone }: { ctx: Ctx; onDone: () => void }) {
+const ADD_WHAT = [
+  { value: 'reading', label: 'Reading' },
+  { value: 'meter', label: 'Meter' },
+] as const;
+
+export const consumptionHasMeters = (content: string) => consumptionColumns(content).length > 0;
+
+/** A reading needs a meter first, so a file without meters only offers the meter form. */
+export function ConsumptionAddForm({ ctx, onDone }: AddFormProps) {
+  const hasMeters = consumptionHasMeters(ctx.content);
+  const [what, setWhat] = useState<'reading' | 'meter'>(hasMeters ? 'reading' : 'meter');
+  return (
+    <>
+      {hasMeters ? (
+        <SegmentedControl
+          testID="consumption-add-what"
+          options={ADD_WHAT}
+          value={what}
+          onChange={setWhat}
+        />
+      ) : null}
+      {what === 'reading' && hasMeters ? (
+        <AddReadingForm ctx={ctx} onDone={onDone} />
+      ) : (
+        <AddMeterForm ctx={ctx} onDone={onDone} />
+      )}
+    </>
+  );
+}
+
+function AddReadingForm({ ctx, onDone }: AddFormProps) {
   const columns = consumptionColumns(ctx.content);
   const [date, setDate] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -65,7 +95,7 @@ function AddReadingForm({ ctx, onDone }: { ctx: Ctx; onDone: () => void }) {
   );
 }
 
-function AddMeterForm({ ctx, onDone }: { ctx: Ctx; onDone: () => void }) {
+function AddMeterForm({ ctx, onDone }: AddFormProps) {
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('');
   const [target, setTarget] = useState('');
@@ -130,9 +160,6 @@ const MONTH_INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', '
 
 export function Consumption({ view, ctx }: { view: ConsumptionView; ctx: Ctx }) {
   const hasMeters = consumptionColumns(ctx.content).length > 0;
-  const [form, setForm] = useState<'reading' | 'meter' | null>(
-    ctx.startAdding ? (hasMeters ? 'reading' : 'meter') : null,
-  );
   const [tab, setTab] = useState<ConsumptionTab>('recent');
   const [all, setAll] = useState(false);
   const year = ctx.now.getFullYear();
@@ -296,31 +323,6 @@ export function Consumption({ view, ctx }: { view: ConsumptionView; ctx: Ctx }) 
           ) : null}
         </>
       ) : null}
-      {form === 'reading' ? (
-        <AddReadingForm ctx={ctx} onDone={() => setForm(null)} />
-      ) : form === 'meter' ? (
-        <AddMeterForm ctx={ctx} onDone={() => setForm(null)} />
-      ) : (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {hasMeters ? (
-            <View style={{ flex: 1 }}>
-              <Button
-                variant="tinted"
-                icon="add"
-                label="Add reading"
-                onPress={() => setForm('reading')}
-                fullWidth
-              />
-            </View>
-          ) : null}
-          <Button
-            variant={hasMeters ? 'plain' : 'tinted'}
-            icon={hasMeters ? undefined : 'add'}
-            label="Add meter"
-            onPress={() => setForm('meter')}
-          />
-        </View>
-      )}
     </>
   );
 }

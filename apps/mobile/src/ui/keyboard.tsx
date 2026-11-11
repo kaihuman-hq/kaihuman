@@ -19,24 +19,33 @@ export const keyboardScrollProps = (lifted: boolean) =>
   }) as const;
 
 /**
+ * A full-screen modal starts at the top of the window, so the header height must not be added
+ * there. React context still reaches into a `Modal`, so the header height alone cannot tell.
+ */
+export const liftOffset = (headerHeight: number | undefined, inModal: boolean) =>
+  inModal ? 0 : (headerHeight ?? 0);
+
+/**
  * Lifts its children above the keyboard. `KeyboardAvoidingView` measures itself against its
- * parent, so under a navigation header the header height is added back as the offset; inside a
- * modal there is no header context and the offset stays 0.
+ * parent, so under a navigation header the header height is added back as the offset.
  */
 export function KeyboardLift({
   children,
   style,
   enabled = true,
+  inModal = false,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   enabled?: boolean;
+  /** Set inside a full-screen `Modal` (bottom sheets). */
+  inModal?: boolean;
 }) {
-  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  const headerHeight = useContext(HeaderHeightContext);
   return (
     <KeyboardAvoidingView
       behavior={KEYBOARD_BEHAVIOR}
-      keyboardVerticalOffset={headerHeight}
+      keyboardVerticalOffset={liftOffset(headerHeight, inModal)}
       enabled={enabled}
       style={[{ flex: 1 }, style]}
     >

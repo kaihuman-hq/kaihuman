@@ -23,7 +23,7 @@ export function TileSheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose} visible>
-      <KeyboardLift>
+      <KeyboardLift inModal>
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}

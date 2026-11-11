@@ -6,9 +6,9 @@ import {
   BUDGET_CATEGORIES,
   budgetDetail,
 } from '../../components/widgets/budget-tile.js';
-import { Button, Chip, haptics, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, Meter, Rows, Stat, StatRow, useDisclosure } from './parts.js';
+import { Chip, haptics, Text, TextField } from '../../ui/index.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, FormButtons, ItemRow, Meter, Rows, Stat, StatRow } from './parts.js';
 
 const num = (n: number) => n.toFixed(2);
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(2)}`;
@@ -76,12 +76,8 @@ function ValuePicker({
   );
 }
 
-export function Budget({ ctx }: { ctx: Ctx }) {
-  const [account, setAccount] = useState<string | null>(null);
-  const detail = useMemo(() => budgetDetail(ctx.content, account), [ctx.content, account]);
-  const { summary } = detail;
-  const max = Math.max(1, ...summary.categories.map((c) => c.value));
-  const form = useDisclosure();
+export function BudgetAddForm({ ctx, onDone }: AddFormProps) {
+  const detail = useMemo(() => budgetDetail(ctx.content, null), [ctx.content]);
   const [name, setName] = useState('');
   const [txAccount, setTxAccount] = useState('');
   const [category, setCategory] = useState(BUDGET_CATEGORIES[0]?.id ?? 'earnings');
@@ -97,12 +93,65 @@ export function Budget({ ctx }: { ctx: Ctx }) {
     ) {
       haptics.success();
       setAdded(name.trim());
-      // The form stays open for the next entry; account, category and date usually repeat.
+      // The sheet stays open for the next entry; account, category and date usually repeat.
       setName('');
       setValue('');
     } else haptics.error();
   };
 
+  return (
+    <>
+      <ValuePicker label="Name" options={detail.names} value={name} onChange={setName} />
+      <ValuePicker
+        label="Account"
+        options={detail.accountNames}
+        value={txAccount}
+        onChange={setTxAccount}
+      />
+      <View style={{ gap: 8 }}>
+        <Heading>Category</Heading>
+        <ChipWrap>
+          {BUDGET_CATEGORIES.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.label}
+              selected={category === c.id}
+              onPress={() => setCategory(c.id)}
+            />
+          ))}
+        </ChipWrap>
+      </View>
+      <TextField
+        label="Amount"
+        value={value}
+        onChangeText={setValue}
+        keyboardType="decimal-pad"
+        placeholder="0.00"
+        returnKeyType="done"
+        onSubmitEditing={save}
+      />
+      <TextField
+        label="Date (YYYY-MM-DD)"
+        value={date}
+        onChangeText={setDate}
+        keyboardType="numbers-and-punctuation"
+      />
+      {added ? <Text variant="footnote" tone="success">{`Added ${added}`}</Text> : null}
+      <FormButtons
+        saveLabel="Save transaction"
+        onSave={save}
+        onCancel={onDone}
+        cancelLabel="Done"
+      />
+    </>
+  );
+}
+
+export function Budget({ ctx }: { ctx: Ctx }) {
+  const [account, setAccount] = useState<string | null>(null);
+  const detail = useMemo(() => budgetDetail(ctx.content, account), [ctx.content, account]);
+  const { summary } = detail;
+  const max = Math.max(1, ...summary.categories.map((c) => c.value));
   return (
     <>
       <View style={{ gap: 2 }} accessible accessibilityLabel={`Balance ${signed(summary.net)}`}>
@@ -194,59 +243,6 @@ export function Budget({ ctx }: { ctx: Ctx }) {
           </Rows>
         )}
       </View>
-
-      {form.open ? (
-        <View style={{ gap: 16 }}>
-          <ValuePicker label="Name" options={detail.names} value={name} onChange={setName} />
-          <ValuePicker
-            label="Account"
-            options={detail.accountNames}
-            value={txAccount}
-            onChange={setTxAccount}
-          />
-          <View style={{ gap: 8 }}>
-            <Heading>Category</Heading>
-            <ChipWrap>
-              {BUDGET_CATEGORIES.map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.label}
-                  selected={category === c.id}
-                  onPress={() => setCategory(c.id)}
-                />
-              ))}
-            </ChipWrap>
-          </View>
-          <TextField
-            label="Amount"
-            value={value}
-            onChangeText={setValue}
-            keyboardType="decimal-pad"
-            placeholder="0.00"
-            returnKeyType="done"
-            onSubmitEditing={save}
-          />
-          <TextField
-            label="Date (YYYY-MM-DD)"
-            value={date}
-            onChangeText={setDate}
-            keyboardType="numbers-and-punctuation"
-          />
-          {added ? <Text variant="footnote" tone="success">{`Added ${added}`}</Text> : null}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button label="Add transaction" size="medium" onPress={save} />
-            <Button label="Done" size="medium" variant="plain" onPress={form.hide} />
-          </View>
-        </View>
-      ) : (
-        <Button
-          label="Add transaction"
-          icon="add"
-          size="medium"
-          variant="tinted"
-          onPress={form.show}
-        />
-      )}
     </>
   );
 }

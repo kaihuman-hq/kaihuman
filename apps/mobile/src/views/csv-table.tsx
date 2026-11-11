@@ -35,7 +35,7 @@ function Sheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} visible>
-      <KeyboardLift>
+      <KeyboardLift inModal>
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}

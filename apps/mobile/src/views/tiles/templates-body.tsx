@@ -12,21 +12,16 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
 import { Badge, Button, Chip, haptics, Icon, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, Rows, useDisclosure } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, FormButtons, ItemRow, Rows } from './parts.js';
 
-type Kind = 'prompt' | 'command';
+export type TemplateKind = 'prompt' | 'command';
+type Kind = TemplateKind;
 
-export function Templates({ ctx, kind }: { ctx: Ctx; kind: Kind }) {
+export function TemplateAddForm({ ctx, onDone, kind }: AddFormProps & { kind: Kind }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tags, setTags] = useState('');
-  const [query, setQuery] = useState('');
-  const [tag, setTag] = useState<string | undefined>();
-  const form = useDisclosure();
-  // The dispatcher's view is unfiltered, so search and the tag filter re-run the presenter here.
-  const view = (kind === 'prompt' ? promptsView : commandsView)(ctx.content, { text: query, tag });
-  const filtering = query.trim() !== '' || tag !== undefined;
   const save = () => {
     const tagList = parseTagInput(tags);
     const result =
@@ -35,12 +30,38 @@ export function Templates({ ctx, kind }: { ctx: Ctx; kind: Kind }) {
         : addCommandEntry(ctx.content, title, body, tagList);
     if (ctx.apply(result)) {
       haptics.success();
-      setTitle('');
-      setBody('');
-      setTags('');
-      form.hide();
+      onDone();
     } else haptics.error();
   };
+  return (
+    <>
+      <TextField
+        label={`New ${kind} title`}
+        value={title}
+        onChangeText={setTitle}
+        autoCapitalize="sentences"
+        autoFocus
+        returnKeyType="next"
+      />
+      <TextField label={`New ${kind} text`} value={body} onChangeText={setBody} multiline />
+      <TextField
+        label={`New ${kind} tags`}
+        value={tags}
+        onChangeText={setTags}
+        autoCapitalize="none"
+        helper="Separate with spaces or commas"
+      />
+      <FormButtons saveLabel={`Save ${kind}`} onSave={save} onCancel={onDone} />
+    </>
+  );
+}
+
+export function Templates({ ctx, kind }: { ctx: Ctx; kind: Kind }) {
+  const [query, setQuery] = useState('');
+  const [tag, setTag] = useState<string | undefined>();
+  // The dispatcher's view is unfiltered, so search and the tag filter re-run the presenter here.
+  const view = (kind === 'prompt' ? promptsView : commandsView)(ctx.content, { text: query, tag });
+  const filtering = query.trim() !== '' || tag !== undefined;
   return (
     <>
       <TextField
@@ -73,37 +94,6 @@ export function Templates({ ctx, kind }: { ctx: Ctx; kind: Kind }) {
             <TemplateItem key={r.title} row={r} />
           ))}
         </Rows>
-      )}
-      {form.open ? (
-        <>
-          <TextField
-            label={`New ${kind} title`}
-            value={title}
-            onChangeText={setTitle}
-            autoCapitalize="sentences"
-            returnKeyType="next"
-          />
-          <TextField label={`New ${kind} text`} value={body} onChangeText={setBody} multiline />
-          <TextField
-            label={`New ${kind} tags`}
-            value={tags}
-            onChangeText={setTags}
-            autoCapitalize="none"
-            helper="Separate with spaces or commas"
-          />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button label={`Save ${kind}`} size="medium" onPress={save} />
-            <Button label="Cancel" size="medium" variant="plain" onPress={form.hide} />
-          </View>
-        </>
-      ) : (
-        <Button
-          label={`Add ${kind}`}
-          icon="add"
-          size="medium"
-          variant="tinted"
-          onPress={form.show}
-        />
       )}
     </>
   );

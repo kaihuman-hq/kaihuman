@@ -1,7 +1,7 @@
 import { webcrypto } from 'node:crypto';
 import { buildDemoSeed, encrypt, type TreeItem } from '@kaihuman/core';
 import { asIdeaSlug, newIdea } from '@kaihuman/formats';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -140,8 +140,11 @@ describe('tiles', () => {
     expect(onWrite).toHaveBeenCalledTimes(1);
     expect(onWrite.mock.calls[0]?.[0]).toBe(f.path);
     expect(onWrite.mock.calls[0]?.[1]).not.toBe(f.content);
+    press('New todo');
     press('Add task');
-    expect(screen.getByRole('alert').textContent).toBe('Enter a task');
+    expect(within(screen.getByTestId('add-entry-sheet')).getByRole('alert').textContent).toBe(
+      'Enter a task',
+    );
     type('New task', 'Buy milk');
     press('Add task');
     expect(onWrite).toHaveBeenCalledTimes(2);
@@ -178,6 +181,7 @@ describe('tiles', () => {
 
   it('actionlog: log action', () => {
     const { onWrite } = renderTile('actionlog');
+    press('Add log entry');
     type('What did you do?', 'Ran 5k');
     press('Log action');
     expect(onWrite.mock.calls[0]?.[1]).toContain('Ran 5k');
@@ -190,16 +194,21 @@ describe('tiles', () => {
 
   it('readitlater: add, mark read, clear read', () => {
     const { onWrite } = renderTile('readitlater');
+    press('Add page');
     type('Page URL', 'https://example.com/a');
     press('Save page');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://example.com/a');
+    expect(screen.queryByLabelText('Page URL')).toBeNull();
     fireEvent.click(screen.getAllByRole('button', { name: /^Mark .* as read$/ })[0] as HTMLElement);
     expect(onWrite).toHaveBeenCalledTimes(2);
     press('Clear read');
     expect(onWrite).toHaveBeenCalledTimes(3);
+    press('Add page');
     type('Page URL', 'nope');
     press('Save page');
-    expect(screen.getByRole('alert').textContent).toBe('Enter an http(s) URL');
+    expect(within(screen.getByTestId('add-entry-sheet')).getByRole('alert').textContent).toBe(
+      'Enter an http(s) URL',
+    );
   });
 
   it('bookmarks: search filters, add and delete write', () => {

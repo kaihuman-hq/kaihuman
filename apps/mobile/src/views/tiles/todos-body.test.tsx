@@ -10,6 +10,7 @@ import {
 } from '../../components/widgets/todos-tile.js';
 import type { Ctx } from './bodies.js';
 import { Todos } from './bodies.js';
+import { TodoAddForm } from './todos-body.js';
 
 afterEach(() => {
   cleanup();
@@ -29,6 +30,14 @@ const mount = (content: string) => {
     return typeof arg === 'string' ? arg : arg.content;
   };
   return { apply, written };
+};
+
+const mountAdd = (content: string, extra: Partial<Ctx> = {}) => {
+  const apply = vi.fn((_: unknown) => true);
+  const onDone = vi.fn();
+  const ctx: Ctx = { content, now: NOW, apply, error: null, ...extra };
+  render(<TodoAddForm ctx={ctx} onDone={onDone} />);
+  return { apply, onDone };
 };
 
 const withMilestone = res(addMilestoneTo('', 'Launch', '2026-12-01', NOW));
@@ -62,16 +71,19 @@ describe('Todos tile', () => {
   });
 
   it('adds a task with tag and milestone from the details panel', () => {
-    const { written } = mount(seed);
+    const { apply, onDone } = mountAdd(seed);
     expect(screen.queryByTestId('todo-details')).toBeNull();
     fireEvent.click(screen.getByTestId('todo-details-toggle'));
     fireEvent.click(screen.getByRole('button', { name: 'Tag work' }));
     fireEvent.click(screen.getByRole('button', { name: 'Milestone Launch' }));
     fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Gamma' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
-    const gamma = parseTodos(written()).items.find((i) => i.text === 'Gamma');
+    const gamma = parseTodos(
+      (apply.mock.calls.at(-1)?.[0] as { content: string }).content,
+    ).items.find((i) => i.text === 'Gamma');
     expect(gamma?.tags).toEqual(['work']);
     expect(gamma?.milestoneId).toBe(parseTodos(seed).milestones[0]?.id);
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('manages milestones in a sheet', () => {
@@ -126,24 +138,18 @@ describe('Todos tile', () => {
 
 describe('Todos tile: prompt file', () => {
   const mountWithFiles = (content: string, openFile?: (p: string) => void) => {
-    const apply = vi.fn((_: unknown) => true);
     const createFile = vi.fn(async (_p: string, _c: string) => {});
-    const ctx: Ctx = {
-      content,
-      now: NOW,
-      apply,
-      error: null,
+    const { apply, onDone } = mountAdd(content, {
       path: '.kh/inbox.todos.md',
       createFile,
       ...(openFile && { openFile }),
-    };
-    render(<Todos view={todosView(content, NOW)} ctx={ctx} />);
-    return { apply, createFile };
+    });
+    return { apply, createFile, onDone };
   };
 
   it('creates the prompt file beside the todos file, defaulting its name to the task', async () => {
     const open = vi.fn();
-    const { apply, createFile } = mountWithFiles(seed, open);
+    const { apply, createFile, onDone } = mountWithFiles(seed, open);
     fireEvent.click(screen.getByTestId('todo-details-toggle'));
     fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Plan the Launch!' } });
     fireEvent.click(screen.getByRole('switch', { name: 'Create prompt file' }));
@@ -156,17 +162,19 @@ describe('Todos tile: prompt file', () => {
     expect(added.items.at(-1)?.prompt?.refFile).toBe('.kh/plan-the-launch.md');
     await waitFor(() => expect(createFile).toHaveBeenCalledWith('.kh/plan-the-launch.md', ''));
     await waitFor(() => expect(open).toHaveBeenCalledWith('.kh/plan-the-launch.md'));
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('creates nothing when the switch is off', () => {
-    const { createFile } = mountWithFiles(seed);
+    const { createFile, onDone } = mountWithFiles(seed);
     fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Plain' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
     expect(createFile).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('hides the option where files cannot be created', () => {
-    mount(seed);
+    mountAdd(seed);
     fireEvent.click(screen.getByTestId('todo-details-toggle'));
     expect(screen.queryByRole('switch', { name: 'Create prompt file' })).toBeNull();
   });

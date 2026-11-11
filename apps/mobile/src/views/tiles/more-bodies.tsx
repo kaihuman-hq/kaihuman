@@ -14,8 +14,8 @@ import {
 import { useEnsureFeeds, useFeedSnapshot } from '../../files/use-feeds.js';
 import { useTheme } from '../../theme/theme.js';
 import { haptics, Icon, SegmentedControl, Text } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, QuickAdd, Rows } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, FieldAddForm, ItemRow, Rows } from './parts.js';
 
 const DAY = 86_400_000;
 
@@ -38,10 +38,29 @@ const RSS_FILTERS = [
   { value: 'all', label: 'All' },
 ] as const;
 
+export function RssAddForm({ ctx, onDone }: AddFormProps) {
+  return (
+    <FieldAddForm
+      label="Feed URL"
+      placeholder="https://example.com/feed.xml"
+      keyboardType="url"
+      saveLabel="Save feed"
+      onCancel={onDone}
+      onSave={(url) => {
+        const ok = ctx.apply(addRssFeedUrl(ctx.content, url, randomUUID().slice(0, 8)));
+        if (ok) {
+          haptics.success();
+          onDone();
+        } else haptics.error();
+        return ok;
+      }}
+    />
+  );
+}
+
 export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
   const snapshot = useFeedSnapshot();
-  const [url, setUrl] = useState('');
   const [filter, setFilter] = useState<RssFilter>('unread');
   // The tile's own view has no fetched items yet; recompute with the live snapshot.
   const view: RssView = useMemo(
@@ -50,12 +69,6 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
   );
   useEnsureFeeds(initial.feeds.map((f) => f.url));
 
-  const add = () => {
-    if (ctx.apply(addRssFeedUrl(ctx.content, url, randomUUID().slice(0, 8)))) {
-      haptics.success();
-      setUrl('');
-    } else haptics.error();
-  };
   const open = (feedId: string, key: string, link: string) => {
     ctx.apply(markRssRead(ctx.content, feedId, key));
     if (link) void openBrowserAsync(link).catch(() => {});
@@ -103,7 +116,7 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
       {shown.length === 0 ? (
         <EmptyLine>
           {view.feeds.length === 0
-            ? 'No feeds yet. Add one below.'
+            ? 'No feeds yet. Add one with ＋.'
             : view.items.length > 0
               ? 'No unread items.'
               : 'No items to show.'}
@@ -169,15 +182,6 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
           ))}
         </Rows>
       ) : null}
-      <QuickAdd
-        label="Feed URL"
-        value={url}
-        onChangeText={setUrl}
-        onSubmit={add}
-        addLabel="Add feed"
-        placeholder="https://example.com/feed.xml"
-        keyboardType="url"
-      />
     </>
   );
 }

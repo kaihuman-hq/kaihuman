@@ -246,17 +246,41 @@ export const commandsGlance = (input: GlanceInput, view: TemplatesView): Glance 
     mono: true,
   });
 
-export function rssGlance(_input: GlanceInput, view: RssView): Glance {
-  const newest = view.items.find((i) => i.unread);
+/** "45m ago", "3h ago", "2d ago": how fresh the newest item is. */
+const ageOf = (iso: string, now: Date): string | undefined => {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return undefined;
+  const min = Math.max(0, Math.floor((now.getTime() - t) / 60_000));
+  if (min < 60) return `${min}m ago`;
+  if (min < 1440) return `${Math.floor(min / 60)}h ago`;
+  return `${Math.floor(min / 1440)}d ago`;
+};
+
+/** Unread count only; titles would make a calm tile into a headline ticker. */
+export function rssGlance({ now }: GlanceInput, view: RssView): Glance {
+  const today = localDate(now);
+  const newToday = view.items.filter(
+    (i) => i.unread && i.date && localDate(new Date(i.date)) === today,
+  ).length;
+  const newest = view.items.find((i) => i.date)?.date;
+  const age = newest ? ageOf(newest, now) : undefined;
+  const top = view.feeds.reduce<RssView['feeds'][number] | undefined>(
+    (best, f) => (f.unread > (best?.unread ?? 0) ? f : best),
+    undefined,
+  );
+  const rows = [{ left: 'Feeds', right: String(view.feeds.length) }];
+  if (view.items.length > 0) rows.push({ left: 'New today', right: String(newToday) });
+  if (age) rows.push({ left: 'Newest', right: age });
+  // The right column does not wrap, so a long feed title is clipped here.
+  const short = (t: string) => (t.length > 14 ? `${t.slice(0, 13)}…` : t);
+  if (top) rows.push({ left: 'Top feed', right: `${short(top.title)} ${top.unread}` });
   return {
     title: 'Feeds',
     icon: 'rss',
     tint: 'orange',
     hero: String(view.unreadCount),
-    label: `unread · ${view.feeds.length} feeds`,
-    ...(newest && {
-      viz: { kind: 'text', title: newest.title, caption: newest.source } as const,
-    }),
+    label: 'unread',
+    viz: { kind: 'rows', rows },
   };
 }
 

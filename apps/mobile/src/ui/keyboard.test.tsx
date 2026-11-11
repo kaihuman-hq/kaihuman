@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { Platform, Text } from 'react-native';
 import { afterEach, describe, expect, it } from 'vitest';
-import { KEYBOARD_BEHAVIOR, KeyboardLift, keyboardScrollProps } from './keyboard.js';
+import { KEYBOARD_BEHAVIOR, KeyboardLift, keyboardScrollProps, liftOffset } from './keyboard.js';
 
 const os = Platform.OS;
 afterEach(() => {
@@ -20,6 +20,12 @@ describe('keyboard handling', () => {
     Platform.OS = 'android';
     expect(keyboardScrollProps(false).automaticallyAdjustKeyboardInsets).toBe(false);
     expect(keyboardScrollProps(false).keyboardShouldPersistTaps).toBe('handled');
+  });
+
+  it('offsets by the header, except in a modal sheet the header context still reaches', () => {
+    expect(liftOffset(96, false)).toBe(96);
+    expect(liftOffset(undefined, false)).toBe(0);
+    expect(liftOffset(96, true)).toBe(0);
   });
 
   it('renders its children', () => {

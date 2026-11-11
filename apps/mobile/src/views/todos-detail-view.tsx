@@ -11,7 +11,6 @@ import { deleteTodoAt, type TodoSegment, todoSegments } from '../screens/todo-se
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
-  Button,
   Divider,
   FadeInView,
   haptics,
@@ -44,7 +43,6 @@ export interface TodosDetailViewProps {
   content: string;
   now: Date;
   onWrite: (path: string, content: string) => void | Promise<void>;
-  onAdd: () => void;
   onOpenTodo?: (index: number) => void;
 }
 
@@ -147,14 +145,7 @@ function TodoItemRow({ row, now, pending, onCheck, onStart, onDelete, onOpen }: 
 
 const dueOverdue = (date: string, now: Date): boolean => date < localDate(now);
 
-export function TodosDetailView({
-  path,
-  content,
-  now,
-  onWrite,
-  onAdd,
-  onOpenTodo,
-}: TodosDetailViewProps) {
+export function TodosDetailView({ path, content, now, onWrite, onOpenTodo }: TodosDetailViewProps) {
   const { spacing } = useTheme();
   const [segment, setSegment] = useState<TodoSegment>('today');
   const [pending, setPending] = useState<ReadonlySet<number>>(new Set());
@@ -272,7 +263,6 @@ export function TodosDetailView({
           segments[segment].map(renderRow)
         )}
       </FadeInView>
-      <Button label="New todo" icon="add" variant="tinted" fullWidth onPress={onAdd} />
     </View>
   );
 }

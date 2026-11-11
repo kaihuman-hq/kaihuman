@@ -101,6 +101,7 @@ describe('todo rows', () => {
 
   it('submits a new task from the keyboard', () => {
     const { onWrite } = renderTile('projects.todos.md');
+    fireEvent.click(screen.getByRole('button', { name: 'New todo' }));
     const input = screen.getByLabelText('New task');
     fireEvent.change(input, { target: { value: 'Call mum' } });
     fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 });

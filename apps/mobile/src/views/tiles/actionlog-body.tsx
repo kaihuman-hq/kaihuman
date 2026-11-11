@@ -9,8 +9,8 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
 import { Button, Chip, haptics, Icon, SegmentedControl, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, QuickAdd, Rows, Stat, StatRow } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, FormButtons, ItemRow, Rows, Stat, StatRow } from './parts.js';
 
 const RECENT = 5;
 type Mode = 'log' | 'report';
@@ -32,9 +32,40 @@ export function ActionLog({ ctx }: { ctx: Ctx }) {
   );
 }
 
-function LogPane({ ctx }: { ctx: Ctx }) {
+export function ActionLogAddForm({ ctx, onDone }: AddFormProps) {
   const [text, setText] = useState('');
   const [tags, setTags] = useState('');
+  const submit = () => {
+    if (ctx.apply(logAction(ctx.content, text, ctx.now, parseTagInput(tags)))) {
+      haptics.success();
+      onDone();
+    } else haptics.error();
+  };
+  return (
+    <>
+      <TextField
+        label="What did you do?"
+        placeholder="Ran 5k #run"
+        value={text}
+        onChangeText={setText}
+        autoCapitalize="sentences"
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={submit}
+      />
+      <TextField
+        label="Tags"
+        value={tags}
+        onChangeText={setTags}
+        autoCapitalize="none"
+        helper="Optional; #tags in the text work too"
+      />
+      <FormButtons saveLabel="Log action" onSave={submit} onCancel={onDone} />
+    </>
+  );
+}
+
+function LogPane({ ctx }: { ctx: Ctx }) {
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | undefined>();
   const [all, setAll] = useState(false);
@@ -42,13 +73,6 @@ function LogPane({ ctx }: { ctx: Ctx }) {
   const list = actionLogList(ctx.content, { text: query, tag, limit: all ? undefined : RECENT });
   const stats = actionLogStats(ctx.content, ctx.now);
   const filtering = query.trim() !== '' || tag !== undefined;
-  const submit = () => {
-    if (ctx.apply(logAction(ctx.content, text, ctx.now, parseTagInput(tags)))) {
-      haptics.success();
-      setText('');
-      setTags('');
-    } else haptics.error();
-  };
   return (
     <>
       <StatRow>
@@ -100,21 +124,6 @@ function LogPane({ ctx }: { ctx: Ctx }) {
           onPress={() => setAll(!all)}
         />
       ) : null}
-      <QuickAdd
-        label="What did you do?"
-        placeholder="Ran 5k #run"
-        value={text}
-        onChangeText={setText}
-        onSubmit={submit}
-        addLabel="Log action"
-      />
-      <TextField
-        label="Tags"
-        value={tags}
-        onChangeText={setTags}
-        autoCapitalize="none"
-        helper="Optional; #tags in the text work too"
-      />
     </>
   );
 }
