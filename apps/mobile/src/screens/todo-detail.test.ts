@@ -1,5 +1,5 @@
 import { parseTodos } from '@kaihuman/formats';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { RepoFiles } from './quick-capture.js';
 import {
   normalizeTag,
@@ -210,6 +210,35 @@ describe('TodoDetailController edits', () => {
     mem.failWrites = true;
     expect(await c.setStatus('done')).toEqual({ ok: false, error: 'offline' });
     expect(c.state).toMatchObject({ kind: 'ready', item: { status: 'backlog' } });
+  });
+
+  it('shows an edit before the save settles', async () => {
+    const { mem } = setup();
+    const c = await ready(`${INBOX}#0`, mem);
+    const write = mem.write.bind(mem);
+    let release = () => {};
+    mem.write = (p, content) =>
+      new Promise<void>((resolve) => {
+        release = () => void write(p, content).then(resolve);
+      });
+    const seen: string[] = [];
+    c.subscribe(() => seen.push(c.state.kind === 'ready' ? c.state.item.status : c.state.kind));
+    const pending = c.setStatus('done');
+    // Regression: the status changed on screen only after the write resolved.
+    await vi.waitFor(() => expect(seen).toEqual(['done']));
+    expect(c.state).toMatchObject({ kind: 'ready', item: { status: 'done' } });
+    release();
+    expect(await pending).toEqual({ ok: true });
+  });
+
+  it('rolls an optimistic edit back when the save fails', async () => {
+    const { mem } = setup();
+    const c = await ready(`${INBOX}#0`, mem);
+    mem.failWrites = true;
+    const seen: string[] = [];
+    c.subscribe(() => seen.push(c.state.kind === 'ready' ? c.state.item.status : c.state.kind));
+    await c.setStatus('done');
+    expect(seen).toEqual(['done', 'backlog']);
   });
 
   it('turns into not-found when the item vanished before an edit', async () => {

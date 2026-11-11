@@ -134,7 +134,8 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const [focusNotice, setFocusNotice] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Cached cards paint at once; the spinner is only for a board with nothing cached yet.
+  const [loading, setLoading] = useState(() => !controller.loadCached());
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
@@ -155,10 +156,16 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
       await controller.load();
       setLoadError(null);
     } catch (err: unknown) {
-      setLoadError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      // A failed revalidation keeps the cached cards on screen and says so above them.
+      if (controller.paths.length > 0) setError(msg);
+      else setLoadError(msg);
     }
     setVersion((v) => v + 1);
   }, [controller]);
+
+  // Optimistic edits (and their rollbacks) re-render before the save settles.
+  useEffect(() => controller.subscribe(() => setVersion((v) => v + 1)), [controller]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {

@@ -181,6 +181,50 @@ describe('cold start', () => {
     next.stop();
   });
 
+  it('renews an expired GitHub App token before the first sync instead of losing the login', async () => {
+    // Regression: only access_token was kept, so the session ended once its 8 hours were up.
+    const first = await launch();
+    first.core.githubProfileStore.currentRepo.value = repo as never;
+    expect(
+      first.core.authStore.handleCallbackUrl(
+        'kaihuman://auth/callback?access_token=ghu_old&refresh_token=ghr_old&expires_in=60',
+      ),
+    ).toBe(true);
+    await flush();
+    first.stop();
+
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
+      calls.push(String(input));
+      // GitHub rejects the expired token; that must not end the session.
+      if (String(input) === 'https://api.github.com/user')
+        return new Response('{}', { status: 401 });
+      if (String(input) !== 'https://auth.kaihuman.com/refresh') return new Promise(() => {});
+      expect(JSON.parse(String(init?.body))).toEqual({ refresh_token: 'ghr_old' });
+      return Response.json({
+        access_token: 'ghu_new',
+        refresh_token: 'ghr_new',
+        expires_in: 28800,
+      });
+    });
+    try {
+      const next = await launch();
+      await flush();
+      expect(calls.filter((c) => c === 'https://auth.kaihuman.com/refresh')).toHaveLength(1);
+      expect(next.core.authStore.token.value).toBe('ghu_new');
+      expect(next.core.authStore.refreshToken.value).toBe('ghr_new');
+      await flush();
+      // The rotated refresh token survives the next restart, and only in the Keychain.
+      const keychain = [...device.keychain.values()].join('');
+      expect(keychain).toContain('ghr_new');
+      expect(keychain).not.toContain('ghr_old');
+      expect([...device.files.values()].join('')).not.toContain('ghr_');
+      next.stop();
+    } finally {
+      vi.stubGlobal('fetch', () => new Promise(() => {}));
+    }
+  });
+
   it('never writes the token into the plain cache files', async () => {
     const app = await launch();
     app.core.authStore.token.value = 'ghp_secret';

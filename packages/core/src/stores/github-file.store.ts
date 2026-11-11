@@ -294,6 +294,14 @@ export class GithubFileStore {
     return 'conflict';
   }
 
+  /**
+   * Loads the cached copy of `path` into memory without touching the network, so a screen can show
+   * it at once and revalidate behind it. True when a copy is (now) in memory.
+   */
+  restoreCached(path: string): Promise<boolean> {
+    return this.restoreFromCache(path);
+  }
+
   /** Loads the IndexedDB copy of `path` into memory, with its dirty flag. False when none. */
   private async restoreFromCache(path: string): Promise<boolean> {
     const repo = githubProfileStore.currentRepo.peek();

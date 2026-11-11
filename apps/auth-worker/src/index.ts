@@ -4,6 +4,10 @@
  * `/login` sends the browser to GitHub. `/callback` exchanges GitHub's one-time code for an
  * access token and redirects to the console with the token in the URL. The worker has no
  * storage bindings and never logs the token, so the token exists only in this request.
+ *
+ * GitHub App user tokens expire after 8 hours. GitHub then also returns a refresh token, which is
+ * passed on with the access token; `POST /refresh` trades it for a new pair, because that exchange
+ * needs the client secret too.
  */
 
 export interface Env {
@@ -22,10 +26,13 @@ const MOBILE_STATE_SUFFIX = ':mobile';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === '/refresh') {
+      return request.method === 'POST' ? refresh(request, env) : text('Method not allowed', 405);
+    }
     if (request.method !== 'GET') {
       return text('Method not allowed', 405);
     }
-    const url = new URL(request.url);
     switch (url.pathname) {
       case '/login':
         return login(url, env);
@@ -82,14 +89,70 @@ async function callback(request: Request, url: URL, env: Env): Promise<Response>
   }
 
   // GitHub answers 200 with `error` for a bad or reused code.
-  const body = (await response.json()) as { access_token?: string; error?: string };
+  const body = (await response.json()) as TokenResponse;
   if (!body.access_token) {
     return text(`GitHub token exchange failed: ${body.error ?? 'no access token'}`, 502);
   }
 
   const target = new URL(state.endsWith(MOBILE_STATE_SUFFIX) ? MOBILE_REDIRECT : env.APP_URL);
-  target.searchParams.set('access_token', body.access_token);
+  for (const [key, value] of Object.entries(tokenFields(body))) {
+    target.searchParams.set(key, String(value));
+  }
   return redirect(target.toString(), stateCookie('', 0));
+}
+
+interface TokenResponse {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  refresh_token_expires_in?: number;
+  error?: string;
+}
+
+/** The fields a client keeps; the expiry ones only exist for expiring (GitHub App) tokens. */
+function tokenFields(body: TokenResponse): Record<string, string | number> {
+  const fields: Record<string, string | number> = {};
+  for (const key of [
+    'access_token',
+    'refresh_token',
+    'expires_in',
+    'refresh_token_expires_in',
+  ] as const) {
+    const value = body[key];
+    if (value !== undefined && value !== null && value !== '') fields[key] = value;
+  }
+  return fields;
+}
+
+/** `POST /refresh {"refresh_token": "..."}` → the new token pair. GitHub rotates the refresh token. */
+async function refresh(request: Request, env: Env): Promise<Response> {
+  const input = (await request.json().catch(() => null)) as { refresh_token?: unknown } | null;
+  const refreshToken = input?.refresh_token;
+  if (typeof refreshToken !== 'string' || !refreshToken) {
+    return json({ error: 'missing_refresh_token' }, 400);
+  }
+  const response = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      client_id: env.GITHUB_CLIENT_ID,
+      client_secret: env.GITHUB_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  }).catch(() => null);
+  if (!response?.ok) return json({ error: 'github_unavailable' }, 502);
+  const body = (await response.json().catch(() => ({}))) as TokenResponse;
+  if (!body.access_token) {
+    // Only a rejected refresh token means signing in again; a misconfigured worker must not.
+    const status = body.error === 'bad_refresh_token' ? 401 : 502;
+    return json({ error: body.error ?? 'no_access_token' }, status);
+  }
+  return json(tokenFields(body), 200);
+}
+
+function json(body: unknown, status: number): Response {
+  return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
 function callbackUrl(url: URL): string {

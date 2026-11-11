@@ -17,8 +17,8 @@ import {
   type TodoRepeat,
 } from '@kaihuman/formats';
 import { syncActions } from '../sync/actions.js';
+import { githubCacheReader } from '../sync/cache-read.js';
 import { whenRepoReady } from '../sync/repo-ready.js';
-import { canServeFromCache } from '../sync/revalidate.js';
 import { setDueOnData, setRepeatOnData } from './todo-due.js';
 
 /**
@@ -35,6 +35,8 @@ export interface RepoFiles {
   read(path: string): Promise<string | null>;
   /** Creates or overwrites; rejects when the save fails. */
   write(path: string, content: string): Promise<void>;
+  /** The in-memory copy, synchronously, for a first paint before `read` settles. */
+  peek?(path: string): string | null;
   /** Waits until reads see the repo's real files; false when it is still not loaded. */
   ready?(): Promise<boolean>;
 }
@@ -47,15 +49,8 @@ export const githubRepoFiles: RepoFiles = {
       .peek()
       .filter((t) => t.type === 'blob' && t.path.endsWith('.todos.md'))
       .map((t) => t.path),
-  async read(path) {
-    const open = githubFileStore.openFiles.peek()[path];
-    const item = githubFileStore.tree.peek().find((t) => t.path === path);
-    if (!open || !canServeFromCache(open, item, githubFileStore.dirtyFiles.peek().has(path))) {
-      if (!item) return null;
-      await githubFileStore.openFile(path);
-    }
-    return githubFileStore.openFiles.peek()[path]?.content ?? null;
-  },
+  read: (path) => githubCacheReader.read(path, { requireInTree: true }),
+  peek: (path) => githubFileStore.openFiles.peek()[path]?.content ?? null,
   async write(path, content) {
     if (githubFileStore.openFiles.peek()[path]) {
       // Optimistic: the edit is stored locally and the outbox pushes it, so a slow or missing

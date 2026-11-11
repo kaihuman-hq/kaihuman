@@ -16,6 +16,7 @@ const NOW = new Date('2026-09-24T10:00:00');
 class MemoryFiles implements RepoFiles {
   writes: string[] = [];
   ready?: () => Promise<boolean>;
+  peek?: (path: string) => string | null;
   failWrites = new Set<string>();
   constructor(
     public store = new Map<string, string>(),
@@ -320,6 +321,41 @@ describe('KanbanBoardController', () => {
     await c.load();
     return { c, files };
   };
+
+  it('applies an edit before the save settles and rolls back when it fails', async () => {
+    const files = mem({ '.kh/inbox.todos.md': INBOX, 'work.todos.md': WORK });
+    const { c } = await board(files);
+    let release = () => {};
+    const write = files.write.bind(files);
+    files.write = (p, content) =>
+      new Promise<void>((resolve, reject) => {
+        release = () => write(p, content).then(resolve, reject);
+      });
+    const seen: number[] = [];
+    c.subscribe(() => seen.push(c.columns().done.length));
+    const doneBefore = c.columns().done.length;
+    const pending = c.setStatus('.kh/inbox.todos.md', 0, 'done');
+    // Regression: the card moved only after the write resolved, so taps felt slow.
+    expect(c.columns().done).toHaveLength(doneBefore + 1);
+    release();
+    expect(await pending).toEqual({ ok: true });
+
+    files.failWrites.add('.kh/inbox.todos.md');
+    files.write = write;
+    const res = await c.setStatus('.kh/inbox.todos.md', 0, 'rejected');
+    expect(res.ok).toBe(false);
+    expect(c.columns().done).toHaveLength(doneBefore + 1);
+    expect(seen.at(-1)).toBe(doneBefore + 1);
+  });
+
+  it('paints from cached copies synchronously', () => {
+    const files = mem({ '.kh/inbox.todos.md': INBOX });
+    const c = new KanbanBoardController(files);
+    expect(c.loadCached()).toBe(false);
+    files.peek = (p) => files.store.get(p) ?? null;
+    expect(c.loadCached()).toBe(true);
+    expect(c.paths).toEqual(['.kh/inbox.todos.md']);
+  });
 
   it('aggregates files into status columns and always includes the inbox', async () => {
     const { c } = await board();

@@ -45,7 +45,8 @@ export class LoginScreenController {
     if (!trimmed) return false;
     // Like the OAuth callback: a persisted logout flag would wipe this token on the next launch.
     getCoreStorage().removeItem('lifeos_logged_out');
-    authStore.token.value = trimmed;
+    // A PAT does not expire like a GitHub App token: drop any refresh token of the last sign-in.
+    authStore.setSession({ accessToken: trimmed });
     return true;
   }
 

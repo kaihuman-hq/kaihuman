@@ -65,6 +65,34 @@ describe('recoverAuth', () => {
     expect(sessionNotice.value).toBe(SESSION_EXPIRED);
   });
 
+  it('refreshes an expired GitHub App token instead of signing out', async () => {
+    // Regression: the 8-hour token expired and the 401 recovery signed the user out.
+    const { d, state } = deps('expired', { renewed: 'valid' }, ['expired']);
+    const refresh = vi.fn(async () => {
+      state.token = 'renewed';
+      return 'refreshed' as const;
+    });
+    expect(await recoverAuth({ ...d, refresh })).toBe('replaced');
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(state.token).toBe('renewed');
+    expect(d.signOut).not.toHaveBeenCalled();
+    expect(sessionNotice.value).toBeNull();
+  });
+
+  it('keeps the session while the refresh service cannot be reached', async () => {
+    const { d } = deps('expired', {}, ['expired']);
+    const refresh = vi.fn(async () => 'unknown' as const);
+    expect(await recoverAuth({ ...d, refresh })).toBe('unknown');
+    expect(d.signOut).not.toHaveBeenCalled();
+  });
+
+  it('signs out when the refresh token is rejected too', async () => {
+    const { d } = deps('expired', {}, ['expired']);
+    const refresh = vi.fn(async () => 'invalid' as const);
+    expect(await recoverAuth({ ...d, refresh })).toBe('signed-out');
+    expect(d.signOut).toHaveBeenCalledOnce();
+  });
+
   it('does nothing while GitHub cannot be asked', async () => {
     const { d } = deps('t', { t: 'unknown' });
     expect(await recoverAuth(d)).toBe('unknown');

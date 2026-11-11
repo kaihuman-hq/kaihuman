@@ -154,6 +154,79 @@ describe('/callback', () => {
   });
 });
 
+describe('expiring (GitHub App) tokens', () => {
+  const pair = {
+    access_token: 'ghu_access',
+    refresh_token: 'ghr_refresh',
+    expires_in: 28800,
+    refresh_token_expires_in: 15897600,
+  };
+
+  it('passes the refresh token and expiry to the app with the access token', async () => {
+    // Regression: only access_token was forwarded, so the session died when it expired after 8 h.
+    mockGitHub(200, { ...pair, token_type: 'bearer', scope: '' });
+
+    const response = await get('/callback?code=abc&state=s1:mobile', 'kh_oauth_state=s1:mobile');
+
+    const location = new URL(response.headers.get('Location') ?? '');
+    expect(location.searchParams.get('access_token')).toBe('ghu_access');
+    expect(location.searchParams.get('refresh_token')).toBe('ghr_refresh');
+    expect(location.searchParams.get('expires_in')).toBe('28800');
+    expect(location.searchParams.get('refresh_token_expires_in')).toBe('15897600');
+    expect(location.searchParams.has('token_type')).toBe(false);
+  });
+
+  function postRefresh(body: unknown): Promise<Response> {
+    return worker.fetch(
+      new Request(`${BASE}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it('trades a refresh token for a new pair', async () => {
+    const fetchMock = mockGitHub(200, pair);
+
+    const response = await postRefresh({ refresh_token: 'ghr_old' });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual(pair);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://github.com/login/oauth/access_token');
+    expect(JSON.parse(init.body as string)).toEqual({
+      client_id: 'client-id',
+      client_secret: 'client-secret',
+      grant_type: 'refresh_token',
+      refresh_token: 'ghr_old',
+    });
+  });
+
+  it('answers 401 for a refresh token GitHub rejects', async () => {
+    mockGitHub(200, { error: 'bad_refresh_token' });
+    const response = await postRefresh({ refresh_token: 'ghr_used' });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'bad_refresh_token' });
+  });
+
+  it('answers 502 when GitHub fails or the worker is misconfigured', async () => {
+    mockGitHub(500, {});
+    expect((await postRefresh({ refresh_token: 'r' })).status).toBe(502);
+    mockGitHub(200, { error: 'incorrect_client_credentials' });
+    expect((await postRefresh({ refresh_token: 'r' })).status).toBe(502);
+  });
+
+  it('rejects a request without a refresh token, and other methods', async () => {
+    const fetchMock = mockGitHub(200, pair);
+    expect((await postRefresh({})).status).toBe(400);
+    expect((await get('/refresh')).status).toBe(405);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('other requests', () => {
   it('returns 404 for unknown paths', async () => {
     expect((await get('/gh/login')).status).toBe(404);

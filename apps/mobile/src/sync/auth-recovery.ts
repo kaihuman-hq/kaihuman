@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import type { RefreshOutcome } from './token-refresh.js';
 
 /** What GitHub says about a token: `unknown` when it could not be asked (offline, 5xx). */
 export type TokenCheck = 'valid' | 'invalid' | 'unknown';
@@ -27,6 +28,8 @@ export interface AuthRecoveryDeps {
   check(token: string): Promise<TokenCheck>;
   adopt(token: string): void;
   signOut(): void;
+  /** Trades the refresh token for a new access token (expiring GitHub App tokens). */
+  refresh?(): Promise<RefreshOutcome>;
 }
 
 /**
@@ -39,6 +42,9 @@ export async function recoverAuth(deps: AuthRecoveryDeps): Promise<AuthRecovery>
   if (!current) return 'signed-out';
   const verdict = await deps.check(current);
   if (verdict !== 'invalid') return verdict;
+  // An expired access token is the normal end of its 8 hours, not of the session.
+  const renewed = deps.refresh ? await deps.refresh().catch(() => 'unknown' as const) : 'none';
+  if (renewed === 'refreshed') return 'replaced';
   const others = await deps.candidates().catch(() => []);
   for (const candidate of new Set(others)) {
     if (!candidate || candidate === current) continue;
@@ -49,6 +55,8 @@ export async function recoverAuth(deps: AuthRecoveryDeps): Promise<AuthRecovery>
   }
   // Another sign-in may have replaced the token meanwhile; that one is not ours to end.
   if (deps.token() !== current) return 'replaced';
+  // The refresh token may still work once the auth service is reachable again.
+  if (renewed === 'unknown') return 'unknown';
   sessionNotice.value = SESSION_EXPIRED;
   deps.signOut();
   return 'signed-out';

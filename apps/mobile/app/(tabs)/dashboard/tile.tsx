@@ -1,8 +1,9 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import { presentTile } from '../../../src/components/widgets/tile-controllers.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
+import { optimisticWrite } from '../../../src/sync/optimistic.js';
 import { EmptyState, errorMessage, Icon, InlineError, Screen } from '../../../src/ui/index.js';
 import { TILE_META, Tile } from '../../../src/views/tile-view.js';
 import { TodosDetailView } from '../../../src/views/todos-detail-view.js';
@@ -11,6 +12,9 @@ export default function TileDetail() {
   const { path } = useLocalSearchParams<{ path: string }>();
   const router = useRouter();
   const [content, setContent] = useState<string | null>(null);
+  // What is on screen now, so a rollback restores the text the optimistic write replaced.
+  const shown = useRef<string | null>(null);
+  shown.current = content;
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
@@ -22,11 +26,24 @@ export default function TileDetail() {
       .catch(() => setFailed(true));
   }, [path]);
 
-  const write = useCallback(async (file: string, next: string) => {
-    await githubContentFiles.write(file, next);
-    setContent(next);
-    setNow(new Date());
-  }, []);
+  const write = useCallback(
+    (file: string, next: string) =>
+      optimisticWrite({
+        apply: () => {
+          const before = shown.current;
+          shown.current = next;
+          setContent(next);
+          setNow(new Date());
+          return before;
+        },
+        write: () => githubContentFiles.write(file, next),
+        rollback: (before) => {
+          shown.current = before;
+          setContent(before);
+        },
+      }),
+    [],
+  );
 
   // A file the controller chokes on shows an inline error instead of closing the app.
   const tile = path && content !== null ? safePresent(path, content, now) : undefined;

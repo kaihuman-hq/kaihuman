@@ -132,8 +132,27 @@ export class KanbanBoardController {
 
   constructor(private readonly files: RepoFiles = githubRepoFiles) {}
 
+  private readonly listeners = new Set<() => void>();
+
   async load(): Promise<void> {
     this.loaded = await loadTodoFiles(this.files);
+  }
+
+  /**
+   * Fills the board from the copies already in memory, synchronously, so a remount paints the
+   * cards at once while `load` revalidates. False when nothing is cached (show a spinner).
+   */
+  loadCached(): boolean {
+    const { peek } = this.files;
+    if (!peek) return false;
+    const loaded: LoadedTodoFile[] = [];
+    for (const path of todoFilePaths(this.files)) {
+      const content = peek(path);
+      if (content !== null) loaded.push({ path, data: parseTodos(content) });
+    }
+    if (loaded.length === 0) return false;
+    this.loaded = loaded;
+    return true;
   }
 
   setFilter(filter: BoardFilter): void {
@@ -234,12 +253,39 @@ export class KanbanBoardController {
     });
   }
 
-  /** Writes one file and only then adopts it, so a failed save leaves the board matching the repo. */
+  /**
+   * Optimistic: adopts the change and notifies listeners at once, then saves; a failed save puts
+   * the previous data back, so the board still ends up matching the repo.
+   */
   private async commit(path: string, data: TodoData): Promise<void> {
-    await this.files.write(path, serializeTodos(data));
     const entry = this.loaded.find((f) => f.path === path);
+    const previous = entry?.data;
     if (entry) entry.data = data;
     else this.loaded.push({ path, data });
+    this.changed();
+    try {
+      await this.files.write(path, serializeTodos(data));
+    } catch (err) {
+      const current = this.loaded.find((f) => f.path === path);
+      if (current && current.data === data) {
+        if (previous) current.data = previous;
+        else this.loaded = this.loaded.filter((f) => f !== current);
+        this.changed();
+      }
+      throw err;
+    }
+  }
+
+  /** Called after every in-memory change (load, optimistic edit, rollback); returns unsubscribe. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private changed(): void {
+    for (const l of this.listeners) l();
   }
 
   private data(path: string): TodoData | undefined {

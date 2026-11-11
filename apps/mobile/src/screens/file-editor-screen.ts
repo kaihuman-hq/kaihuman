@@ -6,8 +6,9 @@ import {
   passwordStore,
   type TreeItem,
 } from '@kaihuman/core';
+import { effect } from '@preact/signals';
 import { syncActions } from '../sync/actions.js';
-import { canServeFromCache } from '../sync/revalidate.js';
+import { githubCacheReader } from '../sync/cache-read.js';
 
 /**
  * The slice of the repository file store the content screens use. Injected so controllers run
@@ -25,28 +26,52 @@ export interface ContentFiles {
   rename(from: string, to: string): Promise<void>;
 }
 
+/** Settles when `done` does or as soon as the store holds a (cached) tree, whichever is first. */
+function untilTreeOrDone(done: Promise<void>): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      settled = true;
+      resolve();
+    };
+    // The effect runs once synchronously, possibly settling before `stop` exists.
+    const stop = effect(() => {
+      if (githubFileStore.tree.value.length > 0) finish();
+      if (settled) queueMicrotask(() => stop());
+    });
+    void done.finally(() => {
+      finish();
+      stop();
+    });
+  });
+}
+
 export const githubContentFiles: ContentFiles = {
   tree: () => githubFileStore.tree.value,
   async refresh() {
     const repo = githubProfileStore.currentRepo.peek()?.full_name;
     const hasTree =
       githubFileStore.loadedRepo.peek() === repo && githubFileStore.tree.peek().length > 0;
-    // With a tree on screen a focus refresh is stale-gated and cheap; the first load must complete.
-    await syncActions().refreshAll({ reason: hasTree ? 'focus' : 'pull' });
+    // Stale-while-revalidate: with a tree on screen the sync runs behind it (its revision bump
+    // re-renders); waiting for it kept every screen on a spinner for a full round trip.
+    if (hasTree) {
+      void syncActions().refreshAll({ reason: 'focus' });
+      return;
+    }
+    // The first load must list the tree, but the cached tree (put in place before the network
+    // call) is enough to render.
+    await untilTreeOrDone(syncActions().refreshAll({ reason: 'pull' }));
   },
   async read(path) {
-    const open = githubFileStore.openFiles.peek()[path];
-    const item = githubFileStore.tree.peek().find((t) => t.path === path);
-    // The tree sha says whether the cached copy is current, so unchanged files cost no request.
-    if (open && canServeFromCache(open, item, githubFileStore.dirtyFiles.peek().has(path))) {
-      return open.content;
-    }
-    await githubFileStore.openFile(path);
-    const file = githubFileStore.openFiles.peek()[path];
-    if (!file) throw new Error(`Could not open ${path}`);
-    return file.content;
+    const content = await githubCacheReader.read(path);
+    if (content === null) throw new Error(`Could not open ${path}`);
+    return content;
   },
   async write(path, content) {
+    // updateFileContent ignores a path that is not open (a sync may have dropped the copy since
+    // it was read), which lost the edit while the screen said "Saved".
+    if (!githubFileStore.openFiles.peek()[path]) await githubFileStore.openFile(path);
+    if (!githubFileStore.openFiles.peek()[path]) throw new Error(`Could not save ${path}`);
     githubFileStore.updateFileContent(path, content);
     // Persist the dirty copy so input survives the app being killed; the outbox pushes it later.
     await githubFileStore.flushPendingWrites();
@@ -189,6 +214,9 @@ export class FileEditorController {
 
   async open(path: string): Promise<FileEditorState> {
     const raw = await this.files.read(path);
+    // Edited while the read was in flight (a re-open after a sync): the edit is newer than `raw`.
+    const now = this.state;
+    if (now.status === 'open' && now.path === path && now.dirty) return now;
     if (!isEncrypted(path)) {
       this.state = {
         status: 'open',
@@ -239,7 +267,11 @@ export class FileEditorController {
       body = await this.crypto.encrypt(state.content, password);
     }
     await this.files.write(state.path, body);
-    this.state = { ...state, dirty: false };
+    // Text typed while the write ran is not saved yet: it stays dirty instead of being reverted.
+    const now = this.state;
+    if (now.status === 'open' && now.path === state.path && now.content === state.content) {
+      this.state = { ...now, dirty: false };
+    }
   }
 
   close(): void {

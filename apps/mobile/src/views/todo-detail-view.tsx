@@ -63,6 +63,8 @@ export function TodoDetailView({ controller, onClose }: TodoDetailViewProps) {
   const { colors, spacing, shape, metrics } = useTheme();
   const [, setVersion] = useState(0);
   const rerender = useCallback(() => setVersion((v) => v + 1), []);
+  // Optimistic edits (and rollbacks) show before the save settles.
+  useEffect(() => controller.subscribe(rerender), [controller, rerender]);
   const rev = useSyncRevision();
 
   const [draft, setDraft] = useState('');

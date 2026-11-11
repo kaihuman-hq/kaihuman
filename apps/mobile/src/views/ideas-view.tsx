@@ -107,6 +107,8 @@ export function IdeaDetailView({
   const { spacing } = theme;
   const pad = theme.platform === 'ios' ? spacing.md : theme.metrics.screenMargin;
   const { error, setError, rerender, run } = useRunner();
+  // Optimistic edits (and rollbacks) show before the save settles.
+  useEffect(() => controller.subscribe(rerender), [controller, rerender]);
   const [loaded, setLoaded] = useState(false);
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
@@ -230,6 +232,8 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
   const { colors, spacing } = theme;
   const pad = ios ? spacing.md : theme.metrics.screenMargin;
   const { error, setError, rerender, run } = useRunner();
+  // Optimistic edits (and rollbacks) show before the save settles.
+  useEffect(() => controller.subscribe(rerender), [controller, rerender]);
   const [loaded, setLoaded] = useState(false);
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();

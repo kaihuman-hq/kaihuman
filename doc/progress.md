@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-11 — Mobile: file saves, optimistic edits, lasting login, cached screens
+
+- File edits lost: `FileEditorController.open()` replaced text typed while a sync-triggered re-open was reading; `save()` marked text typed during the write as clean; `githubContentFiles.write()` silently did nothing when a sync had dropped the open copy (core `updateFileContent` only logs). The editor now keeps in-flight edits, re-opens before writing, and errors instead of showing "Saved".
+- Slow state changes (RSS mark read, habits, todos): screens awaited the save before showing the change. New `src/sync/optimistic.ts`; the dashboard, tile detail, board (`KanbanBoardController.commit`), todo detail and ideas apply at once, save in the background and roll back on a failed save.
+- Login lost after ~a day: expiring GitHub tokens were never refreshed (auth-worker dropped `refresh_token`; a 401 signed out). auth-worker forwards the refresh token and has `POST /refresh`; core `AuthStore` keeps `refreshToken`/`tokenExpiresAt` in the Keychain; mobile `src/sync/token-refresh.ts` renews before syncs and in 401 recovery instead of signing out.
+- Boards always loading: every mount waited for the network (`refresh()` awaited a sync; `read()` refetched a stale copy before returning). Reads are now stale-while-revalidate (`src/sync/cache-read.ts`, core `restoreCached`): memory or on-device copy at once, refetch behind it, re-render on change. `refresh()` no longer waits when a tree is cached. The board paints cached cards synchronously (`loadCached`) and keeps them on a failed revalidation.
+- Tests: `content-ports`, `content-screens`, `todos-and-capture`, `todo-detail`, `optimistic`, `token-refresh`, `auth-recovery`, `cold-start`, core `auth.store`, auth-worker `index`.
+
 ## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
 
 - RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.
