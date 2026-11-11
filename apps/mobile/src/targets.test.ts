@@ -10,6 +10,7 @@ import withKaihumanWidgets, {
   ANDROID_WIDGETS,
   type AndroidManifest,
   APP_INTENTS_DIR,
+  APP_LOCALIZATIONS,
   addComposeCompilerClasspath,
   addGlanceDependencies,
   addIosWidgetTarget,
@@ -32,6 +33,7 @@ import withKaihumanWidgets, {
   WIDGET_ONLY_SOURCES,
   widgetBuildSettings,
   withIosAppGroup,
+  withIosLocalizations,
   withIosQuickActions,
   withLiveActivities,
   withUrlScheme,
@@ -130,6 +132,16 @@ describe('config plugin transforms', () => {
     expect(withLiveActivities({ ios: { bundleIdentifier: 'x' } }).ios?.bundleIdentifier).toBe('x');
     // The full plugin applies it too, next to the app group and scheme.
     expect(withKaihumanWidgets({}).ios?.infoPlist?.NSSupportsLiveActivities).toBe(true);
+  });
+
+  it('declares English and German so Siri uses the German phrases', () => {
+    const once = withIosLocalizations({ ios: { infoPlist: { CFBundleLocalizations: ['fr'] } } });
+    const twice = withIosLocalizations(once);
+    expect(twice.ios?.infoPlist).toMatchObject({
+      CFBundleDevelopmentRegion: 'en',
+      CFBundleLocalizations: ['fr', ...APP_LOCALIZATIONS],
+    });
+    expect(APP_LOCALIZATIONS).toEqual(['en', 'de']);
   });
 
   it('sets the kaihuman scheme without duplicating', () => {
@@ -288,8 +300,17 @@ describe('config plugin transforms', () => {
         dir: 'targets/ios-widget',
         files: [...SHARED_APP_SOURCES].filter((f) => swift.includes(f)),
       },
-      { name: 'KaihumanAppIntents', dir: 'targets/ios-app-intents', files: ['AppShortcuts.swift'] },
+      {
+        name: 'KaihumanAppIntents',
+        dir: 'targets/ios-app-intents',
+        files: ['AppShortcuts.swift'],
+        resources: [],
+      },
     ]);
+    expect(
+      appSourceGroups(IOS_WIDGET_TARGET, [], ['AppShortcuts.swift', 'AppShortcuts.xcstrings'])[0]
+        ?.resources,
+    ).toEqual(['AppShortcuts.xcstrings']);
   });
 
   it('wires the widget extension into a real Xcode project', () => {
@@ -334,6 +355,18 @@ describe('config plugin transforms', () => {
     expect(inApp).toHaveLength(SHARED_APP_SOURCES.length + appSwift.length);
     expect(appSources).toContain('AppShortcuts.swift in Sources');
     expect(appSources).not.toContain('KaihumanWidgets.swift in Sources');
+
+    // German Siri only matches phrases from the String Catalogs, so they ship in the app bundle.
+    const appResources = out.slice(
+      out.indexOf('/* Begin PBXResourcesBuildPhase'),
+      out.indexOf('/* End PBXResourcesBuildPhase'),
+    );
+    for (const catalog of ['AppShortcuts.xcstrings', 'Localizable.xcstrings']) {
+      expect(intents).toContain(catalog);
+      expect(appResources.match(new RegExp(`${catalog} in Resources`, 'g'))).toHaveLength(1);
+    }
+    expect(out.match(/lastKnownFileType = text\.json\.xcstrings;/g)).toHaveLength(2);
+    expect(out).toMatch(/knownRegions = \(\s*en,\s*de,\s*\);/);
 
     // The embed phase sits right after Resources, ahead of the React Native bundling script.
     const appPhases = out.slice(out.indexOf('/* app */ = {'));

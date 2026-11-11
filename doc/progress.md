@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-11 — Mobile: German Siri phrases
+
+- No Siri phrase worked on a German-Siri iPhone (TestFlight). Cause: App Shortcut phrases were English only; Siri matches only phrases in the Siri language. The Swift sources were already compiled into the app target (checked; the test against a real pbxproj covers it).
+- New String Catalogs in `targets/ios-app-intents`: `AppShortcuts.xcstrings` (every phrase, `en` + `de`) and `Localizable.xcstrings` (short titles, intent titles, dialogs).
+- `plugins/with-kaihuman-widgets.ts`: adds the catalogs to the app's Resources phase (`text.json.xcstrings`), adds `en`/`de` to `knownRegions`, and sets `CFBundleLocalizations` (`withIosLocalizations`, `APP_LOCALIZATIONS`).
+- `doc/apple-intelligence.md`: German phrases, localization rules, Siri troubleshooting.
+- Tests: `src/targets.test.ts`, `src/ios-widget.test.ts`.
+
 ## 2026-11-11 — Mobile: file saves, optimistic edits, lasting login, cached screens, search
 
 - File edits lost: `FileEditorController.open()` replaced text typed while a sync-triggered re-open was reading; `save()` marked text typed during the write as clean; `githubContentFiles.write()` silently did nothing when a sync had dropped the open copy (core `updateFileContent` only logs). The editor now keeps in-flight edits, re-opens before writing, and errors instead of showing "Saved".
