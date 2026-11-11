@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-11-11 — Mobile: better file editor
+
+- Toolbar above the keyboard: undo/redo for every file; heading (cycles # → ## → ### → plain), bold, italic, bulleted list, checkbox and link for markdown. Hide-keyboard button while it is up. Pure text edits in `src/editor/markdown-edit.ts`, undo stack in `src/editor/edit-history.ts` (quick typing folds into one step).
+- Enter on a list line continues the list (`- `, `- [ ] `, `1.` → `2.`); Enter on an empty item ends it.
+- Autosave 1.5 s after the last keystroke, plus explicit Save; status reads Unsaved changes → Saving… → Saved. Pending edits are saved when the screen closes. Keystrokes typed during a save are kept (the controller's `save()` restores the content it started with; the view re-applies the newer text).
+- Notes (`.md`, `.txt`) use the body font with 1.5 line height, sentence capitalisation and autocorrect; data files keep monospace.
+- Keyboard-safe footer: `Screen` drops the home-indicator inset while the keyboard is up (`useKeyboardVisible`), so the toolbar sits right on the keyboard.
+- Markdown header toggle reads Edit / Preview.
+- No change to the sync/save layer. Tests: `src/editor/markdown-edit.test.ts`, `src/views/files-more.test.tsx`.
+
 ## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
 
 - RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.
