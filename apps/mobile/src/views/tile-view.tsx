@@ -34,6 +34,8 @@ export interface TileProps {
   onCreateFile?: (path: string, content: string) => Promise<void>;
   /** Opens a repository file in the editor. */
   onOpenFile?: (path: string) => void;
+  /** Saves an RSS item to the read-later file; without it the RSS list has no such swipe. */
+  onSaveReadLater?: Ctx['readLater'];
   /**
    * Whether the ＋ sheet is open, for a screen that puts the ＋ in its navigation header.
    * Without `onAddingChange` the card shows its own ＋ and keeps this state itself.
@@ -92,6 +94,7 @@ function TileCard({
   onWrite,
   onCreateFile,
   onOpenFile,
+  onSaveReadLater,
   adding,
   onAddingChange,
 }: TileProps) {
@@ -131,6 +134,7 @@ function TileCard({
     path,
     ...(onCreateFile && { createFile: onCreateFile }),
     ...(onOpenFile && { openFile: onOpenFile }),
+    ...(onSaveReadLater && { readLater: onSaveReadLater }),
   };
   return (
     <Card>

@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { openBrowserAsync } from 'expo-web-browser';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import {
   addRssFeedUrl,
@@ -73,6 +73,30 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
     ctx.apply(markRssRead(ctx.content, feedId, key));
     if (link) void openBrowserAsync(link).catch(() => {});
   };
+  const [note, setNote] = useState<{ text: string; failed: boolean } | null>(null);
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => setNote(null), 2500);
+    return () => clearTimeout(t);
+  }, [note]);
+  // Feedback comes first; the save runs behind it and is corrected only if it fails or dedupes.
+  const saveLater = (i: RssView['items'][number]) => {
+    if (!ctx.readLater) return;
+    haptics.success();
+    setNote({ text: 'Saved to Read later', failed: false });
+    ctx
+      .readLater({ title: i.title, url: i.link, source: i.source })
+      .then((r) => {
+        if (r === 'duplicate') setNote({ text: 'Already in Read later', failed: false });
+      })
+      .catch((e: unknown) => {
+        haptics.error();
+        setNote({
+          text: `Could not save: ${e instanceof Error ? e.message : 'unknown error'}`,
+          failed: true,
+        });
+      });
+  };
   const shown = filterRssItems(view.items, filter);
   const loading = view.feeds.some((f) => f.status === 'loading');
   const failed = view.feeds.filter((f) => f.status === 'error');
@@ -87,6 +111,13 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
         value={filter}
         onChange={setFilter}
       />
+      {note ? (
+        <View accessibilityRole="alert" testID="rss-note">
+          <Text variant="footnote" tone={note.failed ? 'danger' : 'secondary'}>
+            {note.text}
+          </Text>
+        </View>
+      ) : null}
       {loading ? (
         <View
           accessibilityRole="progressbar"
@@ -145,8 +176,18 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
               onPress={() => open(i.feedId, i.key, i.link)}
               swipe
               fullSwipe
-              actions={
-                i.unread
+              actions={[
+                ...(ctx.readLater && i.link
+                  ? [
+                      {
+                        label: 'Read later',
+                        icon: 'bookmark' as const,
+                        side: 'leading' as const,
+                        onPress: () => saveLater(i),
+                      },
+                    ]
+                  : []),
+                ...(i.unread
                   ? [
                       {
                         label: 'Mark read',
@@ -155,8 +196,8 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
                         },
                       },
                     ]
-                  : undefined
-              }
+                  : []),
+              ]}
             />
           ))}
         </Rows>

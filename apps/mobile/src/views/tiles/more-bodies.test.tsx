@@ -152,6 +152,48 @@ describe('Rss', () => {
     });
   });
 
+  describe('read later', () => {
+    const realOS = Platform.OS;
+    afterEach(() => {
+      (Platform as { OS: string }).OS = realOS;
+    });
+    const withReadLater = (readLater: Ctx['readLater']): Ctx => ({ ...ctx(feedsFile), readLater });
+
+    it('adds a leading swipe action that saves title, url and source, with feedback', async () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      const readLater = vi.fn(async () => 'added' as const);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={withReadLater(readLater)} />);
+      fireEvent.click(screen.getAllByTestId('swipe-action-Read later')[0] as HTMLElement);
+      expect(readLater).toHaveBeenCalledWith({
+        title: 'Fresh two',
+        url: 'https://a.test/2',
+        source: 'Alpha',
+      });
+      expect(openBrowserAsync).not.toHaveBeenCalled();
+      expect((await screen.findByTestId('rss-note')).textContent).toContain('Saved to Read later');
+    });
+
+    it('tells about duplicates and failures', async () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      const readLater = vi.fn(async () => 'duplicate' as const);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={withReadLater(readLater)} />);
+      fireEvent.click(screen.getAllByTestId('swipe-action-Read later')[0] as HTMLElement);
+      expect((await screen.findByTestId('rss-note')).textContent).toContain('Already');
+      readLater.mockRejectedValueOnce(new Error('offline') as never);
+      fireEvent.click(screen.getAllByTestId('swipe-action-Read later')[0] as HTMLElement);
+      expect((await screen.findByText(/Could not save/)).textContent).toContain('Could not save');
+    });
+
+    it('offers no action without a save handler', () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={ctx(feedsFile)} />);
+      expect(screen.queryByTestId('swipe-action-Read later')).toBeNull();
+    });
+  });
+
   it('shows loading and per-feed errors', () => {
     store.set({
       'https://a.test/feed': { items: [], fetchedAt: 0, loading: false, error: 'HTTP 500' },
