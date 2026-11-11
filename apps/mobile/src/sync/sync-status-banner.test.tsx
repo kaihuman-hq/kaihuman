@@ -30,23 +30,15 @@ describe('SyncStatusBanner', () => {
     expect(container.textContent).toBe('');
   });
 
-  it('shows a polite caption and refreshes the relative time every 30 s', () => {
+  it('stays silent for passive states', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
     set({ lastSyncedAt: Date.now() });
-    render(<SyncStatusBanner />);
-    expect(screen.getByText('Updated just now')).toBeTruthy();
-    expect(document.querySelector('[aria-live="polite"]')).toBeTruthy();
-    act(() => {
-      vi.advanceTimersByTime(90_000);
-    });
-    expect(screen.getByText('Updated 1 min ago')).toBeTruthy();
-  });
-
-  it('reacts to status changes', () => {
-    render(<SyncStatusBanner />);
+    const { container } = render(<SyncStatusBanner />);
+    expect(container.textContent).toBe('');
     act(() => set({ phase: 'offline', pending: 2 }));
-    expect(screen.getByText('Offline · 2 changes pending')).toBeTruthy();
+    expect(container.textContent).toBe('');
+    act(() => set({ phase: 'syncing' }));
+    expect(container.textContent).toBe('');
   });
 
   it('offers Retry on errors', () => {

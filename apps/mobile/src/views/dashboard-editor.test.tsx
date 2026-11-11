@@ -44,7 +44,10 @@ function setup(over: Partial<DashboardEditor> = {}) {
   );
   return editor;
 }
-const startEditing = () => fireEvent.click(screen.getByTestId('dashboard-edit'));
+const startEditing = () => {
+  fireEvent.click(screen.getByTestId('dashboard-title'));
+  fireEvent.click(screen.getByTestId('dashboard-edit'));
+};
 
 /** Holds the tile long enough for react-native-web to fire onLongPress. */
 const longPress = (el: HTMLElement) => {
@@ -61,6 +64,13 @@ describe('dashboard edit mode', () => {
     expect(screen.queryByTestId('dashboard-edit')).toBeNull();
   });
 
+  it('keeps only search in the top bar until editing starts', () => {
+    setup();
+    expect(screen.getByTestId('dashboard-search')).toBeTruthy();
+    expect(screen.queryByTestId('dashboard-edit')).toBeNull();
+    expect(screen.queryByTestId('dashboard-done')).toBeNull();
+  });
+
   it('swaps the tiles for an editable list and back', () => {
     setup();
     expect(screen.queryByTestId('dashboard-edit-tiles')).toBeNull();
@@ -68,7 +78,7 @@ describe('dashboard edit mode', () => {
     expect(screen.getByTestId('dashboard-edit-tiles')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Tile settings, Habit' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Done editing' })).toBeTruthy();
-    fireEvent.click(screen.getByTestId('dashboard-edit'));
+    fireEvent.click(screen.getByTestId('dashboard-done'));
     expect(screen.queryByTestId('dashboard-edit-tiles')).toBeNull();
   });
 
