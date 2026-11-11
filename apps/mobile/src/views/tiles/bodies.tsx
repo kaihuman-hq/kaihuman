@@ -5,6 +5,7 @@ import {
   type EventRow,
   eventDateParts,
   groupEventsByDay,
+  type ReadLaterDraft,
   type TileResult,
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
@@ -19,6 +20,8 @@ export interface Ctx {
   error: string | null;
   /** The tile's own file path; lets a tile place related files beside it. */
   path?: string;
+  /** Saves an RSS item to the read-later file; absent where no file store is wired. */
+  readLater?: (draft: ReadLaterDraft) => Promise<'added' | 'duplicate'>;
   /** Creates another repository file (e.g. a todo's prompt file). */
   createFile?: (path: string, content: string) => Promise<void>;
   /** Opens a repository file in the editor. */

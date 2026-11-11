@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-11 — Mobile: RSS "Read later" swipe
+
+- RSS items had no way to save for later. Swiping an item left-to-right (leading edge, right-swipe stays "Mark read") now reveals "Read later", which adds the item to `<app folder>/.readitlater.json` exactly like the console (`name` = title, status `new`, deduped by url; the feed title goes in `tags`, as the format has no source field). A missing file is created.
+- Optimistic: haptic + inline note ("Saved to Read later") show at once, the save runs in the background; a duplicate switches the note to "Already in Read later", a failure to an error haptic and "Could not save".
+- Code: `addReadLaterItem` (pure, `read-later-tile.ts`), `saveToReadLater` (`screens/save-read-later.ts`), `Ctx.readLater`, `Tile` prop `onSaveReadLater` wired in the tile detail screen. `RowAction` gained `icon`/`side`. Tests for all three layers.
+
 ## 2026-11-11 — Mobile: iOS 17 minimum for German Siri phrases
 
 - iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.

@@ -1,10 +1,19 @@
 import {
   deleteItem,
+  parseReadItLater,
   parseReadItLaterForWrite,
   type ReadItLaterConfig,
   serializeReadItLater,
 } from '@kaihuman/formats';
 import type { TileResult } from './tile-controllers.js';
+
+const isHttpUrl = (url: string): boolean => {
+  try {
+    return ['http:', 'https:'].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+};
 
 const GONE = 'That item is no longer on the list';
 
@@ -34,3 +43,33 @@ export const markReadLaterNew = (content: string, id: string, now: Date): TileRe
 
 export const deleteReadLaterItem = (content: string, id: string): TileResult =>
   withItem(content, id, (config) => deleteItem(config, id));
+
+export const ALREADY_SAVED = 'That page is already on the list';
+
+/** What an RSS item hands over; `source` is the feed title. */
+export interface ReadLaterDraft {
+  title: string;
+  url: string;
+  source: string;
+}
+
+/**
+ * Prepends an item like the console does (name = title, deduped by url). `content` may be empty
+ * for a file not created yet. The feed title has no field of its own, so it goes in `tags`.
+ */
+export const addReadLaterItem = (content: string, draft: ReadLaterDraft, now: Date): TileResult => {
+  if (!isHttpUrl(draft.url)) return { ok: false, error: 'Enter an http(s) URL' };
+  const config = parseReadItLater(content);
+  if (config.items.some((i) => i.url === draft.url)) return { ok: false, error: ALREADY_SAVED };
+  const source = draft.source.trim();
+  const item = {
+    id: `ril-${now.getTime()}`,
+    url: draft.url,
+    name: draft.title.trim() || new URL(draft.url).hostname,
+    status: 'new' as const,
+    tags: source ? [source] : [],
+    createdAt: now.getTime(),
+    updatedAt: now.getTime(),
+  };
+  return { ok: true, content: serializeReadItLater({ ...config, items: [item, ...config.items] }) };
+};

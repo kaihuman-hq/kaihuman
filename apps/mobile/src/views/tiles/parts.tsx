@@ -15,7 +15,10 @@ import {
 
 export interface RowAction {
   label: string;
+  icon?: IconName;
   destructive?: boolean;
+  /** Swipe edge the button is revealed from; defaults to trailing. */
+  side?: 'leading' | 'trailing';
   onPress: () => void;
 }
 

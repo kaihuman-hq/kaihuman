@@ -1,8 +1,10 @@
+import { appFolderFor } from '@kaihuman/core';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { presentTile } from '../../../src/components/widgets/tile-controllers.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
+import { saveToReadLater } from '../../../src/screens/save-read-later.js';
 import { optimisticWrite } from '../../../src/sync/optimistic.js';
 import { EmptyState, errorMessage, Icon, InlineError, Screen } from '../../../src/ui/index.js';
 import { TILE_META, Tile } from '../../../src/views/tile-view.js';
@@ -104,6 +106,14 @@ export default function TileDetail() {
               onWrite={write}
               onCreateFile={(file, text) => githubContentFiles.create(file, text)}
               onOpenFile={(file) => router.push(`/files/${file}` as never)}
+              onSaveReadLater={(draft) =>
+                saveToReadLater(
+                  githubContentFiles,
+                  appFolderFor(githubContentFiles.tree().map((t) => t.path)),
+                  draft,
+                  new Date(),
+                )
+              }
               adding={adding}
               onAddingChange={setAdding}
             />
