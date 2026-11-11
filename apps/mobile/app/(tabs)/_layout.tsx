@@ -36,8 +36,6 @@ export default function TabsLayout() {
         {/* Kept as a route so /capture links still resolve; the ＋ menu replaced its tab. */}
         <Tabs.Screen name="capture" options={{ title: 'Capture', href: null }} />
         <Tabs.Screen name="ideas" options={{ title: 'Ideas' }} />
-        {/* No tab: search opens from the header search button on every tab root. */}
-        <Tabs.Screen name="search" options={{ title: 'Search', href: null }} />
         <Tabs.Screen name="more" options={{ title: 'More' }} />
       </Tabs>
       <QuickMenu {...quick.menu} bottomOffset={tabBarHeight(platform, insets.bottom)} />
