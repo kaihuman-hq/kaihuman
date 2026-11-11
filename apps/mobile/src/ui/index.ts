@@ -37,3 +37,4 @@ export { Screen, type ScreenProps, ScreenTitle } from './screen.js';
 export { SegmentedControl, type SegmentedControlProps } from './segmented.js';
 export { Text, type TextProps, type TextTone } from './text.js';
 export { TextField, type TextFieldProps } from './text-field.js';
+export { useKeyboardVisible } from './use-keyboard.js';

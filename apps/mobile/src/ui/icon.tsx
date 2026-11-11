@@ -68,6 +68,14 @@ const icons = {
   play: { ios: 'play.fill', material: 'play_arrow' },
   stop: { ios: 'stop.fill', material: 'stop' },
   copy: { ios: 'doc.on.doc', material: 'content_copy' },
+  undo: { ios: 'arrow.uturn.backward', material: 'undo' },
+  redo: { ios: 'arrow.uturn.forward', material: 'redo' },
+  bold: { ios: 'bold', material: 'format_bold' },
+  italic: { ios: 'italic', material: 'format_italic' },
+  heading: { ios: 'textformat.size', material: 'title' },
+  checkbox: { ios: 'checkmark.square', material: 'check_box' },
+  link: { ios: 'link', material: 'link' },
+  keyboardDismiss: { ios: 'keyboard.chevron.compact.down', material: 'keyboard_hide' },
 } as const satisfies Record<string, IconDef>;
 
 export type IconName = keyof typeof icons;

@@ -10,7 +10,8 @@ export default function FileRoute() {
   const path = Array.isArray(params.path) ? params.path.join('/') : (params.path ?? '');
   const controller = useMemo(() => new FileEditorController(), []);
   const [mode, setMode] = useState<FileMode>('view');
-  const viewable = hasViewer(fileKindForPath(path).view);
+  const kind = fileKindForPath(path);
+  const viewable = hasViewer(kind.view);
   return (
     <>
       <Stack.Screen
@@ -19,7 +20,13 @@ export default function FileRoute() {
           headerBackTitle: 'Files',
           // Kinds without a viewer open straight in the editor, so there is nothing to toggle.
           headerRight: viewable
-            ? () => <FileModeToggle mode={mode} onChange={setMode} />
+            ? () => (
+                <FileModeToggle
+                  mode={mode}
+                  onChange={setMode}
+                  markdown={kind.view.type === 'markdown'}
+                />
+              )
             : undefined,
         }}
       />

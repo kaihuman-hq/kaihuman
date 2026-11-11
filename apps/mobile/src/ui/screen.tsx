@@ -6,6 +6,7 @@ import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
 import { KeyboardLift, keyboardScrollProps } from './keyboard.js';
 import { Text } from './text.js';
+import { useKeyboardVisible } from './use-keyboard.js';
 
 export type ScreenInset = 'grouped' | 'none';
 
@@ -58,6 +59,7 @@ export function Screen({
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useInsets();
+  const keyboardUp = useKeyboardVisible();
   const { spacing, colors } = theme;
   const margin = inset === 'grouped' ? theme.metrics.screenMargin : 0;
   // Native headers already show the title. The web preview hides tab-root headers, so only
@@ -115,8 +117,9 @@ export function Screen({
         <View
           style={{
             paddingHorizontal: theme.metrics.screenMargin,
-            paddingTop: spacing.md,
-            paddingBottom: insets.bottom + spacing.md,
+            paddingTop: keyboardUp ? spacing.sm : spacing.md,
+            // The home-indicator inset sits under the keyboard; keeping it left a gap above it.
+            paddingBottom: keyboardUp ? spacing.sm : insets.bottom + spacing.md,
             backgroundColor: colors.background,
             borderTopWidth: StyleSheet.hairlineWidth,
             borderTopColor: colors.separator,
