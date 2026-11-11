@@ -15,6 +15,13 @@
 - RSS dashboard tile: only the unread count, no item title. Rows: feeds, unread new today, newest item age, top feed by unread. No animation.
 - Tests: `tiles/add-entry.test.tsx`, `glance/lists.test.ts`, body and tile tests updated to the sheet.
 
+## 2026-11-11 — Mobile: board declutter
+
+- Card: due badge (and repeat icon) now sit under the title via new `ListRow` `meta` slot, not right-aligned.
+- Filters (search, Sort & filter, Last 2 weeks, tags) hidden by default; header filter icon toggles them and shows an active-count badge (search counts too). Filters keep applying while hidden.
+- Board/Streams segmented control replaced by an icon toggle beside the filter icon.
+- Tests: `kanban-filters.test.tsx` (chrome), `board-analytics.test.tsx`.
+
 ## 2026-11-11 — Mobile: German Siri phrases
 
 - No Siri phrase worked on a German-Siri iPhone (TestFlight). Cause: App Shortcut phrases were English only; Siri matches only phrases in the Siri language. The Swift sources were already compiled into the app target (checked; the test against a real pbxproj covers it).
