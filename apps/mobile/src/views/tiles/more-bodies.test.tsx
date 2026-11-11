@@ -6,7 +6,8 @@ import type { FeedSnapshot, TravelView } from '../../components/widgets/tile-con
 import { markRssRead, rssView, travelView } from '../../components/widgets/tile-controllers.js';
 import { swipeTranslation } from '../../ui/test-setup.js';
 import type { Ctx } from './bodies.js';
-import { Rss, relativeDate, Travel } from './more-bodies.js';
+import { Rss, RssAddForm, relativeDate, Travel } from './more-bodies.js';
+import { TripAddForm } from './travel-body.js';
 
 const store = vi.hoisted(() => {
   let snap: Record<string, unknown> = {};
@@ -165,12 +166,17 @@ describe('Rss', () => {
 
   it('adds a feed by url with a fresh id and rejects a bad one', () => {
     const apply = vi.fn((r: unknown) => typeof r === 'string' || (r as { ok: boolean }).ok);
-    render(<Rss view={rssView('', {}, NOW)} ctx={ctx('', apply)} />);
+    const onDone = vi.fn();
+    render(<RssAddForm ctx={ctx('', apply)} onDone={onDone} />);
     const field = screen.getByLabelText('Feed URL');
+    fireEvent.change(field, { target: { value: 'not a url' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save feed' }));
+    expect(onDone).not.toHaveBeenCalled();
     fireEvent.change(field, { target: { value: 'https://new.test/rss' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add feed' }));
-    const result = (apply.mock.calls[0] as unknown as [{ ok: boolean; content: string }])[0];
+    fireEvent.click(screen.getByRole('button', { name: 'Save feed' }));
+    const result = (apply.mock.calls.at(-1) as unknown as [{ ok: boolean; content: string }])[0];
     expect(result.ok).toBe(true);
+    expect(onDone).toHaveBeenCalledOnce();
     expect(JSON.parse(result.content).feedOptions[0]).toMatchObject({
       url: 'https://new.test/rss',
     });
@@ -195,9 +201,8 @@ describe('Travel', () => {
 
   it('adds a trip from the form', () => {
     const apply = vi.fn(() => true);
-    render(<Travel view={travelView('', NOW)} ctx={ctx('', apply)} />);
-    expect(screen.getByText('No trips planned.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Add trip' }));
+    const onDone = vi.fn();
+    render(<TripAddForm ctx={ctx('', apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('Trip name'), { target: { value: 'Oslo' } });
     fireEvent.change(screen.getByLabelText('Start (YYYY-MM-DD)'), {
       target: { value: '2026-12-01' },
@@ -208,6 +213,12 @@ describe('Travel', () => {
       title: 'Oslo',
       start: '2026-12-01',
     });
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it('shows the empty line when there are no trips', () => {
+    render(<Travel view={travelView('', NOW)} ctx={ctx('')} />);
+    expect(screen.getByText('No trips planned.')).toBeTruthy();
   });
 
   it('renders a view built by hand', () => {

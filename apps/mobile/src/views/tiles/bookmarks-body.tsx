@@ -15,8 +15,8 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
 import { Button, Chip, haptics, Icon, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, Rows, useDisclosure } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, ItemRow, Rows } from './parts.js';
 
 const COLLAPSED = 5;
 const SORTS: readonly { value: BookmarkSort; label: string }[] = [
@@ -99,13 +99,26 @@ function BookmarkForm({
   );
 }
 
+export function BookmarkAddForm({ ctx, onDone }: AddFormProps) {
+  return (
+    <BookmarkForm
+      submitLabel="Save bookmark"
+      onCancel={onDone}
+      onSubmit={(d) => {
+        const ok = ctx.apply(addBookmarkEntry(ctx.content, d, ctx.now));
+        if (ok) onDone();
+        return ok;
+      }}
+    />
+  );
+}
+
 export function Bookmarks({ initial, ctx }: { initial: BookmarksView; ctx: Ctx }) {
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | undefined>();
   const [sort, setSort] = useState<BookmarkSort>('NEWEST');
   const [all, setAll] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
-  const form = useDisclosure();
   const { colors } = useTheme();
   const filtered = Boolean(query.trim() || tag || sort !== 'NEWEST');
   // The tile's own view is the unfiltered default; any filter re-derives it from the file text.
@@ -218,19 +231,6 @@ export function Bookmarks({ initial, ctx }: { initial: BookmarksView; ctx: Ctx }
             />
           ) : null}
         </>
-      )}
-      {form.open ? (
-        <BookmarkForm
-          submitLabel="Save bookmark"
-          onCancel={form.hide}
-          onSubmit={(d) => {
-            const ok = ctx.apply(addBookmarkEntry(ctx.content, d, ctx.now));
-            if (ok) form.hide();
-            return ok;
-          }}
-        />
-      ) : (
-        <Button label="Add bookmark" variant="tinted" icon="add" fullWidth onPress={form.show} />
       )}
     </>
   );

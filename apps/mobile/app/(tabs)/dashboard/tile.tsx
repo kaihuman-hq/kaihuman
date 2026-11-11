@@ -6,6 +6,7 @@ import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { optimisticWrite } from '../../../src/sync/optimistic.js';
 import { EmptyState, errorMessage, Icon, InlineError, Screen } from '../../../src/ui/index.js';
 import { TILE_META, Tile } from '../../../src/views/tile-view.js';
+import { addEntryFor } from '../../../src/views/tiles/add-entry.js';
 import { TodosDetailView } from '../../../src/views/todos-detail-view.js';
 
 export default function TileDetail() {
@@ -17,6 +18,8 @@ export default function TileDetail() {
   shown.current = content;
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  // Opened from a dashboard tile's ＋: the add sheet is up as soon as the file loads.
+  const [adding, setAdding] = useState(add === '1');
 
   useEffect(() => {
     if (!path) return;
@@ -47,14 +50,18 @@ export default function TileDetail() {
 
   // A file the controller chokes on shows an inline error instead of closing the app.
   const tile = path && content !== null ? safePresent(path, content, now) : undefined;
-  const isTodos = tile !== undefined && !(tile instanceof Error) && tile.kind === 'todos';
+  const shownTile = tile && !(tile instanceof Error) ? tile : undefined;
+  const isTodos = shownTile?.kind === 'todos';
   const addTodo = () =>
     router.push(`/dashboard/todo-add?path=${encodeURIComponent(path ?? '')}` as never);
+  // One ＋ for every kind that adds entries; todos keep their own full-height add screen.
+  const entry = shownTile && content !== null ? addEntryFor(shownTile.kind, content, now) : null;
+  const onAdd = isTodos ? addTodo : entry ? () => setAdding(true) : undefined;
   return (
     <>
       <Stack.Screen
         options={{
-          title: tile && !(tile instanceof Error) ? TILE_META[tile.kind].title : 'Tile',
+          title: shownTile ? TILE_META[shownTile.kind].title : 'Tile',
           // Every tile is a view of one file, so the file itself is always one tap away.
           headerRight: path
             ? () => (
@@ -67,11 +74,12 @@ export default function TileDetail() {
                   >
                     <Icon name="document" size={22} />
                   </Pressable>
-                  {isTodos ? (
+                  {onAdd ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="New todo"
-                      onPress={addTodo}
+                      accessibilityLabel={entry?.label ?? 'New todo'}
+                      testID="tile-add"
+                      onPress={onAdd}
                     >
                       <Icon name="add" size={22} />
                     </Pressable>
@@ -86,13 +94,7 @@ export default function TileDetail() {
           tile instanceof Error ? (
             <InlineError what="this tile" message={tile.message} />
           ) : tile.kind === 'todos' ? (
-            <TodosDetailView
-              path={path}
-              content={content}
-              now={now}
-              onWrite={write}
-              onAdd={addTodo}
-            />
+            <TodosDetailView path={path} content={content} now={now} onWrite={write} />
           ) : (
             <Tile
               path={path}
@@ -102,7 +104,8 @@ export default function TileDetail() {
               onWrite={write}
               onCreateFile={(file, text) => githubContentFiles.create(file, text)}
               onOpenFile={(file) => router.push(`/files/${file}` as never)}
-              startAdding={add === '1'}
+              adding={adding}
+              onAddingChange={setAdding}
             />
           )
         ) : failed || !path ? (

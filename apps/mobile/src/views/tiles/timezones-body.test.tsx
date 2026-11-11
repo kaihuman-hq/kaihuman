@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { worldClocksView } from '../../components/widgets/tile-controllers.js';
 import type { Ctx } from './bodies.js';
-import { Clocks } from './timezones-body.js';
+import { Clocks, ZoneAddForm } from './timezones-body.js';
 
 afterEach(() => {
   cleanup();
@@ -31,6 +31,13 @@ const setup = (content = FILE) => {
   return apply;
 };
 
+const setupAdd = () => {
+  const apply = vi.fn((_r: unknown) => true);
+  const onDone = vi.fn();
+  render(<ZoneAddForm ctx={{ content: FILE, now: NOW, apply, error: null }} onDone={onDone} />);
+  return { apply, onDone };
+};
+
 describe('Clocks body', () => {
   it('shows the large local clock and the year progress', () => {
     setup();
@@ -46,18 +53,17 @@ describe('Clocks body', () => {
   });
 
   it('adds a zone found by city search', () => {
-    const apply = setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Add time zone' }));
+    const { apply, onDone } = setupAdd();
     fireEvent.change(screen.getByLabelText('Search city or zone'), { target: { value: 'tokyo' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Tokyo' }));
     const result = apply.mock.calls[0]?.[0] as { ok: boolean; content: string };
     expect(result.ok).toBe(true);
     expect(result.content).toContain('Asia/Tokyo');
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('says so when nothing matches', () => {
-    setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Add time zone' }));
+    setupAdd();
     fireEvent.change(screen.getByLabelText('Search city or zone'), { target: { value: 'zzzz' } });
     expect(screen.getByText('No matching zones.')).toBeTruthy();
   });

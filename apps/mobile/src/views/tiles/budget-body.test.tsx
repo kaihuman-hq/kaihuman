@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Ctx } from './bodies.js';
-import { Budget } from './budget-body.js';
+import { Budget, BudgetAddForm } from './budget-body.js';
 
 afterEach(cleanup);
 
@@ -18,8 +18,7 @@ const ctx = (apply: Ctx['apply'] = vi.fn((_r: unknown) => true)): Ctx => ({
   error: null,
 });
 
-const addButton = () =>
-  screen.getAllByRole('button', { name: 'Add transaction' })[0] as HTMLElement;
+const saveButton = () => screen.getByRole('button', { name: 'Save transaction' });
 const contentOf = (apply: ReturnType<typeof vi.fn>) =>
   (apply.mock.calls[0]?.[0] as { content: string }).content;
 
@@ -40,26 +39,28 @@ describe('Budget', () => {
 
   it('adds with picked name and account and stays open for the next one', () => {
     const apply = vi.fn((_r: unknown) => true);
-    render(<Budget ctx={ctx(apply)} />);
-    fireEvent.click(addButton());
+    const onDone = vi.fn();
+    render(<BudgetAddForm ctx={ctx(apply)} onDone={onDone} />);
     fireEvent.click(screen.getByRole('button', { name: 'Lunch' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cash' }));
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '4' } });
-    fireEvent.click(addButton());
+    fireEvent.click(saveButton());
     expect(apply).toHaveBeenCalledOnce();
+    expect(onDone).not.toHaveBeenCalled();
     expect(contentOf(apply)).toContain('Lunch;Cash;earnings;2026-11-09;4');
     expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('accepts a custom name', () => {
     const apply = vi.fn((_r: unknown) => true);
-    render(<Budget ctx={ctx(apply)} />);
-    fireEvent.click(addButton());
+    render(<BudgetAddForm ctx={ctx(apply)} onDone={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'New name' }));
     fireEvent.change(screen.getByLabelText('Name (new)'), { target: { value: 'Tea' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cash' }));
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '2' } });
-    fireEvent.click(addButton());
+    fireEvent.click(saveButton());
     expect(contentOf(apply)).toContain('Tea;Cash');
   });
 });

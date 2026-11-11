@@ -2,6 +2,7 @@ import { Children, isValidElement, type ReactNode, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
 import {
+  Button,
   Divider,
   Icon,
   type IconName,
@@ -334,6 +335,67 @@ export function QuickAdd({
         <Icon name="add" size={22} color={colors.onAccentFill} weight="semibold" />
       </Pressable>
     </View>
+  );
+}
+
+/** Save and Cancel under an add form; every add sheet ends the same way. */
+export function FormButtons({
+  saveLabel,
+  onSave,
+  onCancel,
+  cancelLabel = 'Cancel',
+}: {
+  saveLabel: string;
+  onSave: () => void;
+  onCancel: () => void;
+  cancelLabel?: string;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flex: 1 }}>
+        <Button label={saveLabel} onPress={onSave} fullWidth />
+      </View>
+      <Button label={cancelLabel} variant="plain" onPress={onCancel} />
+    </View>
+  );
+}
+
+/** One field plus Save and Cancel: the add sheet for tiles whose entry is a single value. */
+export function FieldAddForm({
+  label,
+  saveLabel,
+  placeholder,
+  keyboardType,
+  onSave,
+  onCancel,
+}: {
+  label: string;
+  saveLabel: string;
+  placeholder?: string;
+  keyboardType?: 'default' | 'url';
+  /** Whether the value was accepted; a rejected value stays in the field. */
+  onSave: (value: string) => boolean;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const save = () => {
+    onSave(value);
+  };
+  return (
+    <>
+      <TextField
+        label={label}
+        value={value}
+        onChangeText={setValue}
+        placeholder={placeholder}
+        keyboardType={keyboardType}
+        autoCapitalize={keyboardType === 'url' ? 'none' : 'sentences'}
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={save}
+      />
+      <FormButtons saveLabel={saveLabel} onSave={save} onCancel={onCancel} />
+    </>
   );
 }
 

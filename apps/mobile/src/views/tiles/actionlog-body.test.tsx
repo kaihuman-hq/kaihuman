@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ActionLog } from './actionlog-body.js';
+import { ActionLog, ActionLogAddForm } from './actionlog-body.js';
 import type { Ctx } from './bodies.js';
 
 afterEach(cleanup);
@@ -44,7 +44,8 @@ describe('ActionLog', () => {
 
   it('logs an action with the tags field and inline tags', () => {
     const apply = vi.fn(() => true);
-    render(<ActionLog ctx={ctx(FILE, apply)} />);
+    const onDone = vi.fn();
+    render(<ActionLogAddForm ctx={ctx(FILE, apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('What did you do?'), {
       target: { value: 'Ran 5k #run' },
     });
@@ -52,6 +53,7 @@ describe('ActionLog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log action' }));
     const result = (apply.mock.calls[0] as unknown as [{ ok: true; content: string }])[0];
     expect(result.content).toContain('2026-11-09 12:00:00 Ran 5k #run #health');
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('switches to the report with monthly counts and top tags', () => {

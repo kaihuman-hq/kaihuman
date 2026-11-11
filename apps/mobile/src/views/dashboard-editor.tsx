@@ -69,7 +69,7 @@ export function Sheet({
   const { height } = useWindowDimensions();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardLift style={{ justifyContent: 'flex-end' }}>
+      <KeyboardLift inModal style={{ justifyContent: 'flex-end' }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Close ${title}`}

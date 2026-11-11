@@ -295,17 +295,28 @@ describe('rssGlance', () => {
       ],
     },
   };
-  it('counts unread and shows the newest unread item', () => {
+  it('shows only the unread count plus feed stats, never an item title', () => {
     const g = rssGlance(input('a.rss.json', content), rssView(content, snap, NOW));
-    expect(g).toMatchObject({
-      title: 'Feeds',
-      icon: 'rss',
-      tint: 'orange',
-      hero: '2',
-      label: 'unread · 2 feeds',
+    expect(g).toMatchObject({ title: 'Feeds', icon: 'rss', tint: 'orange', hero: '2' });
+    expect(g.label).toBe('unread');
+    expect(g.viz).toEqual({
+      kind: 'rows',
+      rows: [
+        { left: 'Feeds', right: '2' },
+        { left: 'New today', right: '0' },
+        // Wall-clock dependent (feed dates are UTC, NOW is local), so only the shape is fixed.
+        { left: 'Newest', right: expect.stringMatching(/^\d+[hd] ago$/) },
+        { left: 'Top feed', right: 'Alpha 1' },
+      ],
     });
-    expect(g.viz).toEqual({ kind: 'text', title: 'Three', caption: 'b.test' });
+    expect(JSON.stringify(g)).not.toContain('Three');
     expect(g.action).toBeUndefined();
+  });
+
+  it('shows just the feed count before any feed has loaded', () => {
+    const g = rssGlance(input('a.rss.json', content), rssView(content, {}, NOW));
+    expect(g.hero).toBe('0');
+    expect(g.viz).toEqual({ kind: 'rows', rows: [{ left: 'Feeds', right: '2' }] });
   });
 });
 

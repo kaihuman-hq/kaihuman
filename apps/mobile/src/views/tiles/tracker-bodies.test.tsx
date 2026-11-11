@@ -6,6 +6,8 @@ import {
   stocksView,
 } from '../../components/widgets/tile-controllers.js';
 import type { Ctx } from './bodies.js';
+import { ConsumptionAddForm } from './consumption-body.js';
+import { StockAddForm } from './stocks-body.js';
 import { Consumption, Habit, Stocks } from './tracker-bodies.js';
 
 afterEach(cleanup);
@@ -32,26 +34,28 @@ describe('Stocks tile', () => {
 
   it('adds a value with the amount invested', () => {
     const apply = vi.fn((_: unknown) => true);
-    render(<Stocks view={stocksView(webStocks)} ctx={ctx(webStocks, apply)} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add value' }));
+    const onDone = vi.fn();
+    render(<StockAddForm ctx={ctx(webStocks, apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('Current value'), { target: { value: '7000,5' } });
     fireEvent.change(screen.getByLabelText('Invested this period'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save value' }));
     const result = apply.mock.calls[0]?.[0] as unknown as { ok: true; content: string };
     expect(result.ok).toBe(true);
     expect(stocksView(result.content)).toMatchObject({ latestValue: 7000.5, invested: 5700 });
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('rejects a value that is not a number', () => {
     const apply = vi.fn((_: unknown) => false);
-    render(<Stocks view={null} ctx={ctx('', apply)} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add value' }));
+    const onDone = vi.fn();
+    render(<StockAddForm ctx={ctx('', apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('Current value'), { target: { value: 'abc' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save value' }));
     expect(apply).toHaveBeenCalledWith({
       ok: false,
       error: 'Enter the current value as a number.',
     });
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
 
@@ -67,23 +71,25 @@ describe('Consumption tile', () => {
   // Regression: on mobile there was no way to add anything.
   it('adds a reading through the form', () => {
     const apply = vi.fn((_: unknown) => true);
-    render(<Consumption view={consumptionView(file, NOW)} ctx={ctx(file, apply)} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add reading' }));
+    const onDone = vi.fn();
+    render(<ConsumptionAddForm ctx={ctx(file, apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('Gas (m³)'), { target: { value: '170' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save reading' }));
     const result = apply.mock.calls[0]?.[0] as { ok: true; content: string };
     expect(result.content.endsWith('2026-11-09,170')).toBe(true);
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('offers to add a meter to an empty file', () => {
     const apply = vi.fn((_: unknown) => true);
-    render(<Consumption view={consumptionView('', NOW)} ctx={ctx('', apply)} />);
-    expect(screen.queryByRole('button', { name: 'Add reading' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Add meter' }));
+    const onDone = vi.fn();
+    render(<ConsumptionAddForm ctx={ctx('', apply)} onDone={onDone} />);
+    expect(screen.queryByRole('button', { name: 'Save reading' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Meter name'), { target: { value: 'Power' } });
     fireEvent.change(screen.getByLabelText('Unit'), { target: { value: 'kWh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save meter' }));
     expect(apply).toHaveBeenCalledWith({ ok: true, content: 'created,Power[unit:kWh]' });
+    expect(onDone).toHaveBeenCalledOnce();
   });
 });
 

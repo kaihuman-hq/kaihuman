@@ -217,6 +217,8 @@ describe('DashboardPager RSS tile', () => {
     });
     const tile = await screen.findByTestId(/^square-.*\.rss\.json$/);
     expect(await within(tile).findByText('2')).toBeTruthy();
-    expect(within(tile).getByText('Item a')).toBeTruthy();
+    expect(within(tile).getByText('unread')).toBeTruthy();
+    // The glance is a count and a few figures; item titles live in the detail view.
+    expect(within(tile).queryByText('Item a')).toBeNull();
   });
 });

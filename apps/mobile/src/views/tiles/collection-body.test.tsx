@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Ctx } from './bodies.js';
-import { Collection } from './collection-body.js';
+import { Collection, CollectionAddForm } from './collection-body.js';
 
 afterEach(cleanup);
 
@@ -35,18 +35,20 @@ describe('Collection', () => {
 
   it('saves an entry with the date defaulting to today', () => {
     const apply = vi.fn((_r: unknown) => true);
-    render(<Collection ctx={ctx(apply)} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add entry' }));
+    const onDone = vi.fn();
+    render(<CollectionAddForm ctx={ctx(apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '76' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save entry' }));
     expect((apply.mock.calls[0]?.[0] as { content: string }).content).toContain('2026-11-09;76');
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('keeps the form open when the entry is rejected', () => {
     const apply = vi.fn((_r: unknown) => false);
-    render(<Collection ctx={ctx(apply)} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add entry' }));
+    const onDone = vi.fn();
+    render(<CollectionAddForm ctx={ctx(apply)} onDone={onDone} />);
     fireEvent.click(screen.getByRole('button', { name: 'Save entry' }));
     expect(screen.getByRole('button', { name: 'Save entry' })).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
