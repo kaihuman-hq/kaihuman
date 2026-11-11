@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-11 — Mobile: business (clients, time, timer, payments)
+
+- The app had no business part. New **More → Business** (`/business`): running timer card (stop → prefilled log-time sheet, discard), start timer by client, hours today/week/month, Needs attention (overdue invoices, retainers due, contract dates, unbilled time), open invoices, clients by stage with open amount and unbilled hours.
+- Client page (`/business/client/[slug]`): add todo / log line, start timer (with project), log time, invoices (open ones → record payment), recent time, links to the client's notes/todos/log files.
+- Sheets: log time (`/business/time`, `1.5`/`1:30`/`90m`, per-field errors) and record payment (`/business/payment`, empty amount = open amount).
+- Data layer `src/business/` (`load`, `summary`, `forms`, `write`, `use-business`) reuses `@kaihuman/formats/business` (`loadBusinessRepo`, `logTime`, `startTimer`, `cancelTimer`, `addClientTodo`/`Log`, `recordPayment`, `deriveInvoiceStatus`, `retainersDue`, `contractReminders`). Reads come from the local cache and writes go file by file through the offline outbox (additions before the timer delete), not as one atomic commit like the console.
+- Skipped (console only): enable set-up, draft editor / issue / credit notes, offer decisions, expenses and receipt upload, contracts form, pipeline stage change, share links, e-invoices, VAT / CSV / year export, client and project creation.
+- Tests: `src/business/business.test.ts` (forms, load, summary, writes against the demo seed), `src/views/business-views.test.tsx`, More row in `navigation-views.test.tsx`.
+
 ## 2026-11-11 — Mobile: iOS 17 minimum for German Siri phrases
 
 - iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.

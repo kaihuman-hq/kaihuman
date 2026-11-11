@@ -22,6 +22,13 @@ const WORKSPACE: readonly WorkspaceLink[] = [
     tone: 'warning',
   },
   {
+    href: '/business',
+    title: 'Business',
+    subtitle: 'Clients, time, invoices',
+    icon: 'wallet',
+    tone: 'info',
+  },
+  {
     href: '/weekly-review',
     title: 'Weekly review',
     subtitle: 'Your week, written to logs/',

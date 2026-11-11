@@ -82,6 +82,22 @@ export default function RootLayout() {
             }}
           />
         ))}
+        <Stack.Screen
+          name="business/index"
+          options={{ title: 'Business', headerLargeTitle: largeTitles, ...webBack('/more') }}
+        />
+        <Stack.Screen
+          name="business/client/[slug]"
+          options={{ title: 'Client', ...webBack('/business') }}
+        />
+        {/* Forms open as sheets with their own Cancel / Save row, like the quick-capture sheets. */}
+        {['business/time', 'business/payment'].map((name) => (
+          <Stack.Screen
+            key={name}
+            name={name}
+            options={{ presentation: 'modal', sheetGrabberVisible: true, headerShown: false }}
+          />
+        ))}
         <Stack.Screen name="scan" options={{ title: 'Scan', ...webBack('/capture') }} />
         <Stack.Screen
           name="weekly-review"
