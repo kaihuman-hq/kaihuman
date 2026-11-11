@@ -1,5 +1,6 @@
 import { configureCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuickCaptureController, type RepoFiles } from '../screens/quick-capture.js';
 import { CaptureHubView } from './capture-hub-view.js';
@@ -168,5 +169,36 @@ describe('QuickCaptureView file placement', () => {
       <QuickCaptureView controller={new QuickCaptureController(new MemoryFiles())} kind="idea" />,
     );
     expect(screen.queryByTestId('create-target-row')).toBeNull();
+  });
+});
+
+describe('QuickCaptureView header state', () => {
+  beforeEach(() => configureCoreStorage(new InMemoryStorageAdapter()));
+
+  // Regression: the screen stores the header state with `useState`. The effect that reports it
+  // depended on a fresh `place.target` object each render, so every report re-rendered the
+  // screen and reported again: an endless update loop that killed the iOS app on open.
+  it.each([
+    'todo',
+    'note',
+    'log',
+    'knowledge',
+  ] as const)('%s settles when the parent stores the header state', async (kind) => {
+    let reports = 0;
+    const controller = new QuickCaptureController(new MemoryFiles());
+    function Host() {
+      const [, setHeader] = useState<CaptureHeaderState | null>(null);
+      // Stable, like the real screen's `setHeader`.
+      const [report] = useState(() => (s: CaptureHeaderState) => {
+        // Stop feeding the loop so a regression fails instead of hanging the run.
+        if (++reports < 20) setHeader(s);
+      });
+      return (
+        <QuickCaptureView controller={controller} kind={kind} headerAction onHeaderState={report} />
+      );
+    }
+    render(<Host />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(reports).toBeLessThan(5);
   });
 });

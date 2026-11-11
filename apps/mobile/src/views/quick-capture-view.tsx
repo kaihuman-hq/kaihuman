@@ -170,7 +170,17 @@ export function QuickCaptureView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `run` closes over the fields tracked below
   useEffect(() => {
     onHeaderState?.({ canSubmit, busy, submit: run });
-  }, [canSubmit, busy, text, extra, due, repeat, place.target, onHeaderState]);
+  }, [
+    canSubmit,
+    busy,
+    text,
+    extra,
+    due,
+    repeat,
+    place.target.folder,
+    place.target.name,
+    onHeaderState,
+  ]);
 
   const clearStatus = () => setStatus(null);
 

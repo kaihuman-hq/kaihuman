@@ -25,6 +25,7 @@ import type { DashboardPage } from '../screens/dashboards.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Button,
+  ErrorBoundary,
   errorMessage,
   haptics,
   Icon,
@@ -471,7 +472,9 @@ function AddTileSheet({
               ))}
             </Section>
           ) : null}
-          <NewTileForm key={kind} kind={kind} editor={editor} onCreated={add} />
+          <ErrorBoundary what="the new tile form" resetKey={kind}>
+            <NewTileForm key={kind} kind={kind} editor={editor} onCreated={add} />
+          </ErrorBoundary>
           <Button label="Back" variant="plain" onPress={() => setKind(null)} />
         </>
       )}
