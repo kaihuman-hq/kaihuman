@@ -800,6 +800,27 @@ export interface PluginOptions {
   kotlinVersion?: string;
 }
 
+/** iOS floor for the app: AppShortcuts.xcstrings (German Siri phrases) needs iOS 17. */
+export const APP_DEPLOYMENT_TARGET = '17.0';
+
+/** Raises every build configuration below the floor (app target and project level) to it. */
+export const raiseDeploymentTarget = (
+  project: unknown,
+  floor: string = APP_DEPLOYMENT_TARGET,
+): void => {
+  const configs = (project as Partial<PbxProject>).hash?.project.objects.XCBuildConfiguration;
+  for (const [key, config] of Object.entries(configs ?? {})) {
+    if (key.endsWith('_comment') || typeof config === 'string') continue;
+    const current = Number.parseFloat(
+      String(config.buildSettings.IPHONEOS_DEPLOYMENT_TARGET ?? '0'),
+    );
+    const isApp = config.buildSettings.PRODUCT_BUNDLE_IDENTIFIER !== undefined;
+    if (current < Number.parseFloat(floor) && (current > 0 || isApp)) {
+      config.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = floor;
+    }
+  }
+};
+
 const withKaihumanWidgets = (
   config: ExpoConfigLike,
   options: PluginOptions = {},
@@ -872,8 +893,14 @@ const withKaihumanWidgets = (
       },
       appIntentFiles,
     );
+    raiseDeploymentTarget(cfg.modResults);
     return cfg;
   });
+
+  next = composeMod<Record<string, string>>(next, 'ios', 'podfileProperties', (cfg) => ({
+    ...cfg,
+    modResults: { ...cfg.modResults, 'ios.deploymentTarget': APP_DEPLOYMENT_TARGET },
+  }));
 
   return next;
 };

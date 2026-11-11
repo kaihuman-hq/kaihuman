@@ -28,6 +28,7 @@ import withKaihumanWidgets, {
   iosWidgetTarget,
   kotlinVersionFromCatalog,
   type ModFn,
+  raiseDeploymentTarget,
   resolveReactNativeKotlinVersion,
   SHARED_APP_SOURCES,
   WIDGET_ONLY_SOURCES,
@@ -337,6 +338,11 @@ describe('config plugin transforms', () => {
       'CODE_SIGN_ENTITLEMENTS = "../targets/ios-widget/KaihumanWidgets.entitlements";',
     );
     expect(out).toContain('IPHONEOS_DEPLOYMENT_TARGET = 17.0;');
+    // AppShortcuts.xcstrings fails the build below iOS 17, so nothing may stay lower.
+    raiseDeploymentTarget(project);
+    const targets = [...project.writeSync().matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([\d.]+);/g)];
+    expect(targets.length).toBeGreaterThan(0);
+    expect(targets.every((m) => Number.parseFloat(m[1] ?? '0') >= 17)).toBe(true);
     expect(out).toContain('MARKETING_VERSION = "0.1.0";');
     expect(out).toContain('CURRENT_PROJECT_VERSION = "7";');
     expect(out.match(/isa = PBXTargetDependency;/g)).toHaveLength(1);

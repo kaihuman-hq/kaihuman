@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-11 — Mobile: iOS 17 minimum for German Siri phrases
+
+- iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.
+- Test: `src/targets.test.ts` checks no deployment target stays below 17 in the real-project fixture.
+
 ## 2026-11-11 — Mobile: German Siri phrases
 
 - No Siri phrase worked on a German-Siri iPhone (TestFlight). Cause: App Shortcut phrases were English only; Siri matches only phrases in the Siri language. The Swift sources were already compiled into the app target (checked; the test against a real pbxproj covers it).
