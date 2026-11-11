@@ -157,6 +157,26 @@ describe('dashboard edit mode', () => {
     expect(editor.onCreateFile).toHaveBeenCalledWith('.kh/work.todos.md', '- [ ] New Task');
   });
 
+  it('creates a new file in a typed subfolder, prefilled with today', async () => {
+    const editor = setup();
+    startEditing();
+    fireEvent.click(screen.getByTestId('add-tile'));
+    fireEvent.click(await screen.findByTestId('add-kind-todos'));
+    expect((screen.getByLabelText('File name') as HTMLInputElement).value).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+    fireEvent.change(screen.getByLabelText('Folder'), { target: { value: 'lists/work/' } });
+    fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'Q4 Plan' } });
+    expect(screen.getByText('A new folder is created.')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('create-tile'));
+    await waitFor(() =>
+      expect(editor.onCreateFile).toHaveBeenCalledWith(
+        'lists/work/q4-plan.todos.md',
+        '- [ ] New Task',
+      ),
+    );
+  });
+
   it('manages dashboards: add, rename, move and confirm delete', async () => {
     const editor = setup();
     startEditing();

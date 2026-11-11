@@ -8,6 +8,7 @@ import {
 } from '@kaihuman/core';
 import { parseTravel, serializeTravel } from '@kaihuman/formats';
 import { type TileKind, tileKindForPath } from '../components/widgets/tile-controllers.js';
+import { type CreateSpec, resolveTarget, tileSpec } from '../files/create-target.js';
 import type { ContentFiles } from './file-editor-screen.js';
 
 export type { DashboardEdit } from '@kaihuman/core';
@@ -64,16 +65,25 @@ export type NewTileFile =
   | { ok: true; path: string; content: string }
   | { ok: false; error: string };
 
-/** Path and starting text for a new `kind` file called `name`, in the app folder. */
-export function newTileFile(tree: readonly string[], kind: TileKind, name: string): NewTileFile {
+/** Folder and name rules for a new `kind` tile file, or null when mobile cannot create it. */
+export const tileCreateSpec = (kind: TileKind): CreateSpec | null => {
   const spec = NEW_TILE_FILES.find((s) => s.kind === kind);
-  if (!spec) return { ok: false, error: 'This kind of tile cannot be created on mobile.' };
-  const base = name.trim().replace(new RegExp(`${spec.suffix.replace(/\./g, '\\.')}$`), '');
-  if (!base) return { ok: false, error: 'Give the file a name.' };
-  if (/[/\\]|^\.|\.\./.test(base)) return { ok: false, error: 'Use a plain file name.' };
-  const path = `${appFolderFor(tree)}/${base}${spec.suffix}`;
-  if (tree.includes(path)) return { ok: false, error: 'A file with that name already exists.' };
-  return { ok: true, path, content: spec.starter };
+  return spec ? tileSpec(kind, spec.suffix) : null;
+};
+
+/** Path and starting text for a new `kind` file called `name`, in `folder` (the app folder by default). */
+export function newTileFile(
+  tree: readonly string[],
+  kind: TileKind,
+  name: string,
+  folder: string = appFolderFor(tree),
+): NewTileFile {
+  const spec = NEW_TILE_FILES.find((s) => s.kind === kind);
+  const create = tileCreateSpec(kind);
+  if (!spec || !create)
+    return { ok: false, error: 'This kind of tile cannot be created on mobile.' };
+  const target = resolveTarget(create, { folder, name }, tree);
+  return target.ok ? { ok: true, path: target.path, content: spec.starter } : target;
 }
 
 /**

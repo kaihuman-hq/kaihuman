@@ -138,6 +138,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Choose where new files go: quick capture (todo, note, log, knowledge) shows a "Saves to …" row that opens a folder picker (existing repo folders, type a new subfolder) and a file name (prefilled, slugified, extension enforced, collision check); the add-tile picker uses the same fields for every tile kind (todos, data collection, action log, board overview…). One tap still saves with the defaults; the last folder is remembered per kind | `apps/mobile/src/files/create-target.ts`, `src/views/create-target-row.tsx` | 2026-11-11 |
 | Search tab and header search button on every tab; text content of all synced files is fetched in the background and searched offline | Search tab, header search icon | 2026-11-10 |
 | Tile data entry: data collection tiles show their sum/avg column, consumption ＋ opens the full add-reading form, every add form stays above the keyboard (shared `KeyboardLift`), tile detail links to its file | `apps/mobile/src/views/tiles/glance/trackers.ts`, `apps/mobile/src/ui/keyboard.tsx`, `apps/mobile/app/(tabs)/dashboard/tile.tsx` | 2026-11-11 |
 | Mobile file editor: keyboard toolbar (undo/redo, heading, bold, italic, list, checkbox, link), list continuation, 1.5 s autosave with save state, prose typography, Edit/Preview toggle for markdown | `apps/mobile/src/editor/`, `apps/mobile/src/views/file-editor-view.tsx`, `apps/mobile/src/views/editor-toolbar.tsx` | 2026-11-11 |

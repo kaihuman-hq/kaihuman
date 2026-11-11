@@ -164,6 +164,25 @@ describe('QuickCaptureController', () => {
     expect(await c.quickKnowledge(' ')).toMatchObject({ ok: false });
   });
 
+  it('writes to a picked target instead of the built-in file', async () => {
+    const files = mem();
+    const c = capture(files);
+    expect(await c.quickNote('hi', 'journal/day.md')).toMatchObject({ path: 'journal/day.md' });
+    expect(await c.quickTodo('t', [], undefined, undefined, 'lists/a.todos.md')).toMatchObject({
+      path: 'lists/a.todos.md',
+    });
+    expect(await c.quickLog('did', [], 'logs/w.actionlog.md')).toMatchObject({
+      path: 'logs/w.actionlog.md',
+    });
+    expect(await c.quickKnowledge('src', undefined, 'kb/s.md')).toMatchObject({ path: 'kb/s.md' });
+    expect([...files.store.keys()].sort()).toEqual([
+      'journal/day.md',
+      'kb/s.md',
+      'lists/a.todos.md',
+      'logs/w.actionlog.md',
+    ]);
+  });
+
   it('surfaces save failures instead of reporting success', async () => {
     const files = mem();
     files.failWrites.add('.kh/inbox.todos.md');
