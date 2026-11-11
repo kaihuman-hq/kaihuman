@@ -17,6 +17,12 @@
 - Tile detail: an "Open file" button in the header for every tile (todos too), and the file name under the tile heading links to the editor.
 - Tests: `trackers.test.ts`, `collection-tile.test.ts`, `consumption-body.test.tsx`, `quick-menu.test.ts`, `dashboard-tiles.test.tsx`, `ui/keyboard.test.tsx`.
 
+## 2026-11-11 — Mobile: passive sync icon, Edit in the dashboards menu, PWA app icon
+
+- Sync status is passive: the "Updated …/Syncing…/Offline" caption is gone. `SyncIndicator` (`src/sync/sync-indicator.tsx`) puts a small refresh icon in the dashboard top bar that turns only while a sync runs. `SyncStatusBanner` now shows only the storage warning, conflicts and errors.
+- Dashboards: Edit moved into the dashboards menu (tap the title); the top right shows only Search (Done appears while editing). The title opens the menu even with a single dashboard so Edit stays reachable.
+- App icon is now the console PWA mark (`apps/console/public/logo.svg`): `assets/icon.svg` regenerated to a 1024 px PNG without alpha; the Android adaptive foreground uses the same mark in the safe zone on an Ink (`#0C0D0C`) background. No splash asset is configured, so nothing else changes.
+
 ## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
 
 - RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.

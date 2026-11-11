@@ -90,6 +90,9 @@ vi.mock('react-native-reanimated', async () => {
     withSpring: settle(),
     withDelay: (_ms: number, v: unknown) => v,
     withSequence: (...v: unknown[]) => v[v.length - 1],
+    withRepeat: (v: unknown) => v,
+    cancelAnimation: () => {},
+    Easing: { linear: 'linear' },
   };
 });
 

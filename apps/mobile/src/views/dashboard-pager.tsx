@@ -20,6 +20,7 @@ import {
   rememberDashboard,
   type TileFile,
 } from '../screens/dashboards.js';
+import { SyncIndicator } from '../sync/sync-indicator.js';
 import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import {
@@ -265,12 +266,15 @@ function DashboardMenu({
   pages,
   index,
   onSelect,
+  onEdit,
   onClose,
 }: {
   visible: boolean;
   pages: DashboardPage[];
   index: number;
   onSelect: (i: number) => void;
+  /** Set when editing is possible; adds the Edit row. */
+  onEdit?: () => void;
   onClose: () => void;
 }) {
   const { colors, spacing, shape, metrics, platform } = useTheme();
@@ -345,6 +349,29 @@ function DashboardMenu({
               {i === index ? <Icon name="check" size={20} color={colors.accent} /> : null}
             </Pressable>
           ))}
+          {onEdit ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit dashboard"
+              testID="dashboard-edit"
+              onPress={onEdit}
+              android_ripple={platform === 'ios' ? undefined : { color: colors.pressed }}
+              style={({ pressed }) => ({
+                minHeight: metrics.rowHeight,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                borderTopWidth: 1,
+                borderTopColor: colors.separator,
+                backgroundColor: pressed && platform === 'ios' ? colors.fill : 'transparent',
+              })}
+            >
+              <Icon name="edit" size={20} color={colors.accent} />
+              <Text variant="body" color={colors.accent}>
+                Edit
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -425,6 +452,7 @@ export function DashboardPager({
           <Text variant="subheadline" tone="secondary" style={{ flex: 1 }}>
             {dateLine(now)}
           </Text>
+          <SyncIndicator />
           {editing ? null : (
             <Pressable
               accessibilityRole="button"
@@ -445,18 +473,18 @@ export function DashboardPager({
               testID="dashboard-manage"
             />
           ) : null}
-          {canEdit ? (
+          {canEdit && editing ? (
             <Button
-              label={editing ? 'Done' : 'Edit'}
-              accessibilityLabel={editing ? 'Done editing' : 'Edit dashboard'}
-              variant={editing ? 'filled' : 'plain'}
+              label="Done"
+              accessibilityLabel="Done editing"
+              variant="filled"
               size="small"
-              onPress={() => setEditing((e) => !e)}
-              testID="dashboard-edit"
+              onPress={() => setEditing(false)}
+              testID="dashboard-done"
             />
           ) : null}
         </View>
-        {items.length > 1 ? (
+        {items.length > 1 || canEdit ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Choose dashboard, current ${current.name}`}
@@ -528,6 +556,12 @@ export function DashboardPager({
         pages={items}
         index={index}
         onSelect={jumpTo}
+        {...(canEdit && {
+          onEdit: () => {
+            setMenuOpen(false);
+            setEditing(true);
+          },
+        })}
         onClose={() => setMenuOpen(false)}
       />
     </View>

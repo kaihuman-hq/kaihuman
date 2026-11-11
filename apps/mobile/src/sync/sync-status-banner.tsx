@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { storageWarning } from '../runtime/storage-boot.js';
 import { useTheme } from '../theme/theme.js';
 import { Button } from '../ui/button.js';
@@ -9,18 +8,10 @@ import { describeSyncStatus } from './describe.js';
 import { refreshAll, resolveConflict } from './runtime.js';
 import { syncStatus } from './status.js';
 
-const TICK_MS = 30_000;
-
 export function SyncStatusBanner() {
   const { colors, spacing, shape } = useTheme();
   const status = useSignalValue(syncStatus);
   const warning = useSignalValue(storageWarning);
-  const [, setTick] = useState(0);
-  // The relative time ("5 min ago") goes stale without a state change, so re-render on a timer.
-  useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
 
   // Losing data on close outranks any sync state, so it shows first; it never blocks the screen.
   if (warning) {
@@ -41,7 +32,6 @@ export function SyncStatusBanner() {
   }
 
   const { text, tone } = describeSyncStatus(status, Date.now());
-  if (!text) return null;
 
   const conflicts = status.conflicts;
   if (conflicts.length > 0 || tone === 'error') {
@@ -93,17 +83,6 @@ export function SyncStatusBanner() {
     );
   }
 
-  return (
-    <View
-      accessibilityLiveRegion="polite"
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
-    >
-      {status.phase === 'syncing' ? (
-        <ActivityIndicator size="small" color={colors.secondaryLabel} />
-      ) : null}
-      <Text variant="caption1" tone="secondary">
-        {text}
-      </Text>
-    </View>
-  );
+  // Passive states (syncing, offline, pending, updated) are not shown here: `SyncIndicator` covers them.
+  return null;
 }
