@@ -36,6 +36,7 @@ import {
 import { ActionLogFull } from './actionlog-full.js';
 import { EditorToolbar, type FormatAction } from './editor-toolbar.js';
 import { FileContentView, NoViewerNote } from './file-views.js';
+import { NewFileSheet } from './new-file-sheet.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -126,6 +127,7 @@ export function FileBrowserView({
   const [, setRev] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
@@ -216,6 +218,26 @@ export function FileBrowserView({
         <Section footer={countLabel(entries.length)}>{entries.map(row)}</Section>
       ) : error ? (
         <Button label="Try again" variant="tinted" size="medium" onPress={() => void load()} />
+      ) : null}
+      <Button
+        label="New file"
+        variant="tinted"
+        size="medium"
+        onPress={() => setCreating(true)}
+        testID="new-file"
+      />
+      {creating ? (
+        <NewFileSheet
+          folder={folder}
+          paths={controller.paths()}
+          onCreate={(path, content) => controller.createFile(path, content)}
+          onCreated={(path) => {
+            setCreating(false);
+            void load();
+            onOpenFile(path);
+          }}
+          onClose={() => setCreating(false)}
+        />
       ) : null}
       {folder && entries.length > 0 ? (
         <View style={{ paddingTop: spacing.xs }}>

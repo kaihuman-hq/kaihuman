@@ -331,3 +331,35 @@ describe('MoreView layout', () => {
     }
   });
 });
+
+describe('FileBrowserView new file', () => {
+  it('creates a file of the picked kind in the open folder and opens it', async () => {
+    const { map, files } = memory({ 'work/a.md': '1', 'home/b.md': '2' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    const onOpenFile = vi.fn();
+    render(<FileBrowserView controller={controller} onOpenFile={onOpenFile} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'work' }));
+    fireEvent.click(screen.getByTestId('new-file'));
+    fireEvent.click(screen.getByTestId('new-file-kind-habit'));
+    expect((screen.getByLabelText('Folder') as HTMLInputElement).value).toBe('work');
+    fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'sleep' } });
+    fireEvent.click(screen.getByTestId('new-file-create'));
+    await waitFor(() => expect(onOpenFile).toHaveBeenCalledWith('work/sleep.habit.csv'));
+    expect(map.get('work/sleep.habit.csv')).toBe('id,title,frequency,target,history\n');
+    expect(screen.queryByTestId('new-file-sheet')).toBeNull();
+  });
+
+  it('refuses a name that is taken and keeps the sheet open', async () => {
+    const { files } = memory({ 'work/a.md': '1' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    const onOpenFile = vi.fn();
+    render(<FileBrowserView controller={controller} onOpenFile={onOpenFile} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'work' }));
+    fireEvent.click(screen.getByTestId('new-file'));
+    fireEvent.click(screen.getByTestId('new-file-kind-note'));
+    fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'a' } });
+    fireEvent.click(screen.getByTestId('new-file-create'));
+    expect(await screen.findByText('A file with that name already exists.')).toBeTruthy();
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+});

@@ -198,6 +198,14 @@ export class FileEditorController {
     return [...dirs.sort(byName), ...entries.sort(byName)];
   }
 
+  /** Every file path in the repo, for the new-file folder picker and collision check. */
+  paths(): string[] {
+    return this.files
+      .tree()
+      .filter((t) => t.type === 'blob')
+      .map((t) => t.path);
+  }
+
   enter(folder: string): void {
     this.cwd = folder.replace(/^\/+|\/+$/g, '');
   }

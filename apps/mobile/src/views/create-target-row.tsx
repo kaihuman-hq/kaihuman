@@ -29,23 +29,30 @@ export interface CreateTargetState {
 
 /**
  * Folder and name for a new file. The name follows the kind's default (and `hint`, e.g. the
- * capture's first line) until the user edits it, so the one-tap path needs no input.
+ * capture's first line) until the user edits it, so the one-tap path needs no input. `startFolder`
+ * (e.g. the folder open in the file browser) wins over the remembered one.
  */
 export function useCreateTarget(
   spec: CreateSpec,
   appFolder: string,
   hint?: string,
+  startFolder?: string,
 ): CreateTargetState {
-  const [folder, setFolder] = useState(() => initialFolder(spec, loadLastFolders(), appFolder));
+  const first = () => startFolder ?? initialFolder(spec, loadLastFolders(), appFolder);
+  const [folder, setFolder] = useState(first);
   const [typed, setTyped] = useState<string | null>(null);
   const [now] = useState(() => new Date());
+  const name = typed ?? spec.defaultName(now, hint);
+  // Stable while folder and name hold: callers put `target` in effect deps, and a fresh object
+  // each render re-ran an effect that set parent state, an endless loop that closed the app.
+  const target = useMemo(() => ({ folder, name }), [folder, name]);
   return {
-    target: { folder, name: typed ?? spec.defaultName(now, hint) },
+    target,
     custom: typed !== null || folder !== spec.defaultFolder(appFolder),
     setFolder,
     setName: setTyped,
     reset: () => {
-      setFolder(initialFolder(spec, loadLastFolders(), appFolder));
+      setFolder(first());
       setTyped(null);
     },
   };

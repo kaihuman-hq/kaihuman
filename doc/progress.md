@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-11 — Mobile: fix crash on create, new file from the file browser
+
+- Crash: opening a quick capture (todo, note, log, knowledge) killed the iOS app. Cause: `useCreateTarget` returned a new `target` object every render, and `QuickCaptureView`'s header-state effect listed `place.target` as a dependency. The effect calls `onHeaderState`, which the capture screen stores with `useState`, so each run re-rendered the screen and ran the effect again: an endless update loop. Fix: `target` is memoized on folder and name, and the effect depends on `place.target.folder` / `place.target.name`.
+- Error boundaries: `QuickCaptureScreen` wraps the capture in `ErrorBoundary` ("Couldn't show this capture"), and the add-tile "Or create one" form and the new-file sheet have their own, so a failing create form shows an error card instead of closing the app.
+- File browser: **New file** opens `NewFileSheet` (kind list: note plus every `NEW_TILE_FILES` kind), then the shared `CreateTargetRow` with the open folder pre-selected (`useCreateTarget` takes a `startFolder`). Creates via `FileEditorController.createFile`, refreshes and opens the file. Pure rules in `src/screens/new-file.ts` (`NEW_FILE_KINDS`, `newFile`); `FileEditorController.paths()` lists the tree.
+- Tests: `views/capture.test.tsx` (header state settles; fails without the fix), `views/quick-capture-screen.test.tsx` (boundary), `views/files-more.test.tsx` (new file in open folder, taken name), `screens/new-file.test.ts`.
+
 ## 2026-11-11 — Mobile: iOS 17 minimum for German Siri phrases
 
 - iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.
