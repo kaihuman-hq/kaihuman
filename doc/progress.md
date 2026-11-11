@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-11 — Mobile: login survives a background launch on a locked phone
+
+- iOS still asked for a new sign-in now and then, the PWA never. Cause: background sync (expo-background-task) launches the app while the phone is locked; Keychain items that are not readable then (legacy `WHEN_UNLOCKED` items, or any item before the first unlock after a reboot) failed to read, core started with no token and no refresh token, `startTokenSync` marked the session hydrated, and the user who opened the app later found the login screen. The secure driver also cached a `null` for the core's "clean-up" delete, so nothing read the Keychain again. The PWA's localStorage/IndexedDB has no lock state, so it never sees an empty session.
+- Fix: `createSecureKeyValueDriver` tracks unreadable keys per key (one readable item no longer unlocks deletes of another) and never caches a delete of an unread key; `startTokenSync` decides nothing after a failed read in the background (`foreground` dep) and `retry()`s when the app comes to the foreground; new core `AuthStore.restore()` re-reads the token, refresh token and expiry (not after a sign-out). `bootstrap.ts` wires both to `AppState` `active`.
+- Checked, unchanged: refresh runs before syncs, on foreground and in 401 recovery; concurrent refreshes share one request; network failures never sign out; expiry parsing. The auth-worker is unchanged (no deploy needed).
+- Tests: `runtime/cold-start.test.ts` (locked background launch, then unlock), `sync/persistent-storage.test.ts`, core `auth.store.test.ts`.
+
 ## 2026-11-11 — Mobile: iOS 17 minimum for German Siri phrases
 
 - iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.

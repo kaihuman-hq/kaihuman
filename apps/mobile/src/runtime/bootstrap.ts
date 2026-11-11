@@ -65,8 +65,15 @@ export function bootstrap(): () => void {
       set: (token) => SecureStore.setItemAsync(SECURE_TOKEN_KEY, token, secureOptions),
       remove: () => SecureStore.deleteItemAsync(SECURE_TOKEN_KEY, secureOptions),
     },
+    foreground: () => AppState.currentState === 'active',
+    restore: () => authStore.restore(),
   });
   ready = stopToken.ready;
+  // A background launch on a locked phone could not read the Keychain; the unlock that brings
+  // the app to the foreground makes it readable again.
+  const unlockSub = AppState.addEventListener('change', (state) => {
+    if (state === 'active') void stopToken.retry();
+  });
   const refresher = createTokenRefresher({
     endpoint: refreshEndpointFor(authGateway()),
     session: () =>
@@ -137,6 +144,7 @@ export function bootstrap(): () => void {
     stopSync();
     stopBridge();
     stopNotifications();
+    unlockSub.remove();
     stopToken();
     active = null;
   };

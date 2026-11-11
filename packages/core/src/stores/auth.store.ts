@@ -146,6 +146,33 @@ export class AuthStore {
     });
   }
 
+  /**
+   * Reads the persisted session again when none is loaded. On iOS a background launch while the
+   * phone is locked cannot read the Keychain, so the session looks absent until the next unlock.
+   * True when a session was restored.
+   */
+  async restore(): Promise<boolean> {
+    await this.ready;
+    if (this.token.value) return false;
+    const db = getCoreStorage();
+    if (db.getItem('lifeos_logged_out')) return false;
+    const token =
+      (await db.getRecord<string>('auth', 'token')) ?? db.getItem(STORAGE_KEY_TOKEN) ?? null;
+    if (!token || this.token.value) return false;
+    const refresh = await db.getRecord<RefreshRecord>('auth', REFRESH_RECORD);
+    const user = await db.getRecord<GithubProfile>('auth', 'user');
+    if (this.token.value) return false;
+    batch(() => {
+      if (refresh?.refreshToken) {
+        this.refreshToken.value = refresh.refreshToken;
+        this.tokenExpiresAt.value = refresh.expiresAt ?? null;
+      }
+      if (user && !this.user.value) this.user.value = user;
+      this.token.value = token;
+    });
+    return true;
+  }
+
   login() {
     const gatewayUrl = viteEnv(import.meta).VITE_GH_LOGIN;
     if (!gatewayUrl) {

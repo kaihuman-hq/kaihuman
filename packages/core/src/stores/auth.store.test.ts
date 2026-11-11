@@ -71,6 +71,46 @@ describe('AuthStore expiring tokens', () => {
   });
 });
 
+describe('AuthStore restore', () => {
+  it('restores the session and refresh token that storage could not give at launch', async () => {
+    // Regression (iOS): a launch on a locked phone read no token, and nothing read it again.
+    storage.setItem('lifeos_gh_token', 'ghu_a');
+    await storage.putRecord('auth', 'token', 'ghu_a');
+    await storage.putRecord('auth', 'refresh', { refreshToken: 'ghr_r', expiresAt: NOW });
+
+    // The locked launch: reads answer "nothing there" and, like the mobile Keychain driver,
+    // deletes of what could not be read are skipped.
+    const locked = [
+      vi.spyOn(storage, 'getItem').mockReturnValue(null),
+      vi.spyOn(storage, 'getRecord').mockResolvedValue(undefined),
+      vi.spyOn(storage, 'removeItem').mockReturnValue(undefined),
+      vi.spyOn(storage, 'deleteRecord').mockResolvedValue(undefined),
+    ];
+    const store = new AuthStore();
+    await store.ready;
+    await flush();
+    expect(store.token.value).toBeNull();
+    for (const spy of locked) spy.mockRestore();
+
+    expect(await store.restore()).toBe(true);
+    expect(store.token.value).toBe('ghu_a');
+    expect(store.refreshToken.value).toBe('ghr_r');
+    expect(store.tokenExpiresAt.value).toBe(NOW);
+    expect(await store.restore()).toBe(false);
+  });
+
+  it('does not bring back a session the user signed out of', async () => {
+    const store = new AuthStore();
+    await store.ready;
+    store.setSession({ accessToken: 'ghu_a' });
+    await flush();
+    store.logout();
+    await flush();
+    expect(await store.restore()).toBe(false);
+    expect(store.token.value).toBeNull();
+  });
+});
+
 describe('AuthStore profile fetch', () => {
   it('does not log out on a 401 while a refresh token can renew the session', async () => {
     vi.stubGlobal(

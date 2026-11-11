@@ -194,6 +194,29 @@ describe('secure driver', () => {
     expect(api.items.get('lifeos_gh_token')).toBe('t');
   });
 
+  it('reads the real value once the device unlocks, even after a remove while locked', () => {
+    // Regression: the remove cached null, so the token stayed "missing" for the whole session.
+    const api = keychain([
+      ['lifeos_gh_token', 't'],
+      ['record_auth_refresh', 'r'],
+    ]);
+    const readable = api.getItem.getMockImplementation();
+    api.getItem.mockImplementation((key: string) => {
+      if (key === 'lifeos_gh_token') throw new Error('locked');
+      return readable?.(key) ?? null;
+    });
+    const driver = createSecureKeyValueDriver(api);
+    expect(driver.get('lifeos_gh_token')).toBeNull();
+    // Another item (AFTER_FIRST_UNLOCK) reads fine; that must not allow deleting this one.
+    expect(driver.get('record:auth:refresh')).toBe('r');
+    driver.remove('lifeos_gh_token');
+    expect(api.deleteItemAsync).not.toHaveBeenCalled();
+    api.getItem.mockImplementation((key: string) => readable?.(key) ?? null);
+    expect(driver.get('lifeos_gh_token')).toBe('t');
+    driver.remove('lifeos_gh_token');
+    expect(api.deleteItemAsync).toHaveBeenCalledWith('lifeos_gh_token');
+  });
+
   it('keeps auth records in the secure driver, not the files', async () => {
     const fs = fakeFs();
     const api = keychain();
