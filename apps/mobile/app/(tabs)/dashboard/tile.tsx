@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { presentTile } from '../../../src/components/widgets/tile-controllers.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { EmptyState, errorMessage, Icon, InlineError, Screen } from '../../../src/ui/index.js';
@@ -8,7 +8,7 @@ import { TILE_META, Tile } from '../../../src/views/tile-view.js';
 import { TodosDetailView } from '../../../src/views/todos-detail-view.js';
 
 export default function TileDetail() {
-  const { path } = useLocalSearchParams<{ path: string }>();
+  const { path, add } = useLocalSearchParams<{ path: string; add?: string }>();
   const router = useRouter();
   const [content, setContent] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -38,15 +38,28 @@ export default function TileDetail() {
       <Stack.Screen
         options={{
           title: tile && !(tile instanceof Error) ? TILE_META[tile.kind].title : 'Tile',
-          headerRight: isTodos
+          // Every tile is a view of one file, so the file itself is always one tap away.
+          headerRight: path
             ? () => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="New todo"
-                  onPress={addTodo}
-                >
-                  <Icon name="add" size={22} />
-                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Open file"
+                    testID="tile-open-file"
+                    onPress={() => router.push(`/files/${path}` as never)}
+                  >
+                    <Icon name="document" size={22} />
+                  </Pressable>
+                  {isTodos ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="New todo"
+                      onPress={addTodo}
+                    >
+                      <Icon name="add" size={22} />
+                    </Pressable>
+                  ) : null}
+                </View>
               )
             : undefined,
         }}
@@ -72,6 +85,7 @@ export default function TileDetail() {
               onWrite={write}
               onCreateFile={(file, text) => githubContentFiles.create(file, text)}
               onOpenFile={(file) => router.push(`/files/${file}` as never)}
+              startAdding={add === '1'}
             />
           )
         ) : failed || !path ? (

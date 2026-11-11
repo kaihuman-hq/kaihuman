@@ -73,14 +73,14 @@ export function trackActions(
     const look = { label: action.label, icon: glance.icon, tint: glance.tint };
     if (action.kind === 'tap')
       return [{ ...look, kind: 'tap', id: `tap:${file.path}`, path: file.path }];
-    if (action.kind === 'field') {
+    if (action.kind === 'field' || (action.kind === 'open' && action.track)) {
       return [
         {
           ...look,
           kind: 'field',
           id: `field:${file.path}`,
           path: file.path,
-          href: quickEntryHref(file.path),
+          href: action.kind === 'open' ? action.href : quickEntryHref(file.path),
         },
       ];
     }

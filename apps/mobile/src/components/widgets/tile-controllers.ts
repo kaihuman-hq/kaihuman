@@ -745,9 +745,17 @@ export interface CollectionColumn {
   unit?: string;
 }
 
+/** `auto:number:sum` / `auto:number:avg`: computed per row from the number columns on save. */
+export type CollectionAggregate = 'sum' | 'avg';
+
+export const collectionAggregate = (type: string): CollectionAggregate | null =>
+  type === 'auto:number:sum' ? 'sum' : type === 'auto:number:avg' ? 'avg' : null;
+
 export interface CollectionSeries {
   column: string;
   unit: string;
+  /** Set for a computed column; such a series is shown but never typed into. */
+  aggregate?: CollectionAggregate;
   latest: number;
   min: number;
   max: number;
@@ -758,7 +766,10 @@ export interface CollectionSeries {
 export interface DataCollectionView {
   columns: CollectionColumn[];
   rowCount: number;
-  /** One chartable series per number column, labelled by the first date-like column. */
+  /**
+   * One chartable series per number or aggregate column, in column order, labelled by the first
+   * date-like column.
+   */
   series: CollectionSeries[];
 }
 
@@ -785,15 +796,21 @@ export const dataCollectionView = (content: string): DataCollectionView => {
   const labelAt = columns.findIndex((c) => c.type.includes('date'));
   const series: CollectionSeries[] = [];
   columns.forEach((col, ci) => {
-    if (col.type !== 'number') return;
+    const aggregate = collectionAggregate(col.type);
+    if (col.type !== 'number' && !aggregate) return;
     const points = rows
-      .map((r, ri) => ({ x: labelAt >= 0 ? (r[labelAt] ?? '') : String(ri + 1), y: Number(r[ci]) }))
-      .filter((p) => rows.length > 0 && !Number.isNaN(p.y));
+      .map((r, ri) => ({
+        x: labelAt >= 0 ? (r[labelAt] ?? '') : String(ri + 1),
+        // A blank cell is missing, not 0.
+        y: (r[ci] ?? '').trim() === '' ? Number.NaN : Number(r[ci]),
+      }))
+      .filter((p) => !Number.isNaN(p.y));
     if (points.length === 0) return;
     const ys = points.map((p) => p.y);
     series.push({
       column: col.name,
       unit: col.unit ?? '',
+      ...(aggregate && { aggregate }),
       latest: ys[ys.length - 1] as number,
       min: Math.min(...ys),
       max: Math.max(...ys),

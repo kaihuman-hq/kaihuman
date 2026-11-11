@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-11 — Mobile: collection sum on tiles, consumption add form, keyboard, open file
+
+- Data collection tile showed the first number column of the newest row even when the file has a sum column. Cause: `dataCollectionView` only built series from `number` columns, so `auto:number:sum` / `auto:number:avg` were dropped. Those columns are now series marked `aggregate`; the square tile shows the aggregate (label `sum · N rows`) and its quick entry still types into the first number column. The detail view lists the aggregate too. Blank cells no longer count as 0. No iOS/Android widget shows data collections, so no native change.
+- Consumption tile ＋ now opens the detail view on the full "Add reading" form (date + every meter; "Add meter" when the file has none) instead of a +1 or a one-meter field. Also listed in the ＋ menu Track entries. `/dashboard/tile?…&add=1` (already built for events and trips) is now read and passed as `Ctx.startAdding`.
+- Fields under the keyboard: Expo 58 is always edge-to-edge on Android, so the window does not resize and the disabled `KeyboardAvoidingView` left forms under the keyboard; on iOS the header height was not offset and the scroll view never scrolled to the focused field. New shared `src/ui/keyboard.tsx` (`KeyboardLift`, `keyboardScrollProps`): padding on both platforms with the header offset, and on iOS scroll screens `automaticallyAdjustKeyboardInsets` (scrolls the focused field into view). Used by `Screen`, `TileSheet`, the todos sheet, the dashboard editor sheet, the CSV table sheet and the kanban stream sheet.
+- Tile detail: an "Open file" button in the header for every tile (todos too), and the file name under the tile heading links to the editor.
+- Tests: `trackers.test.ts`, `collection-tile.test.ts`, `consumption-body.test.tsx`, `quick-menu.test.ts`, `dashboard-tiles.test.tsx`, `ui/keyboard.test.tsx`.
+
 ## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
 
 - RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.

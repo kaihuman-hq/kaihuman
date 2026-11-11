@@ -23,6 +23,8 @@ export interface Ctx {
   createFile?: (path: string, content: string) => Promise<void>;
   /** Opens a repository file in the editor. */
   openFile?: (path: string) => void;
+  /** The tile was opened from its ＋, so a body with an add form shows it at once. */
+  startAdding?: boolean;
 }
 
 export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {

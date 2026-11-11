@@ -129,10 +129,12 @@ const YEAR_COLORS = [
 const MONTH_INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
 export function Consumption({ view, ctx }: { view: ConsumptionView; ctx: Ctx }) {
-  const [form, setForm] = useState<'reading' | 'meter' | null>(null);
+  const hasMeters = consumptionColumns(ctx.content).length > 0;
+  const [form, setForm] = useState<'reading' | 'meter' | null>(
+    ctx.startAdding ? (hasMeters ? 'reading' : 'meter') : null,
+  );
   const [tab, setTab] = useState<ConsumptionTab>('recent');
   const [all, setAll] = useState(false);
-  const hasMeters = consumptionColumns(ctx.content).length > 0;
   const year = ctx.now.getFullYear();
   const unitOf = new Map(view.meters.map((m) => [m.key, m]));
   const cell = (key: string, use: number | null, lastYear: number | null) => {

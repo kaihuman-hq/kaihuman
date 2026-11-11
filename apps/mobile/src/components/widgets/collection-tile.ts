@@ -3,7 +3,11 @@
  * add-entry mutator. The file layout (`name::X,type::Y,unit::Z` header, `;` rows) matches the console.
  */
 import { localDate } from '@kaihuman/formats';
-import type { TileResult } from './tile-controllers.js';
+import {
+  type CollectionAggregate,
+  collectionAggregate,
+  type TileResult,
+} from './tile-controllers.js';
 
 export type CollectionFilter = 'ALL' | '6M' | '12M' | 'YTD';
 
@@ -67,6 +71,7 @@ export interface CollectionBar {
 export interface CollectionDetailSeries {
   column: string;
   unit: string;
+  aggregate?: CollectionAggregate;
   latest: number;
   min: number;
   max: number;
@@ -106,7 +111,8 @@ export const collectionDetail = (
   const labelAt = columns.findIndex((c) => c.type.includes('date'));
   const series: CollectionDetailSeries[] = [];
   columns.forEach((col, ci) => {
-    if (col.type !== 'number') return;
+    const aggregate = collectionAggregate(col.type);
+    if (col.type !== 'number' && !aggregate) return;
     const points = rows
       .map((r, ri) => ({
         x: labelAt >= 0 ? (r[labelAt] ?? '') : String(ri + 1),
@@ -120,6 +126,7 @@ export const collectionDetail = (
     series.push({
       column: col.name,
       unit: col.unit,
+      ...(aggregate && { aggregate }),
       latest: ys[ys.length - 1] as number,
       min: Math.min(...ys),
       max: Math.max(...ys),

@@ -69,7 +69,14 @@ export type QuickAction =
       submit: (content: string, value: string, now: Date) => TileResult;
     }
   /** Entry needs its own screen (todo add sheet, event with a date). */
-  | { kind: 'open'; icon: 'add'; label: string; href: string };
+  | {
+      kind: 'open';
+      icon: 'add';
+      label: string;
+      href: string;
+      /** Also listed as a Track entry in the ＋ menu. */
+      track?: true;
+    };
 
 export interface GlanceCount {
   value: number;

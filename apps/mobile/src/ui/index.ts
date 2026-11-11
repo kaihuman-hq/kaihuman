@@ -15,6 +15,7 @@ export { Fab, type FabProps } from './fab.js';
 export { GithubMark, type GithubMarkProps } from './github-mark.js';
 export { haptics } from './haptics.js';
 export { Icon, type IconName, type IconProps } from './icon.js';
+export { KeyboardLift, keyboardScrollProps } from './keyboard.js';
 export {
   type IconTone,
   ListRow,
