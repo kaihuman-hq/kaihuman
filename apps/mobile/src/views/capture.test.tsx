@@ -1,5 +1,6 @@
+import { configureCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuickCaptureController, type RepoFiles } from '../screens/quick-capture.js';
 import { CaptureHubView } from './capture-hub-view.js';
 import { type CaptureHeaderState, QuickCaptureView } from './quick-capture-view.js';
@@ -14,6 +15,7 @@ class MemoryFiles implements RepoFiles {
   appFolder = () => '.kh';
   exists = (p: string) => this.store.has(p);
   todoPaths = () => [];
+  paths = () => [...this.store.keys()];
   read = async (p: string) => this.store.get(p) ?? null;
   async write(p: string, c: string) {
     this.store.set(p, c);
@@ -112,5 +114,59 @@ describe('QuickCaptureView', () => {
     await waitFor(() => expect(states.at(-1)?.canSubmit).toBe(true));
     states.at(-1)?.submit();
     await waitFor(() => expect(screen.getByText('Note saved')).toBeTruthy());
+  });
+});
+
+describe('QuickCaptureView file placement', () => {
+  beforeEach(() => configureCoreStorage(new InMemoryStorageAdapter()));
+
+  it('keeps the built-in file on one tap and shows where it goes', async () => {
+    const files = new MemoryFiles();
+    render(<QuickCaptureView controller={new QuickCaptureController(files)} kind="note" />);
+    expect(screen.getByRole('button', { name: 'Saves to .kh/dump.md' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByTestId('capture-submit'));
+    await waitFor(() => expect(screen.getByText('Note saved')).toBeTruthy());
+    expect(files.store.get('.kh/dump.md')).toContain('hello');
+  });
+
+  it('saves into a picked folder and name, then starts there next time', async () => {
+    const files = new MemoryFiles();
+    files.store.set('journal/old.md', '');
+    const { unmount } = render(
+      <QuickCaptureView controller={new QuickCaptureController(files)} kind="note" />,
+    );
+    fireEvent.click(screen.getByTestId('create-target-row'));
+    fireEvent.change(screen.getByLabelText('Folder'), { target: { value: 'jour' } });
+    fireEvent.click(screen.getByTestId('create-folder-journal'));
+    fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'Big Day.md' } });
+    expect(screen.getByText('Creates journal/big-day.md')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByTestId('capture-submit'));
+    await waitFor(() => expect(screen.getByText('Note saved')).toBeTruthy());
+    expect(files.store.get('journal/big-day.md')).toContain('hello');
+    unmount();
+    render(<QuickCaptureView controller={new QuickCaptureController(files)} kind="note" />);
+    expect(screen.getByRole('button', { name: 'Saves to journal/dump.md' })).toBeTruthy();
+  });
+
+  it('refuses a folder outside the repo', async () => {
+    const files = new MemoryFiles();
+    render(<QuickCaptureView controller={new QuickCaptureController(files)} kind="todo" />);
+    fireEvent.click(screen.getByTestId('create-target-row'));
+    fireEvent.change(screen.getByLabelText('Folder'), { target: { value: '../x' } });
+    fireEvent.change(screen.getByLabelText('Todo'), { target: { value: 'a' } });
+    fireEvent.click(screen.getByTestId('capture-submit'));
+    await waitFor(() =>
+      expect(screen.getByText('Error: Use a folder inside the repo.')).toBeTruthy(),
+    );
+    expect(files.store.size).toBe(0);
+  });
+
+  it('has no placement row where the path is fixed', () => {
+    render(
+      <QuickCaptureView controller={new QuickCaptureController(new MemoryFiles())} kind="idea" />,
+    );
+    expect(screen.queryByTestId('create-target-row')).toBeNull();
   });
 });

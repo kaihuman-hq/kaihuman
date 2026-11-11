@@ -31,6 +31,8 @@ export interface RepoFiles {
   exists(path: string): boolean;
   /** `.todos.md` paths in the repo tree. */
   todoPaths(): string[];
+  /** Every file path in the repo tree, for the folder picker and name collision checks. */
+  paths?(): string[];
   /** Content of a file, or null when it does not exist. */
   read(path: string): Promise<string | null>;
   /** Creates or overwrites; rejects when the save fails. */
@@ -48,6 +50,11 @@ export const githubRepoFiles: RepoFiles = {
     githubFileStore.tree
       .peek()
       .filter((t) => t.type === 'blob' && t.path.endsWith('.todos.md'))
+      .map((t) => t.path),
+  paths: () =>
+    githubFileStore.tree
+      .peek()
+      .filter((t) => t.type === 'blob')
       .map((t) => t.path),
   read: (path) => githubCacheReader.read(path, { requireInTree: true }),
   peek: (path) => githubFileStore.openFiles.peek()[path]?.content ?? null,
@@ -94,7 +101,7 @@ export class QuickCaptureController {
   private busy = false;
 
   constructor(
-    private readonly files: RepoFiles = githubRepoFiles,
+    readonly files: RepoFiles = githubRepoFiles,
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
@@ -124,14 +131,18 @@ export class QuickCaptureController {
     });
   }
 
-  /** `repeat` only applies with a `due`: a rule counts from the due date. */
+  /**
+   * `repeat` only applies with a `due`: a rule counts from the due date. `target` is a path the
+   * user picked in the sheet; without one each kind keeps its inbox file.
+   */
   quickTodo(
     text: string,
     tags?: string | string[],
     due?: TodoDue,
     repeat?: TodoRepeat,
+    target?: string,
   ): Promise<CaptureResult> {
-    const path = `${this.files.appFolder()}/inbox.todos.md`;
+    const path = target ?? `${this.files.appFolder()}/inbox.todos.md`;
     return this.append(
       path,
       (current) => {
@@ -152,8 +163,8 @@ export class QuickCaptureController {
   }
 
   /** Newest line first, like the console's dump file, so the latest thought is on top. */
-  quickNote(text: string): Promise<CaptureResult> {
-    const path = `${this.files.appFolder()}/dump.md`;
+  quickNote(text: string, target?: string): Promise<CaptureResult> {
+    const path = target ?? `${this.files.appFolder()}/dump.md`;
     const trimmed = text.trim();
     if (!trimmed) return Promise.resolve({ ok: false, error: 'Nothing to add' });
     return this.append(
@@ -166,9 +177,9 @@ export class QuickCaptureController {
   /** Set by `kaihuman://quick-log?idea=<slug>`: log entries then go to that idea's log. */
   targetIdea: string | null = null;
 
-  quickLog(description: string, tags?: string | string[]): Promise<CaptureResult> {
+  quickLog(description: string, tags?: string | string[], target?: string): Promise<CaptureResult> {
     if (this.targetIdea) return this.logToIdea(this.targetIdea, description);
-    const path = `${this.files.appFolder()}/inbox.actionlog.md`;
+    const path = target ?? `${this.files.appFolder()}/inbox.actionlog.md`;
     return this.append(
       path,
       (current) =>
@@ -254,14 +265,14 @@ export class QuickCaptureController {
   }
 
   /** Drops a raw source into `.kh/raw/` for the knowledge-base ingest skill to process. */
-  quickKnowledge(text: string, title?: string): Promise<CaptureResult> {
+  quickKnowledge(text: string, title?: string, target?: string): Promise<CaptureResult> {
     const body = text.trim();
     if (!body) return Promise.resolve({ ok: false, error: 'Nothing to add' });
     const now = this.clock();
     const heading = title?.trim() || body.split('\n')[0]?.trim() || 'note';
     const base = `${this.files.appFolder()}/raw/${localDate(now)}-${slugifyIdeaTitle(heading)}`;
-    let path = `${base}.md`;
-    for (let n = 2; this.files.exists(path); n++) path = `${base}-${n}.md`;
+    let path = target ?? `${base}.md`;
+    if (!target) for (let n = 2; this.files.exists(path); n++) path = `${base}-${n}.md`;
     const content = `---\ntitle: ${JSON.stringify(heading)}\ncaptured: ${now.toISOString()}\nsource: mobile\nprocessed: false\n---\n\n${body}\n`;
     return this.run(path, async () => {
       await this.files.write(path, content);

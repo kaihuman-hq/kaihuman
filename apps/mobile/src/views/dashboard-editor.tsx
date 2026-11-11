@@ -1,3 +1,4 @@
+import { appFolderFor } from '@kaihuman/core';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import type { TileKind } from '../components/widgets/tile-controllers.js';
 import { tileKindForPath } from '../components/widgets/tile-controllers.js';
+import { normalizeFolder, rememberFolder, tileSpec } from '../files/create-target.js';
 import {
   type DashboardEdit,
   dropIndex,
@@ -17,6 +19,7 @@ import {
   moveItem,
   NEW_TILE_FILES,
   newTileFile,
+  tileCreateSpec,
 } from '../screens/dashboard-edit.js';
 import type { DashboardPage } from '../screens/dashboards.js';
 import { useTheme } from '../theme/theme.js';
@@ -32,6 +35,7 @@ import {
   TextField,
 } from '../ui/index.js';
 import { useInsets } from '../ui/insets.js';
+import { CreateTargetRow, useCreateTarget } from './create-target-row.js';
 import { TILE_META } from './tile-view.js';
 
 /** What the dashboard screen hands the pager so it can offer edit mode. */
@@ -420,13 +424,8 @@ function AddTileSheet({
   onAdd: (path: string) => Promise<void>;
 }) {
   const [kind, setKind] = useState<TileKind | null>(null);
-  const [name, setName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const close = () => {
     setKind(null);
-    setName('');
-    setError(null);
     onClose();
   };
   const onPage = new Set(page.files.map((f) => f.path));
@@ -435,22 +434,6 @@ function AddTileSheet({
   const add = async (path: string) => {
     await onAdd(path);
     setKind(null);
-    setName('');
-  };
-  const create = async () => {
-    if (!kind) return;
-    const file = newTileFile(editor.tree, kind, name);
-    if (!file.ok) return setError(file.error);
-    setBusy(true);
-    setError(null);
-    try {
-      await editor.onCreateFile(file.path, file.content);
-      await add(file.path);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
   };
 
   return (
@@ -488,30 +471,74 @@ function AddTileSheet({
               ))}
             </Section>
           ) : null}
-          <Section header="Or create one">
-            <View style={{ padding: 12, gap: 12 }}>
-              <TextField
-                label="File name"
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. work"
-                {...(error ? { error } : {})}
-                testID="new-tile-name"
-                onSubmitEditing={() => void create()}
-              />
-              <Button
-                label="Create and add"
-                loading={busy}
-                disabled={busy}
-                onPress={() => void create()}
-                testID="create-tile"
-              />
-            </View>
-          </Section>
+          <NewTileForm key={kind} kind={kind} editor={editor} onCreated={add} />
           <Button label="Back" variant="plain" onPress={() => setKind(null)} />
         </>
       )}
     </Sheet>
+  );
+}
+
+/** "Or create one": folder and name for a new tile file, prefilled so one tap creates it. */
+function NewTileForm({
+  kind,
+  editor,
+  onCreated,
+}: {
+  kind: TileKind;
+  editor: DashboardEditor;
+  onCreated: (path: string) => Promise<void>;
+}) {
+  const spec = tileCreateSpec(kind);
+  const appFolder = appFolderFor(editor.tree);
+  const place = useCreateTarget(spec ?? tileSpec(kind, ''), appFolder);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!spec) return null;
+
+  const create = async () => {
+    const file = newTileFile(editor.tree, kind, place.target.name, place.target.folder);
+    if (!file.ok) return setError(file.error);
+    setBusy(true);
+    setError(null);
+    try {
+      await editor.onCreateFile(file.path, file.content);
+      rememberFolder(spec.id, normalizeFolder(place.target.folder) ?? '');
+      await onCreated(file.path);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section header="Or create one">
+      <View style={{ padding: 12, gap: 12 }}>
+        <CreateTargetRow
+          spec={spec}
+          state={{
+            ...place,
+            setName: (v) => {
+              setError(null);
+              place.setName(v);
+            },
+          }}
+          appFolder={appFolder}
+          paths={editor.tree}
+          initiallyOpen
+          error={error}
+          onSubmit={() => void create()}
+        />
+        <Button
+          label="Create and add"
+          loading={busy}
+          disabled={busy}
+          onPress={() => void create()}
+          testID="create-tile"
+        />
+      </View>
+    </Section>
   );
 }
 

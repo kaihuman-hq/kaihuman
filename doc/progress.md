@@ -22,6 +22,14 @@
 - Board/Streams segmented control replaced by an icon toggle beside the filter icon.
 - Tests: `kanban-filters.test.tsx` (chrome), `board-analytics.test.tsx`.
 
+## 2026-11-11 — Mobile: choose the folder and name of new files
+
+- Quick capture (todo, note, log, knowledge) and the dashboard add-tile picker now let the user place the new file. Pure rules in `src/files/create-target.ts` (`resolveTarget`, `repoFolders`, `slugifyName`, per-kind `CAPTURE_SPECS` / `tileSpec`, remembered folder per kind under `kh_mobile_create_folders`); shared UI `src/views/create-target-row.tsx` (`useCreateTarget`, `CreateTargetRow`).
+- Fast path unchanged: an untouched capture sheet writes its built-in file (`inbox.todos.md`, `dump.md`, `inbox.actionlog.md`, `raw/<date>-<title>.md`). The row "Saves to …" opens a folder field with matching existing folders (a typed path creates a new subfolder) and a file name. Collisions: todo/note/log append to the existing file, knowledge takes the next free `-2` name, tile files are refused.
+- `QuickCaptureController.quickTodo/quickNote/quickLog/quickKnowledge` take an optional target path; `RepoFiles.paths()` lists the tree. `newTileFile` takes a folder and uses the shared rules; its name is prefilled with today's date.
+- Ideas keep their fixed `ideas/` path (the idea tools find them there); the smart inbox routes by content. No create flow exists on mobile for wiki pages or dashboards (dashboards are config entries, not files).
+- Tests: `src/files/create-target.test.ts`, `src/views/capture.test.tsx`, `src/views/dashboard-editor.test.tsx`, `src/screens/todos-and-capture.test.ts`.
+
 ## 2026-11-11 — Mobile: German Siri phrases
 
 - No Siri phrase worked on a German-Siri iPhone (TestFlight). Cause: App Shortcut phrases were English only; Siri matches only phrases in the Siri language. The Swift sources were already compiled into the app target (checked; the test against a real pbxproj covers it).
