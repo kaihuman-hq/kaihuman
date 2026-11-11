@@ -45,6 +45,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('expo-router/react-navigation', () => ({
   HeaderShownContext: createContext(false),
+  HeaderHeightContext: createContext(undefined),
 }));
 
 // Reanimated needs the native worklet runtime. Animations resolve instantly to their target value

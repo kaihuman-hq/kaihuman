@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type {
   TileView as TileData,
   TileKind,
@@ -33,6 +33,8 @@ export interface TileProps {
   onCreateFile?: (path: string, content: string) => Promise<void>;
   /** Opens a repository file in the editor. */
   onOpenFile?: (path: string) => void;
+  /** Opened from a tile's ＋: the body starts with its add form showing. */
+  startAdding?: boolean;
 }
 
 /** Friendly heading and glyph per tile kind; the file name stays as a mono caption. */
@@ -77,7 +79,16 @@ export function Tile(props: TileProps) {
   );
 }
 
-function TileCard({ path, tile, content, now, onWrite, onCreateFile, onOpenFile }: TileProps) {
+function TileCard({
+  path,
+  tile,
+  content,
+  now,
+  onWrite,
+  onCreateFile,
+  onOpenFile,
+  startAdding,
+}: TileProps) {
   const [error, setError] = useState<string | null>(null);
   const { spacing } = useTheme();
   const meta = TILE_META[tile.kind];
@@ -104,6 +115,7 @@ function TileCard({ path, tile, content, now, onWrite, onCreateFile, onOpenFile 
     path,
     ...(onCreateFile && { createFile: onCreateFile }),
     ...(onOpenFile && { openFile: onOpenFile }),
+    ...(startAdding && { startAdding }),
   };
   return (
     <Card>
@@ -114,9 +126,23 @@ function TileCard({ path, tile, content, now, onWrite, onCreateFile, onOpenFile 
             <Text variant="headline" accessibilityRole="header">
               {meta.title}
             </Text>
-            <Text variant="caption2" mono tone="secondary" numberOfLines={1}>
-              {nameOf(path)}
-            </Text>
+            {onOpenFile ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Open ${nameOf(path)}`}
+                testID="tile-file-link"
+                hitSlop={8}
+                onPress={() => onOpenFile(path)}
+              >
+                <Text variant="caption2" mono tone="accent" numberOfLines={1}>
+                  {nameOf(path)}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text variant="caption2" mono tone="secondary" numberOfLines={1}>
+                {nameOf(path)}
+              </Text>
+            )}
           </View>
           <HeaderBadge tile={tile} />
         </View>

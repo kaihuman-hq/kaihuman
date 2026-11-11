@@ -1,15 +1,6 @@
 import type { TodoDue, TodoRepeat, TodoStatus } from '@kaihuman/formats';
 import { type ReactNode, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  Switch,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, Share, Switch, View } from 'react-native';
 import {
   addMilestoneTo,
   addTodoTask,
@@ -32,7 +23,16 @@ import {
 } from '../../components/widgets/todos-tile.js';
 import { dueBadge, retargetRepeat } from '../../screens/todo-due.js';
 import { useTheme } from '../../theme/theme.js';
-import { Badge, Button, Chip, haptics, Icon, Text, TextField } from '../../ui/index.js';
+import {
+  Badge,
+  Button,
+  Chip,
+  haptics,
+  Icon,
+  KeyboardLift,
+  Text,
+  TextField,
+} from '../../ui/index.js';
 import { DueEditor } from '../due-editor.js';
 import { DueSheet } from '../due-sheet.js';
 import type { Ctx } from './bodies.js';
@@ -51,10 +51,7 @@ function Sheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} visible>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardLift>
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}
@@ -82,7 +79,7 @@ function Sheet({
             </ScrollView>
           </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
+      </KeyboardLift>
     </Modal>
   );
 }

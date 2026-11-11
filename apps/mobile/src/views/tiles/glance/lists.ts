@@ -27,7 +27,9 @@ const daysHero = (days: number): Pick<Glance, 'hero' | 'unit'> =>
   days <= 0 ? { hero: 'Today' } : { hero: String(days), unit: days === 1 ? 'day' : 'days' };
 
 /** `href` of the tile screen's add sheet. */
-const addHref = (path: string): string => `/dashboard/tile?path=${encodeURIComponent(path)}&add=1`;
+/** Opens the tile's detail with its add form already showing. */
+export const addHref = (path: string): string =>
+  `/dashboard/tile?path=${encodeURIComponent(path)}&add=1`;
 
 const hostOf = (url: string): string => {
   try {

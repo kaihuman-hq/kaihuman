@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
-import { Text } from '../../ui/index.js';
+import { KeyboardLift, Text } from '../../ui/index.js';
 
 /**
  * A bottom sheet for editing one thing a tile shows: scrolls its content, dismisses on a tap
@@ -23,10 +23,7 @@ export function TileSheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose} visible>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardLift>
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}
@@ -57,7 +54,7 @@ export function TileSheet({
             {footer}
           </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
+      </KeyboardLift>
     </Modal>
   );
 }

@@ -20,9 +20,15 @@ const CSV = [
   '2026-01-31,230,140',
 ].join('\n');
 
-const setup = (content = CSV) => {
+const setup = (content = CSV, startAdding = false) => {
   const apply = vi.fn((_: unknown) => true);
-  const ctx: Ctx = { content, now: new Date(2026, 1, 15), apply, error: null };
+  const ctx: Ctx = {
+    content,
+    now: new Date(2026, 1, 15),
+    apply,
+    error: null,
+    ...(startAdding && { startAdding }),
+  };
   render(<Consumption view={consumptionView(content, ctx.now)} ctx={ctx} />);
   return { apply };
 };
@@ -37,6 +43,18 @@ const longPress = (el: HTMLElement) => {
 const press = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }));
 
 describe('Consumption tile', () => {
+  it('opened from the ＋ it starts on the reading form with every meter', () => {
+    setup(CSV, true);
+    expect(screen.getByRole('button', { name: 'Save reading' })).toBeTruthy();
+    expect(screen.getByText('Gas (m³)')).toBeTruthy();
+    expect(screen.getByText('Power (kWh)')).toBeTruthy();
+  });
+
+  it('opened from the ＋ with no meters it starts on the meter form', () => {
+    setup('created', true);
+    expect(screen.getByRole('button', { name: 'Save meter' })).toBeTruthy();
+  });
+
   it('starts on the recent readings with every meter', () => {
     setup();
     expect(screen.getByText('Gas')).toBeTruthy();

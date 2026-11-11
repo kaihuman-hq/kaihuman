@@ -25,6 +25,7 @@ import {
   errorMessage,
   haptics,
   Icon,
+  KeyboardLift,
   ListRow,
   Section,
   Text,
@@ -68,7 +69,7 @@ export function Sheet({
   const { height } = useWindowDimensions();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardLift style={{ justifyContent: 'flex-end' }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Close ${title}`}
@@ -115,7 +116,7 @@ export function Sheet({
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardLift>
     </Modal>
   );
 }

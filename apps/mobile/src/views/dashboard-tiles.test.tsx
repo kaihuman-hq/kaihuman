@@ -41,6 +41,26 @@ describe('tile headings', () => {
     const { f } = renderTile('.bookmarks.json');
     expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeTruthy();
     expect(screen.getByText(f.path.slice(f.path.lastIndexOf('/') + 1))).toBeTruthy();
+    expect(screen.queryByTestId('tile-file-link')).toBeNull();
+  });
+
+  it('links the file name to the editor when the host can open files', () => {
+    const f = file('.bookmarks.json');
+    const tile = presentTile(f.path, f.content, NOW);
+    if (!tile) throw new Error('no tile');
+    const onOpenFile = vi.fn();
+    render(
+      <Tile
+        path={f.path}
+        tile={tile}
+        content={f.content}
+        now={NOW}
+        onWrite={vi.fn()}
+        onOpenFile={onOpenFile}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('tile-file-link'));
+    expect(onOpenFile).toHaveBeenCalledWith(f.path);
   });
 });
 

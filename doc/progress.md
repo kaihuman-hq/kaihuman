@@ -9,6 +9,14 @@
 - Search opened nothing: `/search` resolved to a hidden tab (`app/(tabs)/search`, `href: null`), which expo-router does not render and redirects to the first tab. Removed the hidden tab, so `/search` is the root-stack screen. Regression test `src/navigation/route-resolution.test.ts` uses expo-router's own route resolution. Note: `/capture` is also a hidden tab and likely has the same problem.
 - Tests: `content-ports`, `content-screens`, `todos-and-capture`, `todo-detail`, `optimistic`, `token-refresh`, `auth-recovery`, `cold-start`, core `auth.store`, auth-worker `index`.
 
+## 2026-11-11 — Mobile: collection sum on tiles, consumption add form, keyboard, open file
+
+- Data collection tile showed the first number column of the newest row even when the file has a sum column. Cause: `dataCollectionView` only built series from `number` columns, so `auto:number:sum` / `auto:number:avg` were dropped. Those columns are now series marked `aggregate`; the square tile shows the aggregate (label `sum · N rows`) and its quick entry still types into the first number column. The detail view lists the aggregate too. Blank cells no longer count as 0. No iOS/Android widget shows data collections, so no native change.
+- Consumption tile ＋ now opens the detail view on the full "Add reading" form (date + every meter; "Add meter" when the file has none) instead of a +1 or a one-meter field. Also listed in the ＋ menu Track entries. `/dashboard/tile?…&add=1` (already built for events and trips) is now read and passed as `Ctx.startAdding`.
+- Fields under the keyboard: Expo 58 is always edge-to-edge on Android, so the window does not resize and the disabled `KeyboardAvoidingView` left forms under the keyboard; on iOS the header height was not offset and the scroll view never scrolled to the focused field. New shared `src/ui/keyboard.tsx` (`KeyboardLift`, `keyboardScrollProps`): padding on both platforms with the header offset, and on iOS scroll screens `automaticallyAdjustKeyboardInsets` (scrolls the focused field into view). Used by `Screen`, `TileSheet`, the todos sheet, the dashboard editor sheet, the CSV table sheet and the kanban stream sheet.
+- Tile detail: an "Open file" button in the header for every tile (todos too), and the file name under the tile heading links to the editor.
+- Tests: `trackers.test.ts`, `collection-tile.test.ts`, `consumption-body.test.tsx`, `quick-menu.test.ts`, `dashboard-tiles.test.tsx`, `ui/keyboard.test.tsx`.
+
 ## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
 
 - RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.
@@ -39,6 +47,7 @@
 - Scan to entry (1.3): new Scan screen (`/scan`, More tab) turns a document camera scan into a budget line, trip, todo or meter reading. Visual Intelligence `IntentValueQuery` (`targets/ios-app-intents/VisualIntelligenceIntents.swift`) offers the four kinds in the camera and screenshot search; picking one opens `kaihuman://scan?kind=&text=`.
 - Weekly review (2.1): new screen (`/weekly-review`, More tab) builds done todos, habit streaks, time tracked, spend and open loops in TS, has the model write prose (PCC when available, else on-device) above the facts, and writes `logs/weekly-review-<date>.md` (never overwrites) and opens it. Without a model it writes a fixed template. The PCC model API is not wired yet (iOS 27 SDK API unverified), so `server` reports unavailable.
 - Needs a Mac build and device test: no Swift compiler on CI; Swift is covered by source-text tests (`src/intelligence/native-sources.test.ts`).
+
 ## 2026-11-10 — Mobile: Siri App Schemas, app skills and open-ended queries (proposal 1.2)
 
 - Spotlight/Siri file (`spotlight-items.json`) now has log entries (kind `log`, link `kaihuman://files/<log>#<n>`) and a `date` (`YYYY-MM-DD`: log day, todo due day). `SearchDoc` gained `date`.
@@ -49,6 +58,7 @@
 - Siri AI app skills: `targets/ios-app-intents/skills/{todos,notes,log}/SKILL.md` (format and bundling unverified; not copied into the app yet).
 - View Annotations: not done (RN views are not SwiftUI). See `doc/apple-intelligence.md`.
 - Tests: `src/app-schemas.test.ts` (Swift/SKILL.md source text, plugin), spotlight and deep-link cases.
+
 ## 2026-11-10 — Mobile iOS: Focus session on every surface, Focus filters, extra-large Today, digest intent
 
 Proposals 2.3 and 2.5 of `doc/apple-proposals.md`. No Swift compiler in this environment: the Swift is checked by source-text tests (`apple-surfaces.test.ts`) and **must be built and tried on a device** before release.

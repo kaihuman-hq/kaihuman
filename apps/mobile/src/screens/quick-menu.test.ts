@@ -45,12 +45,18 @@ const byPath: Record<string, Glance | null> = {
   'b.budget.csv': glance(field),
   'c.events.csv': glance(open),
   'd.timezones.json': glance(),
-  'e.unknown': null,
 };
 const files: TileFile[] = Object.keys(byPath).map((path) => ({ path, content: 'body' }));
 const glanceFor = (f: TileFile) => byPath[f.path] ?? null;
 
 describe('trackActions', () => {
+  it('lists an open action marked for tracking as a field entry to its own form', () => {
+    const tracked = glance({ ...open, label: 'Add reading', href: '/form', track: true });
+    expect(
+      trackActions([{ path: 'f.consumption.csv', content: 'x' }], () => tracked),
+    ).toMatchObject([{ kind: 'field', id: 'field:f.consumption.csv', href: '/form' }]);
+  });
+
   it('lists one entry per tile with a tap or field action, in tile order', () => {
     const actions = trackActions(files, glanceFor);
     expect(actions).toEqual([
