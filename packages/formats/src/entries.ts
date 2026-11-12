@@ -15,7 +15,15 @@ import {
   type ReadItLaterItem,
   serializeReadItLater,
 } from './read-later.js';
-import { addTodo, moveTodo, parseTodos, serializeTodos, type TodoPrompt } from './todos.js';
+import {
+  addTodo,
+  moveTodo,
+  parseTodos,
+  serializeTodos,
+  setTodoDue,
+  type TodoDue,
+  type TodoPrompt,
+} from './todos.js';
 
 const TAG = /#([\w-]+)/g;
 
@@ -33,6 +41,7 @@ export interface TodoEntry {
   tags?: string[];
   milestoneId?: string;
   prompt?: TodoPrompt;
+  due?: TodoDue;
   /** Default `end`; streams add new items on top. */
   position?: 'top' | 'end';
 }
@@ -41,7 +50,7 @@ export interface TodoEntry {
 export function addTodoEntry(content: string, entry: TodoEntry, now = new Date()): string {
   const { text, tags } = splitInlineTags(entry.text);
   if (!text) throw new Error('Nothing to add');
-  const data = addTodo(
+  const added = addTodo(
     parseTodos(content),
     text,
     unique([...(entry.tags ?? []), ...tags]),
@@ -49,6 +58,8 @@ export function addTodoEntry(content: string, entry: TodoEntry, now = new Date()
     entry.prompt,
     now,
   );
+  const last = added.items[added.items.length - 1];
+  const data = entry.due && last ? setTodoDue(added, last.id, entry.due) : added;
   return serializeTodos(entry.position === 'top' ? moveTodo(data, data.items.length - 1, 0) : data);
 }
 

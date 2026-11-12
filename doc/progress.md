@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-12 — Console: todo date views and due quick picks
+
+- Every todo list (dashboard todo tiles, incl. the default `inbox.todos.md`, and the focused todo view) has view tabs **Today / Tomorrow / Next 7 days / All** with open-item counts. Today shows an **Overdue** section first (earlier dates and passed times today, red count on the tab), then items due today; Next 7 days groups by day (today + 6); All is the previous list. Dated views show open items only and keep the tag filter.
+- The chosen view is remembered per list (`localStorage` key `kh.todo-view.<tile id>`, falls back to All when storage is unavailable).
+- Setting a due date: click a row's due badge, or the "DUE" chip (always in focus mode, on hover in tiles), for Today / Tomorrow / Next week (next Monday) / date picker / clear; a time already set is kept. The todo Add form and the `/quick-todo` inbox page got the same quick picks.
+- File format unchanged (`::due::`). Code: `packages/formats/src/todo-views.ts` (`todoViewSections`, `todoViewCounts`, `dueQuickPick`, `addDays`), `addTodoEntry` takes an optional `due`; UI `DuePicker` / `DueQuickPicks` (`packages/ui/.../Widgets/DuePicker.tsx`), `TodoWidget` `storageKey` prop.
+- Tests: `todo-views.test.ts`, `TodoWidget.views.test.tsx`, `QuickTodoPage.test.tsx` (inbox due).
+
 ## 2026-11-11 — Mobile: login survives a background launch on a locked phone
 
 - iOS still asked for a new sign-in now and then, the PWA never. Cause: background sync (expo-background-task) launches the app while the phone is locked; Keychain items that are not readable then (legacy `WHEN_UNLOCKED` items, or any item before the first unlock after a reboot) failed to read, core started with no token and no refresh token, `startTokenSync` marked the session hydrated, and the user who opened the app later found the login screen. The secure driver also cached a `null` for the core's "clean-up" delete, so nothing read the Keychain again. The PWA's localStorage/IndexedDB has no lock state, so it never sees an empty session.
