@@ -137,7 +137,7 @@ pub enum IdeasCommand {
 
 #[derive(Subcommand)]
 pub enum SkillsCommand {
-    /// Install the kh-ideas skill to ~/.claude/skills/ and ~/.agents/skills/
+    /// Install the kh-ideas and kh-todos skills to ~/.claude/skills/ and ~/.agents/skills/
     Install {
         /// Install under this directory instead of your home directory
         #[arg(long)]
@@ -835,17 +835,22 @@ fn use_color() -> bool {
 
 // --- skills --------------------------------------------------------------------------------------
 
-/// Writes the kh-ideas skill where Claude Code (`.claude/skills/`) and the other agents
-/// (`.agents/skills/`) read user skills, overwriting older copies.
+/// Writes the kh-ideas and kh-todos skills where Claude Code (`.claude/skills/`) and the other
+/// agents (`.agents/skills/`) read user skills, overwriting older copies.
 pub fn install_skill(home: &Path) -> Result<Vec<PathBuf>> {
-    [".claude", ".agents"]
+    let skills = [
+        ("kh-ideas", KH_IDEAS_SKILL),
+        ("kh-todos", crate::todos_cli::KH_TODOS_SKILL),
+    ];
+    skills
         .iter()
-        .map(|base| {
-            let dir = home.join(base).join("skills").join("kh-ideas");
+        .flat_map(|skill| [".claude", ".agents"].map(|base| (base, skill)))
+        .map(|(base, (name, text))| {
+            let dir = home.join(base).join("skills").join(name);
             fs::create_dir_all(&dir)
                 .with_context(|| format!("Failed to create {}", dir.display()))?;
             let path = dir.join("SKILL.md");
-            fs::write(&path, KH_IDEAS_SKILL)
+            fs::write(&path, text)
                 .with_context(|| format!("Failed to write {}", path.display()))?;
             Ok(path)
         })
@@ -1459,13 +1464,18 @@ mod tests {
             [
                 home.join(".claude/skills/kh-ideas/SKILL.md"),
                 home.join(".agents/skills/kh-ideas/SKILL.md"),
+                home.join(".claude/skills/kh-todos/SKILL.md"),
+                home.join(".agents/skills/kh-todos/SKILL.md"),
             ]
         );
         fs::write(&paths[0], "old").unwrap();
         install_skill(&home).unwrap();
-        for path in paths {
+        for (path, name) in paths
+            .iter()
+            .zip(["kh-ideas", "kh-ideas", "kh-todos", "kh-todos"])
+        {
             let text = fs::read_to_string(path).unwrap();
-            assert!(text.starts_with("---\nname: kh-ideas\n"));
+            assert!(text.starts_with(&format!("---\nname: {name}\n")));
         }
         fs::remove_dir_all(home).unwrap();
     }
