@@ -172,6 +172,26 @@ pub enum TodoCommand {
     Rm { id: String },
     /// Give every todo without an id one, in one commit
     AssignIds,
+    /// Import todos from another app (a dry run that prints the plan, unless --apply)
+    Import(ImportArgs),
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+pub enum ImportSource {
+    Ticktick,
+}
+
+#[derive(Args)]
+pub struct ImportArgs {
+    pub source: ImportSource,
+    /// The TickTick backup CSV
+    pub file: std::path::PathBuf,
+    /// Write the todos, one commit per file; without it only the plan is printed
+    #[arg(long)]
+    pub apply: bool,
+    /// Also import completed and won't-do todos
+    #[arg(long)]
+    pub include_done: bool,
 }
 
 #[derive(Args)]
@@ -245,7 +265,7 @@ impl Snapshot {
             .map(|(p, c)| (p.as_str(), TodoFile::parse(c)))
     }
 
-    fn ids(&self) -> HashSet<TodoId> {
+    pub(crate) fn ids(&self) -> HashSet<TodoId> {
         self.parsed()
             .flat_map(|(_, f)| f.todos().filter_map(|t| t.id.clone()).collect::<Vec<_>>())
             .collect()
@@ -491,7 +511,7 @@ fn status_value(raw: &str) -> Result<Status> {
 
 /// One todo to add: a `todo add` call or one NDJSON line. `id`, `status`, `created` and `updated`
 /// let an importer keep what the source had; `id` makes a re-run skip what is already there.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct NewTodo {
     pub text: String,
@@ -510,7 +530,7 @@ pub struct NewTodo {
 
 impl NewTodo {
     /// The todo (normalized as the file will read back) and its list's path.
-    fn build(&self, app_folder: &str, now: &Now) -> Result<(String, Todo)> {
+    pub(crate) fn build(&self, app_folder: &str, now: &Now) -> Result<(String, Todo)> {
         let path = resolve_list(self.list.as_deref().unwrap_or("inbox"), app_folder)?;
         let mut todo = Todo::new(&parse_text(&self.text)?, now);
         todo.id = self.id.as_deref().map(parse_id).transpose()?;
@@ -662,6 +682,26 @@ pub enum Output {
     Added(AddReport),
     Removed { removed: TodoJson },
     Assigned { files: Vec<Assigned>, total: usize },
+    Import(ImportPlan),
+}
+
+/// One target file of an import: what it gets and what an earlier import already put there.
+#[derive(Debug, Serialize, PartialEq)]
+pub struct ImportFile {
+    pub path: String,
+    pub new: usize,
+    pub existing: usize,
+    pub todos: Vec<TodoJson>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct ImportPlan {
+    pub applied: bool,
+    pub files: Vec<ImportFile>,
+    pub new: usize,
+    pub existing: usize,
+    /// Completed todos left out; pass --include-done to import them.
+    pub excluded_done: usize,
 }
 
 impl Output {
@@ -707,6 +747,21 @@ impl Output {
                         .iter()
                         .map(|s| format!("skipped {} ({})", s.id, s.reason)),
                 );
+                lines.join("\n")
+            }
+            Output::Import(plan) => {
+                let mut lines: Vec<_> = plan
+                    .files
+                    .iter()
+                    .map(|f| format!("{}: {} new, {} already there", f.path, f.new, f.existing))
+                    .collect();
+                lines.push(format!(
+                    "{} new, {} already there, {} completed left out",
+                    plan.new, plan.existing, plan.excluded_done
+                ));
+                if !plan.applied {
+                    lines.push("Dry run: nothing written. Add --apply to write.".into());
+                }
                 lines.join("\n")
             }
             Output::Removed { removed } => format!("removed {}", removed.line()),
@@ -1068,6 +1123,55 @@ async fn assign_ids(remote: &impl Remote, snap: Snapshot) -> Result<Output> {
     })
 }
 
+/// Plans the import of a TickTick CSV and, with `--apply`, writes it (one commit per file). Todos
+/// whose id is in the repo already count as `existing`, so a second run adds nothing.
+async fn import(
+    remote: &impl Remote,
+    snap: &Snapshot,
+    args: &ImportArgs,
+    csv: &str,
+    now: &Now,
+) -> Result<Output> {
+    let parsed = match args.source {
+        ImportSource::Ticktick => {
+            crate::todos_ticktick::parse(csv, args.include_done, &chrono::Local)
+        }
+    }
+    .map_err(|e| usage(e.to_string()))?;
+    let mut taken = snap.ids();
+    let mut files: BTreeMap<String, ImportFile> = BTreeMap::new();
+    let mut fresh = Vec::new();
+    for (n, item) in parsed.todos.iter().enumerate() {
+        let (path, todo) = item
+            .build(&snap.app_folder, now)
+            .map_err(|e| usage(format!("todo {}: {e}", n + 1)))?;
+        let file = files.entry(path.clone()).or_insert_with(|| ImportFile {
+            path: path.clone(),
+            new: 0,
+            existing: 0,
+            todos: Vec::new(),
+        });
+        if todo.id.as_ref().is_some_and(|id| !taken.insert(id.clone())) {
+            file.existing += 1;
+        } else {
+            file.new += 1;
+            file.todos.push(TodoJson::new(&path, &todo));
+            fresh.push(item.clone());
+        }
+    }
+    if args.apply && !fresh.is_empty() {
+        add_todos(remote, snap, &fresh, now).await?;
+    }
+    let files: Vec<_> = files.into_values().collect();
+    Ok(Output::Import(ImportPlan {
+        applied: args.apply,
+        new: files.iter().map(|f| f.new).sum(),
+        existing: files.iter().map(|f| f.existing).sum(),
+        files,
+        excluded_done: parsed.excluded_done,
+    }))
+}
+
 /// Runs one command against `remote`; `stdin` is read only by `add --stdin`.
 pub(crate) async fn execute(
     remote: &impl Remote,
@@ -1125,6 +1229,11 @@ pub(crate) async fn execute(
         TodoCommand::Move { id, to } => move_todo(remote, snap, id, to, now).await,
         TodoCommand::Rm { id } => remove(remote, &snap, id).await,
         TodoCommand::AssignIds => assign_ids(remote, snap).await,
+        TodoCommand::Import(args) => {
+            let csv = std::fs::read_to_string(&args.file)
+                .map_err(|e| usage(format!("cannot read {}: {e}", args.file.display())))?;
+            import(remote, &snap, args, &csv, now).await
+        }
     }
 }
 
@@ -1655,5 +1764,67 @@ mod tests {
             report_usage_json("error: unexpected argument\n\nUsage: …"),
             2
         );
+    }
+
+    const TICKTICK: &str = include_str!("../tests/fixtures/ticktick.csv");
+
+    /// The fixture on disk (the command reads a path) and the plan of importing it.
+    async fn import_run(fake: &Fake, extra: &[&str]) -> ImportPlan {
+        let path = std::env::temp_dir().join(format!("kh-import-{}.csv", std::process::id()));
+        std::fs::write(&path, TICKTICK).unwrap();
+        let mut args = vec!["import", "ticktick", path.to_str().unwrap()];
+        args.extend(extra);
+        let out = exec(fake, &args).await;
+        std::fs::remove_file(&path).ok();
+        match out.unwrap() {
+            Output::Import(plan) => plan,
+            other => panic!("not a plan: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn import_dry_run_plans_per_file_and_writes_nothing() {
+        let fake = Fake::with(&[(INBOX, SEED)]);
+        let plan = import_run(&fake, &[]).await;
+        assert!(!plan.applied);
+        assert_eq!((plan.new, plan.existing, plan.excluded_done), (7, 0, 3));
+        let paths: Vec<_> = plan.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                ".kh/home.todos.md",
+                ".kh/inbox.todos.md",
+                ".kh/travel-2027.todos.md",
+                ".kh/work.todos.md"
+            ]
+        );
+        assert_eq!(plan.files[1].todos.len(), 2);
+        assert_eq!(fake.content(INBOX), SEED);
+        assert!(fake.messages.borrow().is_empty());
+    }
+
+    #[tokio::test]
+    async fn import_apply_commits_per_file_and_a_rerun_adds_nothing() {
+        let fake = Fake::with(&[(INBOX, SEED)]);
+        let plan = import_run(&fake, &["--apply", "--include-done"]).await;
+        assert!(plan.applied);
+        assert_eq!(plan.new, 10);
+        assert_eq!(fake.messages.borrow().len(), 4);
+        let inbox = fake.content(INBOX);
+        assert!(inbox.contains("Buy milk\n") || inbox.contains("- [ ] Buy milk"));
+        assert!(inbox.contains("- [x] Done with 2"));
+        assert!(inbox.contains("- [-] Won't do"));
+        let after = fake.content(INBOX);
+        let again = import_run(&fake, &["--apply", "--include-done"]).await;
+        assert_eq!((again.new, again.existing), (0, 10));
+        assert_eq!(fake.content(INBOX), after);
+        assert_eq!(fake.messages.borrow().len(), 4);
+    }
+
+    #[tokio::test]
+    async fn import_reads_a_missing_file_as_a_usage_error() {
+        let fake = Fake::with(&[(INBOX, SEED)]);
+        let r = exec(&fake, &["import", "ticktick", "/nonexistent/x.csv"]).await;
+        assert_eq!(code(r), Code::Usage);
     }
 }

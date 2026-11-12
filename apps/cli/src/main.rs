@@ -20,6 +20,7 @@ mod ideas_cli;
 mod server;
 mod todos;
 mod todos_cli;
+mod todos_ticktick;
 mod ui;
 
 use app::App;

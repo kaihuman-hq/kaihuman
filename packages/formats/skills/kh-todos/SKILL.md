@@ -51,3 +51,16 @@ kaihuman todo rm <id> --json            # only when the user asks to delete; pre
   exists is skipped, so a rerun is safe. One commit per list file.
 
 After a change, tell the user in one line what changed (text, list, due).
+
+## Migrate from TickTick
+
+1. Ask the user for the TickTick backup CSV (TickTick: Settings > Account > Generate Backup).
+2. Dry run: `kaihuman todo import ticktick <csv> --json`. It prints, per target file, `new` and
+   `existing` counts and the todos. Check it with the user; `excluded_done` counts completed todos left
+   out (add `--include-done` to keep them).
+3. Write: the same command with `--apply`. One commit per list file.
+- `Inbox` goes to the inbox; every other list to `<name>.todos.md`. Status, priority (5 super-high,
+  3 high), tags, due, created time and notes carry over.
+- Repeat rules the CLI cannot express get the tag `#repeat-unmapped` and the TickTick rule as a note.
+  Offer to fix those by hand with `todo update`.
+- The id comes from the TickTick task id, so a rerun skips what is already imported.
