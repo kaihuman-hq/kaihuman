@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-12 — Console: version files are no longer regenerated locally
+
+- `pnpm dev` / `pnpm build` ran `generate-version.js`, which rewrote `src/version.ts` (new build time) and left a git diff each time.
+- `generate-version.js` now only writes when `CI` or `GITHUB_ACTIONS` is set, or with `--force` / `GENERATE_VERSION=1`. GitHub Actions sets `CI`, so the deploy workflow still produces the right version. `bump-version.js` passes `--force`, so `version:bump` and `build:prod` still work locally.
+- Test: `scripts/generate-version.test.ts` covers the gate.
+
 ## 2026-11-12 — Mobile: adding a todo from a dashboard tile closed the app
 
 - Report: on iOS (TestFlight), adding a todo from the dashboard todo tile's ＋ closed the app. It did not reproduce in jsdom: every add path (`todo-add` sheet, tile detail, tile-card ＋ sheet, dashboard and detail re-render) adds with no errors, and there is no device crash log yet. So the native cause is not confirmed.
