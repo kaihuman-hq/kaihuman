@@ -95,6 +95,20 @@ export const sortStreams = <F extends StreamFile>(
     .map((x) => x.f);
 };
 
+/**
+ * Lays `files` out in a previously frozen `order` (paths), so status edits never
+ * reshuffle tiles under the user's cursor. Paths not in `order` follow in the given order.
+ */
+export const keepOrder = <F extends StreamFile>(
+  files: readonly F[],
+  order: readonly string[],
+): F[] => {
+  const pos = new Map(order.map((p, i) => [p, i]));
+  const known = files.filter((f) => pos.has(f.path));
+  known.sort((a, b) => (pos.get(a.path) ?? 0) - (pos.get(b.path) ?? 0));
+  return [...known, ...files.filter((f) => !pos.has(f.path))];
+};
+
 const ALL_STATUSES: TodoStatus[] = ['backlog', 'in-progress', 'done', 'rejected'];
 export const actionsFor = (status: TodoStatus): TodoStatus[] =>
   ALL_STATUSES.filter((s) => s !== status);

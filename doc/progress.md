@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-12 — Console: stream tiles keep their order while the page is open
+
+- `/stream` sorted tiles on every render, so marking todos done moved the tiles while you were working in them. `StreamsBoard` now sorts once and keeps that order until the page closes. It sorts again only when you change MOST ITEMS/NEWEST, ACTIVE/CLOSED or the search. New streams go at the end.
+- The new helper `keepOrder(files, order)` lives in `@kaihuman/formats` (`todo-board.ts`). Tests are in `todo-board.test.ts` and `StreamsBoard.order.test.tsx`.
+
 ## 2026-11-12 — CI: Cloudflare deploy commits all generated version files again
 
 - The console deploy failed at "Commit Generated File": since ce5dcab the template passed `"$GENERATED_FILE_PATH"` quoted, so `apps/console/src/version.ts apps/console/version.json` reached `git add` as one path. The list is now split into words with `read -ra` and passed as `"${paths[@]}"`, so the value is still never evaluated as shell code.

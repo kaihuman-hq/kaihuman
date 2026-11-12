@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   actionsFor,
   filterRecent,
+  keepOrder,
   matchesBoardSearch,
   matchesDueFilter,
   sortByDue,
@@ -111,5 +112,20 @@ describe('filterRecent', () => {
   it('drops items older than two weeks but keeps ones without a timestamp', () => {
     expect(filterRecent(rows, true, now).map((r) => r.item.id)).toEqual(['fresh', 'none']);
     expect(filterRecent(rows, false, now)).toHaveLength(4);
+  });
+});
+
+describe('keepOrder', () => {
+  const f = (path: string) => ({
+    path,
+    data: { items: [], milestones: [] } as unknown as TodoData,
+  });
+  it('keeps the frozen order, appends unknown paths, drops missing ones', () => {
+    const files = [f('new.md'), f('b.md'), f('a.md')];
+    expect(keepOrder(files, ['a.md', 'gone.md', 'b.md']).map((x) => x.path)).toEqual([
+      'a.md',
+      'b.md',
+      'new.md',
+    ]);
   });
 });
