@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addTodo,
   compareDue,
+  completeTodo,
   cyclePriority,
   dueStatus,
   formatDue,
   maxPriorityRank,
   moveTodo,
+  newTodoId,
   PRIORITY_LABELS,
   PRIORITY_RANK,
   parseTodos,
   serializeTodos,
+  setStatus,
   setTodoColor,
   setTodoDue,
   setTodoPriority,
@@ -17,6 +21,7 @@ import {
   TODO_COLORS,
   type TodoItem,
   type TodoStatus,
+  updateTodoText,
 } from './todos.js';
 
 describe('parseTodos', () => {
@@ -204,5 +209,42 @@ describe('item due date', () => {
     expect(formatDue({ dueDate: '2026-11-10' })).toBe('2026-11-10');
     expect(formatDue({ dueDate: '2026-11-10', dueTime: '14:00' })).toBe('2026-11-10T14:00');
     expect(formatDue({})).toBeUndefined();
+  });
+});
+
+describe('item id', () => {
+  const line =
+    '- [ ] a\n::updated:: 5 ::created:: 2026-01-01T00:00:00.000Z ::due:: 2026-02-01 ::id:: abc123xz\n';
+  it('parses and round-trips ::id:: last on the metadata line', () => {
+    const data = parseTodos(line);
+    expect(data.items[0]?.todoId).toBe('abc123xz');
+    expect(data.items[0]?.dueDate).toBe('2026-02-01');
+    expect(serializeTodos(data)).toBe(line);
+  });
+  it('keeps id-less todos id-less', () => {
+    const md = '- [ ] a\n::updated:: 5\n';
+    expect(parseTodos(md).items[0]?.todoId).toBeUndefined();
+    expect(serializeTodos(parseTodos(md))).toBe(md);
+  });
+  it('ignores malformed ids', () => {
+    expect(parseTodos('- [ ] a\n::id:: BAD\n').items[0]?.todoId).toBeUndefined();
+  });
+  it('preserves the id through edits', () => {
+    const d = parseTodos(line);
+    const edited = [
+      setStatus(d, 0, 'done'),
+      setTodoDue(d, 'item-0', { date: '2026-03-01' }),
+      setTodoPriority(d, 'item-0', 'high'),
+      completeTodo(d, 'item-0'),
+      updateTodoText(d, 0, 'z'),
+    ];
+    for (const e of edited) expect(e.items[0]?.todoId).toBe('abc123xz');
+  });
+  it('gives new todos a random id', () => {
+    const a = addTodo(parseTodos(''), 'x');
+    const id = a.items[0]?.todoId ?? '';
+    expect(id).toMatch(/^[0-9a-z]{8}$/);
+    expect(parseTodos(serializeTodos(a)).items[0]?.todoId).toBe(id);
+    expect(newTodoId()).not.toBe(newTodoId());
   });
 });

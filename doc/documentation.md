@@ -22,7 +22,8 @@ kaihuman capture                  # …or open $EDITOR for a multi-line note
 kaihuman idea "Offline sync"      # New idea in .kh/ideas/ (first line = title)
 kaihuman ideas                    # Overview of open ideas
 kaihuman ideas log <slug> "…"     # Add a log entry (see below for all commands)
-kaihuman skills install           # Install the kh-ideas skill for every agent
+kaihuman todo list                # Active todos across all lists (see below)
+kaihuman skills install           # Install the kh-ideas and kh-todos skills for every agent
 ```
 
 ## `kaihuman capture` — knowledge quick-capture
@@ -63,11 +64,30 @@ Agents use the same commands through the `kh-ideas` skill.
 | `kaihuman ideas status <slug> <status> [--reason R] [--by A]` | `seed`, `exploring`, `committed`, `shipped`, `parked`, `dropped`; logged |
 | `kaihuman ideas import [--by A]` | Apply `kh-idea` hand-off blocks from stdin or `$EDITOR` |
 | `kaihuman ideas path [slug]` | Path in the local clone |
-| `kaihuman skills install [--dir D]` | Write the `kh-ideas` skill to `~/.claude/skills/` and `~/.agents/skills/` |
+| `kaihuman skills install [--dir D]` | Write the `kh-ideas` and `kh-todos` skills to `~/.claude/skills/` and `~/.agents/skills/` |
 
 Reads pull the local clone first. Writes go through the GitHub contents API: creates never
 overwrite, edits are checked against the file's `sha`. Offline, or on a GitHub error, a write is
 queued in the spool (`ideas/`) and replayed in order before the next write.
+
+## `kaihuman todo` — agent todo CLI
+
+Todos are checkbox lines in `*.todos.md` files in the active repo. Reads go through the GitHub API, so agents see the latest state. Agents use the same commands through the `kh-todos` skill.
+
+| Command | Action |
+|---|---|
+| `kaihuman todo lists` | Every `*.todos.md` with counts. Inbox = `.kh/inbox.todos.md` (`.lifeos/` if no `.kh/`) |
+| `kaihuman todo list [--list inbox\|<name>\|<path>\|all] [--status active\|open\|in-progress\|done\|rejected\|any] [--due overdue\|today\|week\|YYYY-MM-DD] [--tag t] [--limit n]` | Default: all lists. Active = open + in progress. `week` = due within 7 days, overdue included |
+| `kaihuman todo show <id>` | One todo |
+| `kaihuman todo add <text> [--list l] [--due d] [--tag t]… [--priority high\|super-high\|ultra-high] [--repeat rule] [--note text]` | `<name>` = `.kh/<name>.todos.md`, created if missing |
+| `kaihuman todo add --stdin` | NDJSON, one object per line: text, list, due, tags, priority, repeat, note, plus optional id, status, created, updated. An id already in the repo is skipped, so re-runs are safe. One commit per file |
+| `kaihuman todo update <id> [--text] [--due\|--no-due] [--priority\|--no-priority] [--add-tag] [--rm-tag] [--status]` | Change a todo |
+| `kaihuman todo done <id>` | Complete it; a recurring todo moves to its next due date |
+| `kaihuman todo move <id> --to <list>` | One commit |
+| `kaihuman todo rm <id>` | Delete it |
+| `kaihuman todo assign-ids` | Give every todo without an id one. One commit |
+
+All commands accept `--json`. A todo is `{id, list, status, text, tags[], priority, due, repeat, created, updated, note}`. With `--json`, errors go to stderr as `{"error":{"code","message"}}`. Exit codes: 0 ok, 1 error, 2 usage, 3 not found, 4 conflict after retry. Any write gives the todos in the files it touches an `::id::`. Files in the old `# Group` format are read but not written.
 
 ## TUI Key Bindings
 

@@ -138,7 +138,7 @@ kaihuman ideas summary palette-sync "Queue writes; no CRDT."
 kaihuman ideas status palette-sync parked --reason "Not before v2" --by claude
 pbpaste | kaihuman ideas import --by claude.ai          # apply kh-idea blocks from a chat
 kaihuman ideas path palette-sync                        # path in the local clone
-kaihuman skills install                                 # the kh-ideas skill for every agent
+kaihuman skills install                                 # the kh-ideas and kh-todos skills for every agent
 ```
 
 `kaihuman idea` takes its text from the arguments, else piped stdin, else `$EDITOR`: the first line is the title, the rest the braindump. Slugs may be written with an `idea:` prefix. `--by` is `human` unless an agent names itself.
@@ -148,7 +148,12 @@ kaihuman skills install                                 # the kh-ideas skill for
 - **Offline, or on any GitHub error,** the write is queued as JSON in the spool's `ideas/` folder and replayed in order before the next write. An op that can never apply (a taken slug, an unknown idea) is renamed `.json.failed` and reported.
 - **Exit codes:** 0 on success or when queued, 1 on an error, printed to stderr as `<command> error: <reason>`.
 
-`kaihuman skills install` writes `~/.claude/skills/kh-ideas/SKILL.md` (Claude Code) and `~/.agents/skills/kh-ideas/SKILL.md` (Antigravity, Gemini CLI, Codex, Copilot, Cursor), so agents working in any product repository can file ideas. `--dir` installs under another directory. The text is `packages/formats/skills/kh-ideas/SKILL.md`, built into the binary.
+`kaihuman skills install` writes `~/.claude/skills/kh-ideas/SKILL.md` and `kh-todos/SKILL.md` (Claude Code) and the same under `~/.agents/skills/` (Antigravity, Gemini CLI, Codex, Copilot, Cursor), so agents working in any product repository can file ideas and read or change todos. `--dir` installs under another directory. The texts are `packages/formats/skills/kh-ideas/SKILL.md` and `kh-todos/SKILL.md`, built into the binary.
+
+## Importing TickTick todos with kaihuman todo import
+<!-- docspack: tags=todo,kaihuman todo,todo import,ticktick,import,csv,kh-todos,migrate -->
+
+`kaihuman todo import ticktick <backup.csv>` reads a TickTick backup CSV and prints a JSON plan: per target file, the counts of new and already-imported todos, and the todos. Nothing is written until `--apply`, which makes one commit per file. `--include-done` also imports completed and won't-do todos. The `Inbox` list goes to the inbox; any other list to `<app folder>/<list name>.todos.md`. The id is a hash of the TickTick task id, so running the import again skips todos already there. Due dates are converted to the task's own time zone (all-day tasks keep only the date). Repeat rules that todos cannot express get the tag `repeat-unmapped` and the original rule as a note. The `kh-todos` skill describes the migration steps for agents.
 
 In the TUI, `i` opens the ideas list (status, title, age, open challenges): `Enter` opens the file in the editor, `n` creates an idea from a title, `l` adds a log entry as `human`, `r` refreshes, `Esc` goes back.
 

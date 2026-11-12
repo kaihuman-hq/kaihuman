@@ -66,19 +66,17 @@ fn dashboard_config_from_value(val: &serde_json::Value) -> DashboardConfig {
 
     let dashboards = val.get("dashboards").and_then(|v| v.as_array()).map(|arr| {
         arr.iter()
-            .filter_map(|obj| {
-                Some(DashboardWorkspace {
-                    id: obj
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string(),
-                    name: obj
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string(),
-                })
+            .map(|obj| DashboardWorkspace {
+                id: obj
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                name: obj
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
             })
             .collect()
     });
@@ -128,13 +126,13 @@ pub fn load_dashboard_config(repo_dir: &Path) -> (Option<DashboardConfig>, Strin
 
     for &candidate in &candidates {
         let full = repo_dir.join(candidate);
-        if let Ok(content) = fs::read_to_string(&full) {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                return (
-                    Some(dashboard_config_from_value(&val)),
-                    candidate.to_string(),
-                );
-            }
+        if let Ok(content) = fs::read_to_string(&full)
+            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+        {
+            return (
+                Some(dashboard_config_from_value(&val)),
+                candidate.to_string(),
+            );
         }
     }
 
@@ -169,15 +167,15 @@ fn scan_dir(base: &Path, dir: &Path, depth: usize) -> Option<(DashboardConfig, S
             .to_string();
 
         if path.is_file() && name.ends_with("dashboard.config.json") {
-            if let Ok(content) = fs::read_to_string(&path) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                    let rel = path
-                        .strip_prefix(base)
-                        .unwrap_or(&path)
-                        .to_string_lossy()
-                        .to_string();
-                    return Some((dashboard_config_from_value(&val), rel));
-                }
+            if let Ok(content) = fs::read_to_string(&path)
+                && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+            {
+                let rel = path
+                    .strip_prefix(base)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                return Some((dashboard_config_from_value(&val), rel));
             }
         } else if path.is_dir() {
             subdirs.push(path);

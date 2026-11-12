@@ -1,0 +1,16 @@
+"Date: 2026-11-12+0000"
+"Version: 7.0"
+"Status: 0 Normal, 1 Completed, 2 Archived"
+
+"Folder Name","List Name","Title","Kind","Tags","Content","Is Check list","Start Date","Due Date","Reminder","Repeat","Priority","Status","Created Time","Completed Time","Order","Timezone","Is All Day","Is Floating","Column Name","Column Order","View Mode","taskId","parentId"
+"","Inbox","Buy milk","TEXT","","","N","","","","","0","0","2026-10-01T08:15:00+0000","","1","Europe/Berlin","true","false","","","","1001",""
+"","Inbox","Call mom","TEXT","","","N","","2026-11-11T23:00:00+0000","","","3","0","2026-10-02T08:15:00+0000","","2","Europe/Berlin","true","false","","","","1002",""
+"Life","Travel 2027","Plan, ""big"" trip","TEXT","trip, fun stuff","Book flights
+Ask Sam about hotel","N","","","","","5","0","2026-10-03T08:15:00+0000","","3","Europe/Berlin","true","false","","","","1003",""
+"","Home","Dentist","TEXT","","","N","","2026-11-12T09:30:00+0000","","","0","0","2026-10-04T08:15:00+0000","","4","Europe/Berlin","false","false","","","","1004",""
+"","Home","Water plants","TEXT","","","N","","2026-11-12T22:00:00+0000","","RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=FR","0","0","2026-10-05T08:15:00+0000","","5","","false","true","","","","1005",""
+"","Work","Standup","TEXT","","","N","","","","RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR","0","0","2026-10-06T08:15:00+0000","","6","","false","false","","","","1006",""
+"","Home","Pay rent","TEXT","","","N","","","","RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO","0","0","2026-10-07T08:15:00+0000","","7","","false","false","","","","1007",""
+"","Inbox","Done with 2","TEXT","","","N","","","","","0","2","2026-09-01T08:15:00+0000","2026-09-02T08:15:00+0000","8","","false","false","","","","1008",""
+"","Inbox","Done with 1","TEXT","","","N","","","","","0","1","2026-09-01T08:15:00+0000","2026-09-02T08:15:00+0000","9","","false","false","","","","1009",""
+"","Inbox","Won't do","TEXT","","","N","","","","","0","-1","2026-09-01T08:15:00+0000","","10","","false","false","","","","1010",""
