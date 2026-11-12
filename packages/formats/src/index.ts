@@ -14,6 +14,7 @@ export * from './prompts.js';
 export * from './read-later.js';
 export * from './rss.js';
 export * from './streams.js';
+export * from './task-board.js';
 export * from './time-tracking.js';
 export * from './timezones.js';
 export * from './todo-board.js';

@@ -66,6 +66,7 @@
 | Todo due dates (`::due::`): date + optional time editor on board cards, Overdue / Today / date badge, due filter and sort | `/board` | 2026-11-08 |
 | Recurring todos (`::repeat::`, e.g. `weekly:mon,thu`, `monthly:last`, `every 2 weeks`): set when adding or editing a todo, repeat icon on board cards and todo widget rows, completing moves the due date to the next occurrence and logs it in `::done::` | `/board`, todo widget, `packages/formats/src/todo-repeat.ts` | 2026-11-09 |
 | Todo date views: Today (overdue grouped first) / Tomorrow / Next 7 days (by day) / All tabs with counts on every todo list, view remembered per list; due quick picks (Today / Tomorrow / Next week / date / clear) on rows, in the Add form and on the inbox quick-add page | todo widget, `/quick-todo`, `packages/formats/src/todo-views.ts` | 2026-11-12 |
+| Tasks board: one TickTick-style view over all todo lists — Today / Next 7 Days / Inbox smart lists, Lists, Tags and Completed with counts, sort by due or list, quick add, one-click complete, collapsible sidebar on mobile | `/tasks`, magic menu, navbar item `tasks` | 2026-11-12 |
 | Extension Todos list: all open and in-progress todos sorted by priority, age and status, with colour, stream name and quick actions | side panel | 2026-11-04 |
 
 ## Browser extension (`apps/browser-extension`)

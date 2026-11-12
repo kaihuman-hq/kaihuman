@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-12 — Console: Tasks board (`/tasks`)
+
+- New full-page board over every `.todos.md` list (TickTick-style). Sidebar: smart lists **Today** (incl. overdue), **Next 7 Days** (overdue through day 7) and **Inbox** with open counts; **Lists** (name, colour dot, open count); **Tags** (stable colour dot from the todo palette, count); **Completed** at the bottom. No Trash: the data model has none.
+- Main pane: view title, sort toggle (due time / list), "…" menu (open list file, Kanban, Stream), an "Add task to "<list>"" row (Inbox for smart views; tag views add the tag), and compact rows: checkbox (completes; recurring todos advance), title with links, then list name, repeat icon, clock and due time in blue, red when overdue.
+- Mobile: the sidebar hides behind the header menu icon. Reachable from the magic menu and as a configurable navbar item (`tasks`).
+- Logic in `packages/formats/src/task-board.ts`, built on the date views from `todo-views.ts`. Tests: `task-board.test.ts` (bucketing, sorting, counts, labels), `apps/console/src/pages/TasksBoardPage.test.tsx` (render, complete, add, mobile sidebar).
+
 ## 2026-11-12 — Mobile: adding a todo from a dashboard tile closed the app
 
 - Report: on iOS (TestFlight), adding a todo from the dashboard todo tile's ＋ closed the app. It did not reproduce in jsdom: every add path (`todo-add` sheet, tile detail, tile-card ＋ sheet, dashboard and detail re-render) adds with no errors, and there is no device crash log yet. So the native cause is not confirmed.

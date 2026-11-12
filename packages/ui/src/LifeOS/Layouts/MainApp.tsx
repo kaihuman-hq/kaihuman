@@ -160,6 +160,7 @@ export interface MainAppProps {
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 
   onBoardClick?: () => void;
+  onTasksClick?: () => void;
   onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
   onKnowledgeClick?: () => void;
@@ -251,6 +252,7 @@ export const MainApp = ({
   githubToken,
   onCheckPath,
   onBoardClick,
+  onTasksClick,
   onActionLogClick,
   onShortcutsClick,
   onKnowledgeClick,
@@ -1382,6 +1384,7 @@ abbreviations: undefined
       setShowFiles(true);
     },
     board: onBoardClick,
+    tasks: onTasksClick,
     shortcuts: onShortcutsClick,
     wiki: onWikiClick,
     knowledge: onKnowledgeClick,
@@ -2120,6 +2123,7 @@ abbreviations: undefined
                   },
                   ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
                   ...(onBoardClick ? [{ label: 'Stream', onClick: onBoardClick }] : []),
+                  ...(onTasksClick ? [{ label: 'Tasks', onClick: onTasksClick }] : []),
                   ...(onActionLogClick ? [{ label: 'Action Log', onClick: onActionLogClick }] : []),
                   ...(onKnowledgeClick
                     ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]

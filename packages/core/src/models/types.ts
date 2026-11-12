@@ -75,6 +75,7 @@ export type NavItemId =
   | 'dashboard'
   | 'files'
   | 'board'
+  | 'tasks'
   | 'shortcuts'
   | 'wiki'
   | 'knowledge'
