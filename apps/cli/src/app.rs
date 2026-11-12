@@ -320,29 +320,26 @@ impl<'a> App<'a> {
             self.poll_sync_status();
 
             // ── Events ───────────────────────────────────────────────────────
-            if event::poll(std::time::Duration::from_millis(100))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == event::KeyEventKind::Press {
-                        if key.code == KeyCode::Char('c')
-                            && key.modifiers.contains(KeyModifiers::CONTROL)
-                        {
-                            self.should_quit = true;
-                            continue;
-                        }
+            if event::poll(std::time::Duration::from_millis(100))?
+                && let Event::Key(key) = event::read()?
+                && key.kind == event::KeyEventKind::Press
+            {
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                    self.should_quit = true;
+                    continue;
+                }
 
-                        match self.current_screen.clone() {
-                            CurrentScreen::Main => self.handle_main_input(terminal, key).await?,
-                            CurrentScreen::Login => {}
-                            CurrentScreen::RepoSelect => self.handle_repo_select_input(key),
-                            CurrentScreen::NoteInput => self.handle_note_input(key).await,
-                            CurrentScreen::AiPrompt => self.handle_ai_prompt_input(key),
-                            CurrentScreen::AiResponse => self.handle_ai_response_input(key),
-                            CurrentScreen::FileBrowser => self.handle_file_browser_input(key),
-                            CurrentScreen::FileEditor => self.handle_file_editor_input(key),
-                            CurrentScreen::DashboardView => self.handle_dashboard_view_input(key),
-                            CurrentScreen::Ideas => self.handle_ideas_input(terminal, key).await?,
-                        }
-                    }
+                match self.current_screen.clone() {
+                    CurrentScreen::Main => self.handle_main_input(terminal, key).await?,
+                    CurrentScreen::Login => {}
+                    CurrentScreen::RepoSelect => self.handle_repo_select_input(key),
+                    CurrentScreen::NoteInput => self.handle_note_input(key).await,
+                    CurrentScreen::AiPrompt => self.handle_ai_prompt_input(key),
+                    CurrentScreen::AiResponse => self.handle_ai_response_input(key),
+                    CurrentScreen::FileBrowser => self.handle_file_browser_input(key),
+                    CurrentScreen::FileEditor => self.handle_file_editor_input(key),
+                    CurrentScreen::DashboardView => self.handle_dashboard_view_input(key),
+                    CurrentScreen::Ideas => self.handle_ideas_input(terminal, key).await?,
                 }
             }
 
@@ -443,9 +440,7 @@ impl<'a> App<'a> {
     }
 
     fn menu_key_to_index(c: char) -> Option<usize> {
-        MENU_ITEMS
-            .iter()
-            .position(|(k, _)| k.chars().next() == Some(c))
+        MENU_ITEMS.iter().position(|(k, _)| k.starts_with(c))
     }
 
     async fn activate_menu_item<B: Backend>(
@@ -1038,10 +1033,10 @@ impl<'a> App<'a> {
     // ── Utilities ─────────────────────────────────────────────────────────────
 
     async fn refresh_repos(&mut self) {
-        if let Some(client) = &self.github_client {
-            if let Ok(repos) = client.list_repos().await {
-                self.repos = repos;
-            }
+        if let Some(client) = &self.github_client
+            && let Ok(repos) = client.list_repos().await
+        {
+            self.repos = repos;
         }
     }
 }

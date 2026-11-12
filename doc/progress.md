@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-12 — Agent todo CLI
+
+- Agent todo CLI: `kaihuman todo lists|list|show|add|add --stdin|update|done|move|rm|assign-ids` with `--json`, stable `::id::` ids, Rust port of todos.ts/todo-repeat.ts (byte-exact round trip for unchanged todos), GitHub reads, sha-checked writes with one retry, multi-file changes in one commit; kh-todos agent skill installed by `kaihuman skills install`. TickTick import still to do. Also fixed the pre-existing `cargo clippy -D warnings` failures in `app.rs`, `files.rs` and `github.rs` (collapsible ifs, unused inbox helpers).
+
 ## 2026-11-12 — CI: Cloudflare deploy commits all generated version files again
 
 - The console deploy failed at "Commit Generated File": since ce5dcab the template passed `"$GENERATED_FILE_PATH"` quoted, so `apps/console/src/version.ts apps/console/version.json` reached `git add` as one path. The list is now split into words with `read -ra` and passed as `"${paths[@]}"`, so the value is still never evaluated as shell code.
