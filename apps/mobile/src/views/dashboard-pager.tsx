@@ -37,6 +37,7 @@ import { useInsets } from '../ui/insets.js';
 import { Animated } from '../ui/motion.js';
 import { type DashboardEditor, DashboardsSheet, EditTiles } from './dashboard-editor.js';
 import { Skeleton } from './dashboard-view.js';
+import { jumpSlot, pageAtOffset, pageOfSlot, slotOf } from './pager-loop.js';
 import { type Glance, glanceOf } from './tiles/glance/index.js';
 import { SquareTile, TILE_GAP, tileSide } from './tiles/square/square-tile.js';
 import { tileRoute, UnsupportedTile } from './tiles/summary-tile.js';
@@ -82,6 +83,8 @@ interface PageProps {
   /** Set on the current page while editing: its tiles show as an editable list. */
   edit?: { pages: readonly DashboardPage[]; editor: DashboardEditor };
   onStartEdit?: () => void;
+  /** Wrap-around copy of a page: same content, but not addressable by test id. */
+  clone?: boolean;
 }
 
 function Page({
@@ -97,6 +100,7 @@ function Page({
   onNavigate,
   edit,
   onStartEdit,
+  clone,
 }: PageProps) {
   const { colors, spacing, metrics } = useTheme();
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -148,7 +152,7 @@ function Page({
     );
 
   return (
-    <View style={{ width }} testID={`dashboard-page-${page.id}`}>
+    <View style={{ width }} testID={clone ? undefined : `dashboard-page-${page.id}`}>
       <ScrollView
         scrollEnabled={scrollEnabled}
         keyboardShouldPersistTaps="handled"
@@ -413,9 +417,20 @@ export function DashboardPager({
   const { colors, spacing, metrics } = useTheme();
   const insets = useInsets();
   const { width } = useWindowDimensions();
-  const list = useRef<FlatList<DashboardPage>>(null);
   const items = pages.length > 0 ? pages : [PLACEHOLDER];
+  // Endless swipe: [last, ...pages, first] (see pager-loop.ts).
+  const slots =
+    items.length > 1
+      ? [
+          { page: items[items.length - 1] as DashboardPage, key: 'head', clone: true },
+          ...items.map((page) => ({ page, key: page.id, clone: false })),
+          { page: items[0] as DashboardPage, key: 'tail', clone: true },
+        ]
+      : items.map((page) => ({ page, key: page.id, clone: false }));
+  const list = useRef<FlatList<(typeof slots)[number]>>(null);
   const [currentId, setCurrentId] = useState<string | null>(lastDashboardId);
+  // Clones mount their content only while a drag is in flight, so a resting page is never duplicated.
+  const [cloneLive, setCloneLive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [dashboardsOpen, setDashboardsOpen] = useState(false);
@@ -435,14 +450,24 @@ export function DashboardPager({
     [items, current.id],
   );
 
-  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
-    settle(Math.round(e.nativeEvent.contentOffset.x / width));
+  // Title and dots follow the live offset, so they change as soon as the next page is half visible.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+    settle(pageAtOffset(e.nativeEvent.contentOffset.x, width, items.length));
+
+  // Landing on a wrap-around clone: jump (unanimated) to the identical real page.
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const slot = Math.round(e.nativeEvent.contentOffset.x / width);
+    settle(pageOfSlot(slot, items.length));
+    const to = jumpSlot(slot, items.length);
+    if (to !== null) list.current?.scrollToOffset({ offset: to * width, animated: false });
+    setCloneLive(false);
+  };
 
   const jumpTo = (i: number) => {
     setMenuOpen(false);
     // Set the page directly too: a programmatic scroll does not always report momentum end.
     settle(i);
-    list.current?.scrollToIndex({ index: i, animated: true });
+    list.current?.scrollToIndex({ index: slotOf(i, items.length), animated: true });
   };
 
   return (
@@ -523,33 +548,44 @@ export function DashboardPager({
         // Remounting on resize or first real data places the list at the remembered page.
         key={`${width}:${pages.length > 0}`}
         ref={list}
-        data={items}
+        data={slots}
         horizontal
         pagingEnabled
         // Paging off while editing, so dragging a tile cannot swipe to another dashboard.
         scrollEnabled={!editing}
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(p) => p.id}
-        initialScrollIndex={index}
+        keyExtractor={(s) => s.key}
+        initialScrollIndex={slotOf(index, items.length)}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        onScroll={onScroll}
+        onScrollBeginDrag={() => setCloneLive(true)}
+        scrollEventThrottle={16}
         onMomentumScrollEnd={onMomentumScrollEnd}
         style={{ flex: 1 }}
-        renderItem={({ item, index: i }) => (
-          <Page
-            page={item}
-            width={width}
-            defaulted={defaulted}
-            now={now}
-            loading={loading}
-            refreshing={refreshing}
-            error={error}
-            onRefresh={onRefresh}
-            onWrite={onWrite}
-            onNavigate={onNavigate}
-            {...(editing && editor && i === index && { edit: { pages: items, editor } })}
-            {...(canEdit && !editing && { onStartEdit: () => setEditing(true) })}
-          />
-        )}
+        renderItem={({ item: { page, clone } }) =>
+          clone && !cloneLive ? (
+            <View style={{ width }} />
+          ) : (
+            <Page
+              page={page}
+              clone={clone}
+              width={width}
+              defaulted={defaulted}
+              now={now}
+              loading={loading}
+              refreshing={refreshing}
+              error={error}
+              onRefresh={onRefresh}
+              onWrite={onWrite}
+              onNavigate={onNavigate}
+              {...(editing &&
+                editor &&
+                !clone &&
+                page.id === current.id && { edit: { pages: items, editor } })}
+              {...(canEdit && !editing && { onStartEdit: () => setEditing(true) })}
+            />
+          )
+        }
       />
       {editor ? (
         <DashboardsSheet

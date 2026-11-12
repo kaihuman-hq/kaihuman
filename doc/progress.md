@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-12 — Mobile: dashboard pager updates live and swipes endlessly
+
+- The dashboard name and page dots now follow the live scroll offset (`onScroll`, throttled 16 ms) and change as soon as the next page is half visible, instead of after the swipe settles.
+- Endless swipe: with 2+ dashboards the list renders `[last, ...pages, first]`; landing on a clone silently jumps (unanimated) to the identical real page. Clones mount their tiles only while a drag is in flight, so a resting page is never duplicated.
+- Index maths lives in `apps/mobile/src/views/pager-loop.ts`; tests in `pager-loop.test.ts` (slot mapping, live offset to page, clone jumps). Existing pager tests pass unchanged.
+
 ## 2026-11-12 — Console: quick link from the dashboard todo tile to `/tasks`
 
 - The dashboard todo tile header has a small muted "↗" icon button (`aria-label="Open Tasks board"`) next to the "N ACTIVE" count; it routes to the Tasks board. Hidden unless `onOpenBoard` is passed (wired from `MainApp`'s existing `onTasksClick`), so the widget stays standalone-safe. No new dashboard chrome; works at mobile width (12px icon in the existing header row; the collapsed mobile tile is unchanged).
