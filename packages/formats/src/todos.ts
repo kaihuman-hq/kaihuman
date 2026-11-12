@@ -28,6 +28,10 @@
  * `::done:: <date>,<date>` (completion log, newest last, capped at DONE_LOG_LIMIT) after `::due::`.
  * Completing a recurring todo moves `::due::` to the next occurrence instead of marking it done.
  *
+ * Every todo made by the app also gets `::id:: <8 chars [0-9a-z]>`, written LAST on the metadata
+ * line (older parsers read the fields before it). It is a stable identity across edits and moves;
+ * todos without one stay valid and are never given one by parse/serialize.
+ *
  * Status markers:
  *   [ ] = backlog, [>] = in-progress, [x] = done, [-] = rejected
  *
@@ -116,7 +120,18 @@ export interface TodoItem {
   repeat?: TodoRepeat;
   /** Local dates (YYYY-MM-DD) a recurring todo was completed on, oldest first. */
   doneLog?: string[];
+  /** Stable `::id::` (see `newTodoId`); absent on todos written before ids existed. `id` stays positional. */
+  todoId?: string;
 }
+
+const TODO_ID_RE = /^[0-9a-z]{8}$/;
+const ID_CHARS = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+/** Random 8-char `[0-9a-z]` id; uniqueness across a repo is the caller's concern (collisions are ~1e-12). */
+export const newTodoId = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => ID_CHARS[b % 36]).join('');
+};
 
 export interface TodoData {
   milestones: Milestone[];
@@ -377,7 +392,8 @@ export const parseTodos = (md: string): TodoData => {
     const metaLine = (lines[i + 1] ?? '').trim();
     let repeat: TodoRepeat | undefined;
     let doneLog: string[] | undefined;
-    if (/^::(updated|created|due|repeat|done)::/.test(metaLine)) {
+    let todoId: string | undefined;
+    if (/^::(updated|created|due|repeat|done|id)::/.test(metaLine)) {
       due = parseDue(metaField(metaLine, 'due'));
       repeat = parseRepeat(metaField(metaLine, 'repeat'));
       const log = metaField(metaLine, 'done')
@@ -385,6 +401,8 @@ export const parseTodos = (md: string): TodoData => {
         .filter((d) => parseDue(d.trim()) && !d.includes('T'))
         .map((d) => d.trim());
       if (log.length > 0) doneLog = log;
+      const rawId = metaField(metaLine, 'id');
+      if (TODO_ID_RE.test(rawId)) todoId = rawId;
       const updatedMatch = metaLine.match(/::updated::\s*(\d+)/);
       if (updatedMatch?.[1]) updatedAt = parseInt(updatedMatch[1], 10);
       const createdMatch = metaLine.match(/::created::\s*(\S+)/);
@@ -425,6 +443,7 @@ export const parseTodos = (md: string): TodoData => {
       ...(due?.time && { dueTime: due.time }),
       ...(repeat && { repeat }),
       ...(doneLog && { doneLog }),
+      ...(todoId && { todoId }),
     });
     i++;
   }
@@ -449,13 +468,14 @@ export const serializeTodos = (data: TodoData): string => {
 
     const due = formatDue(item);
     const doneLog = item.doneLog?.length ? item.doneLog.join(',') : undefined;
-    if (item.updatedAt || item.createdAt || due || item.repeat || doneLog) {
+    if (item.updatedAt || item.createdAt || due || item.repeat || doneLog || item.todoId) {
       const metaParts: string[] = [];
       if (item.updatedAt) metaParts.push(`::updated:: ${item.updatedAt}`);
       if (item.createdAt) metaParts.push(`::created:: ${item.createdAt}`);
       if (due) metaParts.push(`::due:: ${due}`);
       if (item.repeat) metaParts.push(`::repeat:: ${formatRepeat(item.repeat)}`);
       if (doneLog) metaParts.push(`::done:: ${doneLog}`);
+      if (item.todoId) metaParts.push(`::id:: ${item.todoId}`);
       result += `${metaParts.join(' ')}\n`;
     }
 
@@ -513,6 +533,7 @@ export const addTodo = (
     prompt,
     createdAt: now.toISOString(),
     updatedAt: now.getTime(),
+    todoId: newTodoId(),
   };
   return { ...data, items: [...data.items, item] };
 };

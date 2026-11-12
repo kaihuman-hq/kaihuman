@@ -213,7 +213,7 @@ describe('writes from the start page', () => {
 
     expect(response.today.inbox.count).toBe(2);
     expect(remote['.kh/inbox.todos.md']).toMatch(
-      /^- \[ \] existing\n- \[ \] Buy milk #home\n::updated:: \d+ ::created:: \S+\n$/,
+      /^- \[ \] existing\n- \[ \] Buy milk #home\n::updated:: \d+ ::created:: \S+ ::id:: [0-9a-z]{8}\n$/,
     );
   });
 

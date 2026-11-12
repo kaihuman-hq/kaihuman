@@ -24,8 +24,10 @@ describe('entryKindOf', () => {
 // The formats themselves are tested in @kaihuman/formats; these check the answers reach them.
 describe('each kind hands its answers to the shared add', () => {
   it('a todo, its #tags taken from the text', () => {
-    expect(add('a.todos.md', '', ['Call #admin the bank'])).toBe(
-      `- [ ] Call the bank #admin\n::updated:: ${NOW.getTime()} ::created:: ${NOW.toISOString()}\n`,
+    expect(add('a.todos.md', '', ['Call #admin the bank'])).toMatch(
+      new RegExp(
+        `^- \\[ \\] Call the bank #admin\\n::updated:: ${NOW.getTime()} ::created:: ${NOW.toISOString()} ::id:: [0-9a-z]{8}\\n$`,
+      ),
     );
   });
 

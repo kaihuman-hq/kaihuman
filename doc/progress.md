@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-12 — Formats: todos get a stable `::id::`
+
+- `todos.ts` parses/serializes `::id:: <8 chars [0-9a-z]>`, written last on the metadata line (`TodoItem.todoId`, `newTodoId`). New todos from `addTodo`/`addTodoEntry` get one; all edits keep it; todos without an id stay id-less on round-trip. The iOS/Android widget line edits touch only `::updated::`, so they keep the id.
+- `merge.ts` keys todos by id, and matches an id backfilled on one side to the same todo via its created time/text.
+
 ## 2026-11-12 — CI: Cloudflare deploy commits all generated version files again
 
 - The console deploy failed at "Commit Generated File": since ce5dcab the template passed `"$GENERATED_FILE_PATH"` quoted, so `apps/console/src/version.ts apps/console/version.json` reached `git add` as one path. The list is now split into words with `read -ra` and passed as `"${paths[@]}"`, so the value is still never evaluated as shell code.

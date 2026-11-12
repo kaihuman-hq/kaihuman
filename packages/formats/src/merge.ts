@@ -164,7 +164,17 @@ function mergeTodos(base: string, local: string, remote: string): Outcome<string
 
   // Item ids are positional (`item-<index>`), so they change whenever an item is added or
   // removed above; creation time is the stable identity, with the text for legacy items.
-  const itemKey = (item: Omit<TodoItem, 'id'>) => item.createdAt ?? `text:${item.text}`;
+  // An explicit `::id::` wins. A todo that only some sides have an id for (backfill) is matched
+  // through its fallback key so it is not mistaken for a delete plus an add.
+  const fallbackKey = (item: Omit<TodoItem, 'id'>) => item.createdAt ?? `text:${item.text}`;
+  const idByFallback = new Map<string, string>();
+  for (const item of [...b.items, ...l.items, ...r.items]) {
+    if (item.todoId) idByFallback.set(fallbackKey(item), item.todoId);
+  }
+  const itemKey = (item: Omit<TodoItem, 'id'>) => {
+    const id = item.todoId ?? idByFallback.get(fallbackKey(item));
+    return id ? `id:${id}` : fallbackKey(item);
+  };
   const withoutId = (items: TodoItem[]) => items.map(({ id: _id, ...rest }) => rest);
   const items = mergeList(withoutId(b.items), withoutId(l.items), withoutId(r.items), itemKey);
   const milestones = mergeList<Milestone>(b.milestones, l.milestones, r.milestones, (m) => m.id);
