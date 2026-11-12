@@ -61,6 +61,9 @@ export function SearchScreen() {
     <>
       <Stack.Screen
         options={{
+          // Explicit so the iOS large "Search" title survives the native search bar.
+          title: 'Search',
+          headerLargeTitle: Platform.OS === 'ios',
           headerSearchBarOptions: web
             ? undefined
             : {

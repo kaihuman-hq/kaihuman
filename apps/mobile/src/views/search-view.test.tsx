@@ -60,7 +60,29 @@ const props = (over: Partial<SearchViewProps> = {}): SearchViewProps => ({
   ...over,
 });
 
+const scrollTo = vi.fn();
+vi.mock('react-native', async (orig) => {
+  const rn = await orig<typeof import('react-native')>();
+  const React = await import('react');
+  const ScrollView = React.forwardRef<unknown, Record<string, unknown>>((p, ref) => {
+    React.useImperativeHandle(ref, () => ({ scrollTo }));
+    return React.createElement(rn.ScrollView, p);
+  });
+  return { ...rn, ScrollView };
+});
+
 describe('SearchView', () => {
+  it('scrolls back to the top when the query changes', () => {
+    scrollTo.mockClear();
+    const { rerender } = render(<SearchView {...props({ query: 'f' })} />);
+    scrollTo.mockClear();
+    rerender(<SearchView {...props({ query: 'fi' })} />);
+    expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+    scrollTo.mockClear();
+    rerender(<SearchView {...props({ query: 'fi' })} />);
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
   it('renders grouped results with counted headers', () => {
     render(<SearchView {...props()} />);
     expect(screen.getByText('Todos (12)')).toBeTruthy();
