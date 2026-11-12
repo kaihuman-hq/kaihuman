@@ -857,6 +857,7 @@ abbreviations: undefined
         <TodoWidget
           content={tile.rawContent}
           mode={mode}
+          storageKey={String(tile.id)}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
           onOpenAdd={() => {
             setFocusedViewMode('ADD');
@@ -2981,6 +2982,7 @@ const FocusedTileInternal = ({
                 <TodoWidget
                   content={tile.rawContent as string}
                   mode="FOCUS"
+                  storageKey={String(tile.id)}
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}

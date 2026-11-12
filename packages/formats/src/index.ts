@@ -18,5 +18,6 @@ export * from './time-tracking.js';
 export * from './timezones.js';
 export * from './todo-board.js';
 export * from './todo-repeat.js';
+export * from './todo-views.js';
 export * from './todos.js';
 export * from './travel.js';

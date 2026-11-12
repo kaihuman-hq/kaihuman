@@ -1,7 +1,7 @@
 import { githubFileStore } from '@kaihuman/core';
 import { addTodoEntry } from '@kaihuman/formats';
 import type { Slug } from '@kaihuman/formats/business';
-import { StatusBar } from '@kaihuman/ui';
+import { DueQuickPicks, StatusBar } from '@kaihuman/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -19,6 +19,7 @@ export const QuickTodoPage = () => {
 
   const [text, setText] = useState('');
   const [tags, setTags] = useState('');
+  const [due, setDue] = useState('');
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState(false);
   const [client, setClient] = useState('');
@@ -93,7 +94,11 @@ export const QuickTodoPage = () => {
         .split(/[\s,]+/)
         .map((t) => t.replace(/^#/, '').trim().toLowerCase())
         .filter(Boolean);
-      const serialized = addTodoEntry(baseContent, { text: trimmed, tags: parsedTags });
+      const serialized = addTodoEntry(baseContent, {
+        text: trimmed,
+        tags: parsedTags,
+        ...(due && { due: { date: due } }),
+      });
 
       if (existingFile) {
         githubFileStore.updateFileContent(path, serialized);
@@ -104,6 +109,7 @@ export const QuickTodoPage = () => {
 
       setText('');
       setTags('');
+      setDue('');
       setFlash(true);
       setTimeout(() => setFlash(false), 1500);
     } catch (err) {
@@ -203,6 +209,15 @@ export const QuickTodoPage = () => {
                   class="bg-[var(--los-bg)] border border-[var(--los-border)] px-3 py-2 text-sm font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
                 />
               </div>
+
+              {!client && (
+                <div class="flex flex-col gap-1.5">
+                  <span class="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
+                    Due <span class="opacity-50 normal-case">(optional)</span>
+                  </span>
+                  <DueQuickPicks value={due} onChange={setDue} />
+                </div>
+              )}
 
               <div class="flex items-center gap-3 mt-1">
                 <button

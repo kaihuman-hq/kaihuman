@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
 import { buildRepeat, NO_REPEAT, type RepeatState } from '../../Templates/repeatView';
+import { DueQuickPicks } from './DuePicker';
 import { RepeatFields } from './RepeatFields';
 
 export interface PromptRef {
@@ -185,20 +186,15 @@ export const TodoAddForm = ({
         <div className="flex flex-col gap-1">
           <MonoLabel>DUE (optional)</MonoLabel>
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              aria-label="Due date"
+            <DueQuickPicks
               value={dueDate}
-              onInput={(e) => {
-                const value = e.currentTarget.value;
+              onChange={(value) => {
                 setDueDate(value);
-                // No due date, no time and no recurrence.
                 if (!value) {
                   setDueTime('');
                   setRepeat(NO_REPEAT);
                 }
               }}
-              className="bg-[var(--los-bg)] border border-[var(--los-border)] px-2 py-1 text-xs font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
             />
             <input
               type="time"
