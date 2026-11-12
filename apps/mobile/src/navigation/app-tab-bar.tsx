@@ -1,6 +1,7 @@
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { type DesignPlatform, useTheme } from '../theme/theme.js';
+import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import { type DesignPlatform, type Palette, useTheme } from '../theme/theme.js';
 import { haptics, Icon, type IconName, Text } from '../ui/index.js';
 
 /** Tabs left and right of the raised ＋ (docs/redesign decision 6). `capture` stays a hidden route for /capture links. */
@@ -14,7 +15,24 @@ const ICONS: Record<(typeof LEFT)[number] | (typeof RIGHT)[number], IconName> = 
   more: 'more',
 };
 
-const PLUS_SIZE = 56;
+export const PLUS_SIZE = 56;
+/** How far the ＋ stands above the bar's top edge. */
+export const PLUS_LIFT = PLUS_SIZE / 3;
+
+/** The ＋ disc, shared with the quick menu's travelling copy so the hand-over is seamless. */
+export const plusFaceStyle = (colors: Palette): ViewStyle => ({
+  width: PLUS_SIZE,
+  height: PLUS_SIZE,
+  borderRadius: PLUS_SIZE / 2,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: colors.accentFill,
+  shadowColor: colors.shadow,
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 6,
+});
 
 /** Height of the bar above the home indicator; the ＋ menu ends above it. */
 export const tabBarHeight = (platform: DesignPlatform, bottomInset: number): number =>
@@ -26,6 +44,8 @@ export interface AppTabBarProps extends BottomTabBarProps {
   onCloseMenu: () => void;
   /** Long-press ＋: run the last quick action without opening the menu. */
   onRepeatLast: () => void;
+  /** Quick menu progress (0 closed … 1 open); the ＋ hides while the menu's own ＋ is travelling. */
+  menuProgress: SharedValue<number>;
 }
 
 /**
@@ -41,6 +61,7 @@ export function AppTabBar({
   onToggleMenu,
   onCloseMenu,
   onRepeatLast,
+  menuProgress,
 }: AppTabBarProps) {
   const { colors, platform } = useTheme();
   const ios = platform === 'ios';
@@ -124,7 +145,12 @@ export function AppTabBar({
       }}
     >
       {LEFT.map(tab)}
-      <PlusButton open={menuOpen} onPress={onToggleMenu} onLongPress={onRepeatLast} />
+      <PlusButton
+        open={menuOpen}
+        progress={menuProgress}
+        onPress={onToggleMenu}
+        onLongPress={onRepeatLast}
+      />
       {RIGHT.map(tab)}
     </View>
   );
@@ -132,50 +158,40 @@ export function AppTabBar({
 
 function PlusButton({
   open,
+  progress,
   onPress,
   onLongPress,
 }: {
   open: boolean;
+  progress: SharedValue<number>;
   onPress: () => void;
   onLongPress: () => void;
 }) {
   const { colors } = useTheme();
+  // The menu draws an identical ＋ on top and moves it; this one only stands in while closed.
+  const handOver = useAnimatedStyle(() => ({ opacity: progress.get() > 0 ? 0 : 1 }));
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Pressable
-        testID="tab-plus"
-        accessibilityRole="button"
-        accessibilityLabel={open ? 'Close quick menu' : 'Quick add'}
-        accessibilityHint="Long-press repeats the last quick action"
-        accessibilityState={{ expanded: open }}
-        onPress={() => {
-          haptics.light();
-          onPress();
-        }}
-        onLongPress={() => {
-          haptics.medium();
-          onLongPress();
-        }}
-        style={{
-          width: PLUS_SIZE,
-          height: PLUS_SIZE,
-          marginTop: -PLUS_SIZE / 3,
-          borderRadius: PLUS_SIZE / 2,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.accentFill,
-          shadowColor: colors.shadow,
-          shadowOpacity: 0.25,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 6,
-        }}
-      >
-        {/* Turned into an × while open, without animating the turn. */}
-        <View style={{ transform: [{ rotate: open ? '45deg' : '0deg' }] }}>
+      <Animated.View style={[{ marginTop: -PLUS_LIFT }, handOver]}>
+        <Pressable
+          testID="tab-plus"
+          accessibilityRole="button"
+          accessibilityLabel={open ? 'Close quick menu' : 'Quick add'}
+          accessibilityHint="Long-press repeats the last quick action"
+          accessibilityState={{ expanded: open }}
+          onPress={() => {
+            haptics.light();
+            onPress();
+          }}
+          onLongPress={() => {
+            haptics.medium();
+            onLongPress();
+          }}
+          style={plusFaceStyle(colors)}
+        >
           <Icon name="add" size={28} color={colors.onAccentFill} />
-        </View>
-      </Pressable>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }

@@ -12,6 +12,13 @@
 - The Search screen sets `title: 'Search'` and `headerLargeTitle` explicitly on iOS so the large title survives the native search bar; the web preview draws it inline via `Screen title`.
 - Test: `search-view.test.tsx` (scroll reset fires when the query changes, not on an identical rerender).
 
+## 2026-11-12 — Mobile: quick menu grows out of the tab bar
+
+- The ＋ quick menu now springs up from the tab bar's top edge (full-width sheet in the bar's surface colour, clipped at the bar so it rises out of it) instead of popping in as a floating card. The scrim fades with the sheet.
+- The ＋ rides the sheet's top edge as it opens and turns 135° into the ×; closing reverses both. One shared progress value drives the sheet, the travelling ＋ and the tab bar ＋'s hand-over.
+- Swipe down on the sheet follows the finger (upward over-pull resists) and closes on a fast flick or a long enough pull, otherwise springs back; the close spring keeps the finger's velocity. Built on `react-native-reanimated` + `react-native-gesture-handler` v3 (`usePanGesture`), no new deps.
+- Pure motion math in `apps/mobile/src/views/quick-menu-motion.ts` (snap decision, drag resistance, rise/turn fraction, release hand-off) with unit tests; `quick-menu.test.tsx` covers the ＋ close, swipe close and snap-back.
+
 ## 2026-11-12 — Console: quick link from the dashboard todo tile to `/tasks`
 
 - The dashboard todo tile header has a small muted "↗" icon button (`aria-label="Open Tasks board"`) next to the "N ACTIVE" count; it routes to the Tasks board. Hidden unless `onOpenBoard` is passed (wired from `MainApp`'s existing `onTasksClick`), so the widget stays standalone-safe. No new dashboard chrome; works at mobile width (12px icon in the existing header row; the collapsed mobile tile is unchanged).
