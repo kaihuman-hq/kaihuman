@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-12 — CI: only check what a pull request touches
+
+- `ci.yml`: a new `changes` job diffs the pull request. Build, lint, type-check and test run through `turbo --affected`, so only changed packages and their dependents run (the stream-order change no longer builds the Rust CLI, docspack or the landing pages). Root config (`package.json`, lockfile, workspace, `turbo.json`, `biome.json`, `packages/config/`, `ci.yml`) still runs everything, because turbo does not see those as package inputs. The Rust system libraries and cargo cache are set up only when `apps/cli` changes. The KoSIT e-invoice job runs only when `packages/formats` changes.
+- `turbo.json` has a `test` task (after `^build`), so tests can use `--affected`.
+- `mobile-build.yml`: the Android and iOS Debug builds run only when a native input changes (Expo config, plugins, native modules and targets, assets, `package.json`). They no longer run for `packages/core` or `packages/formats` changes, or for app TypeScript changes. The `check` job ran the app's lint, types and tests a second time, so it is removed: `ci.yml` covers them.
+- `mobile-screenshots.yml`: runs only for changes in `apps/mobile`, without docs, tests and release scripts. It no longer runs for shared package changes. Use **Run workflow** to run it by hand.
+
 ## 2026-11-12 — Console: stream tiles keep their order while the page is open
 
 - `/stream` sorted tiles on every render, so marking todos done moved the tiles while you were working in them. `StreamsBoard` now sorts once and keeps that order until the page closes. It sorts again only when you change MOST ITEMS/NEWEST, ACTIVE/CLOSED or the search. New streams go at the end.
