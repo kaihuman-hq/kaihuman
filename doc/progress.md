@@ -8,6 +8,12 @@
 - Other 13 add forms: they share `AddEntrySheet` → `TileSheet`, so the boundary covers them. They write through `optimisticWrite`, which already handles errors.
 - Tests: `views/todo-add-sheet.test.tsx` (close before write; a failed save does not reject unhandled), `tiles/add-entry.test.tsx` (a failing form stays inside the sheet), `ui/error-boundary.test.tsx` (route fallback). All three fail without the fix.
 
+## 2026-11-12 — Mobile: dashboard header search no longer fights the dashboards dropdown
+
+- Search was hard to tap on the dashboard. Cause: the search icon was a bare 22pt `Pressable` leaning on `hitSlop` (11pt each side), and the dashboards dropdown below it was full-width with its own `hitSlop={8}`; the two slop areas overlapped, so taps near the icon often hit the dropdown.
+- Fix (`views/dashboard-pager.tsx`): search is a real `hitTarget` (44pt) box with no `hitSlop`, so the header row is 44pt tall; the dropdown is shrink-wrapped (`alignSelf: 'flex-start'`, `maxWidth: '100%'`, no `hitSlop`), so it only covers its title and chevron, and a long dashboard name still truncates.
+- Test: `dashboard-pager.test.tsx` checks the search box is ≥44pt and the title is shrink-wrapped.
+
 ## 2026-11-11 — Mobile: login survives a background launch on a locked phone
 
 - iOS still asked for a new sign-in now and then, the PWA never. Cause: background sync (expo-background-task) launches the app while the phone is locked; Keychain items that are not readable then (legacy `WHEN_UNLOCKED` items, or any item before the first unlock after a reboot) failed to read, core started with no token and no refresh token, `startTokenSync` marked the session hydrated, and the user who opened the app later found the login screen. The secure driver also cached a `null` for the core's "clean-up" delete, so nothing read the Keychain again. The PWA's localStorage/IndexedDB has no lock state, so it never sees an empty session.

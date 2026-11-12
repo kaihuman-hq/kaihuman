@@ -458,8 +458,14 @@ export function DashboardPager({
               accessibilityRole="button"
               accessibilityLabel="Search"
               testID="dashboard-search"
-              hitSlop={(metrics.hitTarget - 22) / 2}
               onPress={() => onNavigate('/search')}
+              // The box itself is the 44pt target (no hitSlop): slop would reach into the title row below.
+              style={{
+                width: metrics.hitTarget,
+                height: metrics.hitTarget,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               <Icon name="search" size={22} />
             </Pressable>
@@ -490,8 +496,10 @@ export function DashboardPager({
             accessibilityLabel={`Choose dashboard, current ${current.name}`}
             testID="dashboard-title"
             onPress={() => setMenuOpen(true)}
-            hitSlop={8}
+            // Shrink-wrapped, no hitSlop: the target is the title text and chevron only.
             style={{
+              alignSelf: 'flex-start',
+              maxWidth: '100%',
               flexDirection: 'row',
               alignItems: 'center',
               gap: spacing.xs,
