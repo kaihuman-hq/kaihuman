@@ -54,4 +54,7 @@ console.log(`✓ Bumped version from ${oldVersion} to ${newVersion}`);
 
 // Run generate-version script
 console.log('Generating version info...');
-execSync('node scripts/generate-version.js', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+execSync('node scripts/generate-version.js --force', {
+  stdio: 'inherit',
+  cwd: path.join(__dirname, '..'),
+});
