@@ -109,3 +109,19 @@ describe('DueQuickPicks', () => {
     expect(onChange).toHaveBeenLastCalledWith('');
   });
 });
+
+describe('TodoWidget board link', () => {
+  it('renders a link button that opens the board when onOpenBoard is set', () => {
+    const open = vi.fn();
+    act(() => render(<TodoWidget content={md} mode="SMALL" onOpenBoard={open} />, host));
+    const btn = host.querySelector('[aria-label="Open Tasks board"]') as HTMLButtonElement;
+    expect(btn).not.toBeNull();
+    click(btn);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders no board link without onOpenBoard', () => {
+    act(() => render(<TodoWidget content={md} mode="SMALL" />, host));
+    expect(host.querySelector('[aria-label="Open Tasks board"]')).toBeNull();
+  });
+});

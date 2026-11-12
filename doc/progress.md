@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-12 — Console: quick link from the dashboard todo tile to `/tasks`
+
+- The dashboard todo tile header has a small muted "↗" icon button (`aria-label="Open Tasks board"`) next to the "N ACTIVE" count; it routes to the Tasks board. Hidden unless `onOpenBoard` is passed (wired from `MainApp`'s existing `onTasksClick`), so the widget stays standalone-safe. No new dashboard chrome; works at mobile width (12px icon in the existing header row; the collapsed mobile tile is unchanged).
+- Test: `TodoWidget.views.test.tsx` (link present and fires `onOpenBoard`; absent without it).
+
 ## 2026-11-12 — Console: Tasks board (`/tasks`)
 
 - New full-page board over every `.todos.md` list (TickTick-style). Sidebar: smart lists **Today** (incl. overdue), **Next 7 Days** (overdue through day 7) and **Inbox** with open counts; **Lists** (name, colour dot, open count); **Tags** (stable colour dot from the todo palette, count); **Completed** at the bottom. No Trash: the data model has none.

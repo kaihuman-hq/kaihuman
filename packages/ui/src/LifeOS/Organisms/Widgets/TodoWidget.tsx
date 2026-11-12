@@ -22,6 +22,7 @@ import {
 } from '@kaihuman/formats';
 import {
   AlertTriangle,
+  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -51,6 +52,8 @@ export interface TodoWidgetProps {
   className?: string;
   onChange?: (newContent: string) => void;
   onOpenAdd?: () => void;
+  /** Opens the full Tasks board; renders a small "Board" link in the header when set. */
+  onOpenBoard?: () => void;
   /** Remembers the chosen Today / Tomorrow / Next 7 days / All view per list (e.g. its path). */
   storageKey?: string;
 }
@@ -637,6 +640,7 @@ export const TodoWidget = ({
   className,
   onChange,
   onOpenAdd,
+  onOpenBoard,
   storageKey,
 }: TodoWidgetProps) => {
   const data: TodoData = useMemo(() => parseTodos(content), [content]);
@@ -962,6 +966,20 @@ export const TodoWidget = ({
             <MonoText className="text-[10px] text-[var(--los-muted)]">
               {activeCount} ACTIVE
             </MonoText>
+            {onOpenBoard && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenBoard();
+                }}
+                className="text-[var(--los-muted)] hover:text-[var(--los-accent)] transition-colors"
+                title="Open Tasks board"
+                aria-label="Open Tasks board"
+              >
+                <ArrowUpRight size={12} />
+              </button>
+            )}
           </div>
         </div>
 

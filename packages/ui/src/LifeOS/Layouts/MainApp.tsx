@@ -865,6 +865,7 @@ abbreviations: undefined
             setFocusedViewMode('ADD');
             setActiveTileId(tile.id);
           }}
+          onOpenBoard={onTasksClick}
         />
       );
     }
