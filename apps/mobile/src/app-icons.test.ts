@@ -19,9 +19,9 @@ describe('app icons', () => {
     expect([4, 6]).not.toContain(colorType);
   });
 
-  it('has an Android adaptive icon with a Volt background', () => {
+  it('has an Android adaptive icon with an Ink background', () => {
     const adaptive = config.android.adaptiveIcon;
-    expect(adaptive.backgroundColor).toBe('#E6FF4A');
+    expect(adaptive.backgroundColor).toBe('#0C0D0C');
     const { width, height } = ihdr(adaptive.foregroundImage);
     expect([width, height]).toEqual([1024, 1024]);
   });

@@ -13,7 +13,7 @@ import {
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTheme } from '../theme/theme.js';
-import { Button, Icon, Text, TextField } from '../ui/index.js';
+import { Button, Icon, KeyboardLift, Text, TextField } from '../ui/index.js';
 
 const CELL_WIDTH = 140;
 
@@ -35,28 +35,30 @@ function Sheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} visible>
-      <Pressable
-        accessibilityLabel="Close"
-        onPress={onClose}
-        style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' }}
-      >
-        {/* Swallows presses so taps inside the sheet do not dismiss it. */}
+      <KeyboardLift inModal>
         <Pressable
-          accessible={false}
-          testID={testID}
-          style={{
-            backgroundColor: colors.surface,
-            padding: spacing.lg,
-            gap: spacing.sm,
-            maxHeight: '80%',
-            borderTopLeftRadius: shape.lg,
-            borderTopRightRadius: shape.lg,
-          }}
+          accessibilityLabel="Close"
+          onPress={onClose}
+          style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' }}
         >
-          <Text variant="headline">{title}</Text>
-          {children}
+          {/* Swallows presses so taps inside the sheet do not dismiss it. */}
+          <Pressable
+            accessible={false}
+            testID={testID}
+            style={{
+              backgroundColor: colors.surface,
+              padding: spacing.lg,
+              gap: spacing.sm,
+              maxHeight: '80%',
+              borderTopLeftRadius: shape.lg,
+              borderTopRightRadius: shape.lg,
+            }}
+          >
+            <Text variant="headline">{title}</Text>
+            {children}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardLift>
     </Modal>
   );
 }

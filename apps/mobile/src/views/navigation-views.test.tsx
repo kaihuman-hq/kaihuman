@@ -24,6 +24,8 @@ describe('MoreView', () => {
     render(<MoreView onNavigate={onNavigate} onSignOut={onSignOut} version="0.1.0" />);
     fireEvent.click(screen.getByTestId('more-repositories'));
     expect(onNavigate).toHaveBeenCalledWith('/repos');
+    fireEvent.click(screen.getByTestId('more-business'));
+    expect(onNavigate).toHaveBeenCalledWith('/business');
     fireEvent.click(screen.getByTestId('more-files'));
     expect(onNavigate).toHaveBeenCalledWith('/files');
     fireEvent.click(screen.getByTestId('more-sign-out'));

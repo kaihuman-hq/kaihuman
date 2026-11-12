@@ -1,5 +1,6 @@
 import {
   getVisibleTodos,
+  isTodoView,
   type Milestone,
   migrateLegacyFormat,
   NEXT_STATUS,
@@ -9,12 +10,19 @@ import {
   setMilestone,
   setPrompt,
   setStatus,
+  setTodoDue,
+  TODO_VIEW_LABELS,
+  TODO_VIEWS,
   type TodoData,
   type TodoItem,
   type TodoStatus,
+  type TodoView,
+  todoViewCounts,
+  todoViewSections,
 } from '@kaihuman/formats';
 import {
   AlertTriangle,
+  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -35,6 +43,7 @@ import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import { dueBadge } from '../../Templates/dueView';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
+import { DuePicker } from './DuePicker';
 import { RepeatIcon } from './RepeatFields';
 
 export interface TodoWidgetProps {
@@ -43,7 +52,39 @@ export interface TodoWidgetProps {
   className?: string;
   onChange?: (newContent: string) => void;
   onOpenAdd?: () => void;
+  /** Opens the full Tasks board; renders a small "Board" link in the header when set. */
+  onOpenBoard?: () => void;
+  /** Remembers the chosen Today / Tomorrow / Next 7 days / All view per list (e.g. its path). */
+  storageKey?: string;
 }
+
+const VIEW_STORAGE_PREFIX = 'kh.todo-view.';
+
+const readView = (key?: string): TodoView => {
+  if (!key) return 'all';
+  try {
+    const stored = localStorage.getItem(VIEW_STORAGE_PREFIX + key);
+    return isTodoView(stored) ? stored : 'all';
+  } catch {
+    return 'all';
+  }
+};
+
+const writeView = (key: string | undefined, view: TodoView) => {
+  if (!key) return;
+  try {
+    localStorage.setItem(VIEW_STORAGE_PREFIX + key, view);
+  } catch {
+    // Storage can be unavailable (private mode); the view then resets on reload.
+  }
+};
+
+const EMPTY_VIEW: Record<TodoView, string> = {
+  today: 'Nothing due today.',
+  tomorrow: 'Nothing due tomorrow.',
+  week: 'Nothing due in the next 7 days.',
+  all: 'No tasks.',
+};
 
 // ─── Status Icons ─────────────────────────────────────────────────────────────
 
@@ -553,23 +594,62 @@ const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const ANIM_DURATION_MS = 700;
 
 /** Due/overdue badge plus the recurrence icon of an item; renders nothing without either. */
-const DueMarks = ({ item, className }: { item: TodoItem; className?: string }) => {
+const DueMarks = ({
+  item,
+  className,
+  onSetDue,
+  showAdd = false,
+}: {
+  item: TodoItem;
+  className?: string;
+  /** Makes the badge (or an "+ DUE" chip) open the quick picks; `''` clears the date. */
+  onSetDue?: (date: string) => void;
+  /** Shows the "+ DUE" chip permanently instead of on hover only. */
+  showAdd?: boolean;
+}) => {
   const badge = dueBadge(item);
-  if (!badge && !(item.repeat && item.dueDate)) return null;
+  const open = item.status === 'backlog' || item.status === 'in-progress';
+  const picker = onSetDue && open;
+  if (!badge && !(item.repeat && item.dueDate) && !picker) return null;
+  const badgeEl = badge && (
+    <span className={cn('text-[9px] font-mono border px-1', badge.className)}>{badge.label}</span>
+  );
   return (
     <span className={cn('inline-flex items-center gap-1 shrink-0', className)}>
-      {badge && (
-        <span className={cn('text-[9px] font-mono border px-1', badge.className)}>
-          {badge.label}
-        </span>
+      {picker ? (
+        <DuePicker
+          value={item.dueDate ?? ''}
+          onChange={onSetDue}
+          className={cn(
+            !badge && !showAdd && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+          )}
+        >
+          {badgeEl}
+        </DuePicker>
+      ) : (
+        badgeEl
       )}
       {item.repeat && item.dueDate && <RepeatIcon repeat={item.repeat} />}
     </span>
   );
 };
 
-export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: TodoWidgetProps) => {
+export const TodoWidget = ({
+  content,
+  mode,
+  className,
+  onChange,
+  onOpenAdd,
+  onOpenBoard,
+  storageKey,
+}: TodoWidgetProps) => {
   const data: TodoData = useMemo(() => parseTodos(content), [content]);
+  const [view, setViewState] = useState<TodoView>(() => readView(storageKey));
+  useEffect(() => setViewState(readView(storageKey)), [storageKey]);
+  const setView = (next: TodoView) => {
+    setViewState(next);
+    writeView(storageKey, next);
+  };
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showAllInFocus, setShowAllInFocus] = useState(false);
   const [animatingOut, setAnimatingOut] = useState<
@@ -638,6 +718,12 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
       lines.length > 0 || refFile ? { lines, refFile } : undefined,
     );
     onChange?.(serializeTodos(newData));
+  };
+
+  const handleSetDue = (item: TodoItem, date: string) => {
+    // A quick pick moves the day and keeps a time already set.
+    const due = date ? { date, time: item.dueTime } : undefined;
+    onChange?.(serializeTodos(setTodoDue(data, item.id, due)));
   };
 
   const handleMigrate = () => {
@@ -756,6 +842,92 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
       : data.items.length - displayData.items.length
     : data.items.filter((it) => it.status !== 'backlog' && it.status !== 'in-progress').length;
 
+  const viewItems = activeTag ? data.items.filter((it) => it.tags.includes(activeTag)) : data.items;
+  const sections = todoViewSections(viewItems, view);
+  const viewCounts = todoViewCounts(data.items);
+  const hasOverdue = todoViewSections(data.items, 'today').some((x) => x.overdue);
+
+  const renderItem = (item: TodoItem) => {
+    const idx = data.items.indexOf(item);
+    const isDone = item.status === 'done';
+    const isRejected = item.status === 'rejected';
+    const dimmed = isDone || isRejected;
+
+    return (
+      <div
+        key={item.id}
+        className="group border-b border-[var(--los-border)] last:border-0 px-1 py-2 hover:bg-white/5 transition-colors"
+      >
+        <div className="flex items-start gap-2">
+          {isFocus ? (
+            <div className="mt-0.5">
+              <StatusBadge status={item.status} onPick={(s) => handlePickStatus(idx, s)} />
+            </div>
+          ) : (
+            <div className="mt-0.5">
+              <StatusBadge status={item.status} compact onCycle={() => handleCycleStatus(idx)} />
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <MonoText
+                className={cn(
+                  'text-xs break-words leading-relaxed',
+                  dimmed ? 'opacity-40 line-through' : 'opacity-100',
+                )}
+              >
+                {item.text}
+              </MonoText>
+              {isFocus && data.milestones.length > 0 ? (
+                <MilestonePicker
+                  milestoneId={item.milestoneId}
+                  milestones={data.milestones}
+                  onChange={(id) => handleSetMilestone(idx, id)}
+                />
+              ) : (
+                item.milestoneId && (
+                  <span className="shrink-0 text-[9px] font-mono text-[var(--los-accent)] border border-[var(--los-accent)]/30 px-1 py-0.5 rounded-sm opacity-70">
+                    !{item.milestoneId}
+                  </span>
+                )
+              )}
+            </div>
+
+            <DueMarks
+              item={item}
+              className="mt-1"
+              onSetDue={onChange && ((date) => handleSetDue(item, date))}
+              showAdd={isFocus}
+            />
+
+            {/* Tags */}
+            {item.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-[9px] font-mono text-[var(--los-muted)] opacity-70"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Prompt — focus mode only */}
+            {isFocus && (
+              <PromptSection
+                item={item}
+                onSave={(lines, refFile) => handleSetPrompt(idx, lines, refFile)}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── SMALL / FOCUS ─────────────────────────────────────────────────────────
   return (
     <div className={cn('flex items-stretch w-full', isFocus ? 'min-h-full' : 'h-full', className)}>
@@ -794,7 +966,59 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
             <MonoText className="text-[10px] text-[var(--los-muted)]">
               {activeCount} ACTIVE
             </MonoText>
+            {onOpenBoard && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenBoard();
+                }}
+                className="text-[var(--los-muted)] hover:text-[var(--los-accent)] transition-colors"
+                title="Open Tasks board"
+                aria-label="Open Tasks board"
+              >
+                <ArrowUpRight size={12} />
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Date views */}
+        <div
+          role="tablist"
+          aria-label="Todo view"
+          className="flex flex-wrap gap-1 mb-2 px-1 shrink-0"
+        >
+          {TODO_VIEWS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={(e) => {
+                e.stopPropagation();
+                setView(v);
+              }}
+              className={cn(
+                'text-[9px] font-mono uppercase px-1.5 py-0.5 border transition-colors',
+                view === v
+                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+              )}
+            >
+              {TODO_VIEW_LABELS[v]}
+              {v !== 'all' && viewCounts[v] > 0 && (
+                <span
+                  className={cn(
+                    'ml-1',
+                    v === 'today' && hasOverdue ? 'text-red-500' : 'opacity-70',
+                  )}
+                >
+                  {viewCounts[v]}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* Milestone Manager — focus mode only */}
@@ -842,85 +1066,30 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
             isFocus ? 'overflow-visible' : 'overflow-y-auto',
           )}
         >
-          {displayData.items.map((item) => {
-            const idx = data.items.indexOf(item);
-            const isDone = item.status === 'done';
-            const isRejected = item.status === 'rejected';
-            const dimmed = isDone || isRejected;
-
-            return (
-              <div
-                key={item.id}
-                className="group border-b border-[var(--los-border)] last:border-0 px-1 py-2 hover:bg-white/5 transition-colors"
-              >
-                <div className="flex items-start gap-2">
-                  {isFocus ? (
-                    <div className="mt-0.5">
-                      <StatusBadge status={item.status} onPick={(s) => handlePickStatus(idx, s)} />
-                    </div>
-                  ) : (
-                    <div className="mt-0.5">
-                      <StatusBadge
-                        status={item.status}
-                        compact
-                        onCycle={() => handleCycleStatus(idx)}
-                      />
-                    </div>
+          {view === 'all' ? (
+            displayData.items.map(renderItem)
+          ) : sections.length === 0 ? (
+            <div className="py-6 text-center">
+              <MonoText className="text-[10px] text-[var(--los-muted)]">
+                {EMPTY_VIEW[view]}
+              </MonoText>
+            </div>
+          ) : (
+            sections.map((section) => (
+              <section key={section.key} aria-label={section.label}>
+                <div
+                  className={cn(
+                    'flex justify-between px-1 pt-2 pb-1 text-[9px] font-mono uppercase tracking-wider border-b border-[var(--los-border)]',
+                    section.overdue ? 'text-red-500' : 'text-[var(--los-muted)]',
                   )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <MonoText
-                        className={cn(
-                          'text-xs break-words leading-relaxed',
-                          dimmed ? 'opacity-40 line-through' : 'opacity-100',
-                        )}
-                      >
-                        {item.text}
-                      </MonoText>
-                      {isFocus && data.milestones.length > 0 ? (
-                        <MilestonePicker
-                          milestoneId={item.milestoneId}
-                          milestones={data.milestones}
-                          onChange={(id) => handleSetMilestone(idx, id)}
-                        />
-                      ) : (
-                        item.milestoneId && (
-                          <span className="shrink-0 text-[9px] font-mono text-[var(--los-accent)] border border-[var(--los-accent)]/30 px-1 py-0.5 rounded-sm opacity-70">
-                            !{item.milestoneId}
-                          </span>
-                        )
-                      )}
-                    </div>
-
-                    <DueMarks item={item} className="mt-1" />
-
-                    {/* Tags */}
-                    {item.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {item.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-[9px] font-mono text-[var(--los-muted)] opacity-70"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Prompt — focus mode only */}
-                    {isFocus && (
-                      <PromptSection
-                        item={item}
-                        onSave={(lines, refFile) => handleSetPrompt(idx, lines, refFile)}
-                      />
-                    )}
-                  </div>
+                >
+                  <span>{section.label}</span>
+                  <span>{section.items.length}</span>
                 </div>
-              </div>
-            );
-          })}
+                {section.items.map(renderItem)}
+              </section>
+            ))
+          )}
 
           {/* Animating-out items (SMALL mode only) */}
           {!isFocus &&
@@ -929,14 +1098,14 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
             ))}
 
           {/* Hidden items notice */}
-          {!isFocus && hiddenCount > 0 && (
+          {view === 'all' && !isFocus && hiddenCount > 0 && (
             <div className="text-center py-2">
               <MonoText className="text-[10px] text-[var(--los-muted)]">
                 + {hiddenCount} completed
               </MonoText>
             </div>
           )}
-          {isFocus && !showAllInFocus && hiddenCount > 0 && (
+          {view === 'all' && isFocus && !showAllInFocus && hiddenCount > 0 && (
             <div className="text-center py-2">
               <MonoText className="text-[10px] text-[var(--los-muted)]">
                 + {hiddenCount} older than 2h —{' '}

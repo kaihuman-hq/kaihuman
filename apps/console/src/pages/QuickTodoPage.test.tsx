@@ -33,7 +33,12 @@ vi.mock('../lib/business/write', async (importOriginal) => ({
   writeBusiness: writes.writeBusiness,
 }));
 vi.mock('../hooks/useManifest', () => ({ useManifest: () => {} }));
-vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div /> }));
+vi.mock('@kaihuman/ui', () => ({
+  StatusBar: () => <div />,
+  DueQuickPicks: ({ onChange }: { onChange: (date: string) => void }) => (
+    <button type="button" id="due-pick" onClick={() => onChange('2026-11-13')} />
+  ),
+}));
 vi.mock('preact-router', () => ({ route: vi.fn() }));
 
 const { QuickTodoPage } = await import('./QuickTodoPage');
@@ -112,6 +117,16 @@ describe('QuickTodoPage', () => {
     const [path, content] = store.createFile.mock.calls[0] as unknown as [string, string];
     expect(path).toBe('kh/inbox.todos.md');
     expect(content).toContain('plain task');
+  });
+
+  it('writes the picked due date to the inbox todo', async () => {
+    set('quick-todo-task', 'pay rent');
+    act(() => (host.querySelector('#due-pick') as HTMLButtonElement).click());
+    await submit();
+
+    const [, content] = store.createFile.mock.calls[0] as unknown as [string, string];
+    expect(content).toContain('pay rent');
+    expect(content).toContain('::due:: 2026-11-13');
   });
 
   it('shows the failure and keeps the input when the client write fails', async () => {

@@ -32,6 +32,10 @@ const field = (g: Glance): Extract<QuickAction, { kind: 'field' }> => {
 };
 const text = (r: string | { ok: boolean; content?: string }): string =>
   typeof r === 'string' ? r : (r as { content: string }).content;
+const open = (g: Glance): Extract<QuickAction, { kind: 'open' }> => {
+  if (g.action?.kind !== 'open') throw new Error('expected open');
+  return g.action;
+};
 
 describe('habitGlance', () => {
   const csv = [
@@ -123,25 +127,28 @@ describe('consumptionGlance', () => {
     });
     expect(g.label).toMatch(/^cups today · avg \d\.\d$/);
     expect(g.viz).toEqual({ kind: 'pills', total: 4, filled: 3 });
-    const a = tap(g);
-    expect(a).toMatchObject({ icon: 'add', label: 'Coffee +1' });
-    const next = text(a.run(COUNT, now));
-    const v = consumptionView(next, now);
-    expect(v.meters[0]?.latestReading).toBe(23);
-    expect(v.recent[0]?.use.Coffee).toBe(4);
+    expect(open(g)).toEqual({
+      kind: 'open',
+      icon: 'add',
+      label: 'Add Coffee reading',
+      href: '/dashboard/tile?path=coffee.consumption.csv&add=1',
+      track: true,
+    });
   });
 
-  it('count variant: +1 on a day without a reading appends one', () => {
+  it('count variant: ＋ opens the reading form, never a blind +1', () => {
     const later = new Date(2026, 10, 6, 9, 0);
-    const a = tap(
-      consumptionGlance(
-        { path: 'coffee.consumption.csv', content: COUNT, now: later },
-        consumptionView(COUNT, later),
-      ),
+    const g = consumptionGlance(
+      { path: 'coffee.consumption.csv', content: COUNT, now: later },
+      consumptionView(COUNT, later),
     );
-    const next = text(a.run(COUNT, later));
-    expect(consumptionView(next, later).meters[0]?.latestReading).toBe(23);
-    expect(consumptionView(next, later).meters[0]?.latestDate).toBe('2026-11-06');
+    expect(g.action?.kind).toBe('open');
+  });
+
+  it('no meters yet: ＋ opens the add-meter form', () => {
+    const empty = 'created';
+    const g = consumptionGlance(input('e.consumption.csv', empty), consumptionView(empty, now));
+    expect(open(g)).toMatchObject({ label: 'Add meter', href: expect.stringContaining('&add=1') });
   });
 
   const POWER = [
@@ -159,15 +166,10 @@ describe('consumptionGlance', () => {
     expect(g).toMatchObject({ tint: 'blue', hero: '8', unit: 'kWh', label: 'last reading' });
     expect(g.delta).toEqual({ text: '▼ 33.3%', tone: 'success' });
     expect(g.viz?.kind).toBe('spark');
-    const f = field(g);
-    expect(f).toMatchObject({
-      label: 'Power reading',
-      placeholder: 'Meter reading',
-      keyboard: 'decimal-pad',
+    expect(open(g)).toMatchObject({
+      label: 'Add Power reading',
+      href: '/dashboard/tile?path=power.consumption.csv&add=1',
     });
-    const r = f.submit(POWER, '2025', new Date(2026, 10, 6));
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(consumptionView(r.content, now).meters[0]?.latestReading).toBe(2025);
   });
 
   it('marks a rise as danger', () => {
@@ -209,6 +211,33 @@ describe('collectionGlance', () => {
     const r = f.submit(csv, '78.9', now);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.content.endsWith('\n2026-11-05;78.9')).toBe(true);
+  });
+
+  it('regression: a sum column is the hero, input stays a typed column', () => {
+    const sum = [
+      'name::When,type::date;name::A,type::number;name::B,type::number;name::Total,type::auto:number:sum',
+      '2026-11-01;1;2;3',
+      '2026-11-02;4;5;9',
+    ].join('\n');
+    const g = collectionGlance(input('s.data-collection.csv', sum), dataCollectionView(sum));
+    expect(g).toMatchObject({ hero: '9', label: 'sum · 2 rows' });
+    expect(g.viz).toMatchObject({ values: [3, 9] });
+    const f = field(g);
+    expect(f.placeholder).toBe('A');
+  });
+
+  it('an avg column wins too; blank cells are skipped, not 0', () => {
+    const avg = [
+      'name::When,type::date;name::A,type::number;name::Mean,type::auto:number:avg',
+      '2026-11-01;2;2',
+      '2026-11-02;;',
+    ].join('\n');
+    const v = dataCollectionView(avg);
+    expect(v.series.map((s) => [s.column, s.aggregate, s.latest])).toEqual([
+      ['A', undefined, 2],
+      ['Mean', 'avg', 2],
+    ]);
+    expect(collectionGlance(input('a.data-collection.csv', avg), v).hero).toBe('2');
   });
 
   it('empty collection', () => {

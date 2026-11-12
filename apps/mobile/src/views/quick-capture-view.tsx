@@ -1,12 +1,20 @@
 import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import {
+  CAPTURE_SPECS,
+  type CaptureTargetKind,
+  normalizeFolder,
+  rememberFolder,
+  resolveTarget,
+} from '../files/create-target.js';
 import { smartInbox } from '../intelligence/smart-inbox.js';
 import type { QuickKind } from '../navigation/routes.js';
 import type { QuickCaptureController } from '../screens/quick-capture.js';
 import { retargetRepeat } from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, haptics, Icon, Screen, Text, TextField } from '../ui/index.js';
+import { CreateTargetRow, useCreateTarget } from './create-target-row.js';
 import { DueEditor } from './due-editor.js';
 
 export const CAPTURE_TITLES: Record<QuickKind, string> = {
@@ -100,6 +108,11 @@ export function QuickCaptureView({
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const copy = COPY[kind];
+  const spec = kind in CAPTURE_SPECS ? CAPTURE_SPECS[kind as CaptureTargetKind] : null;
+  const appFolder = controller.files.appFolder();
+  const paths = controller.files.paths?.() ?? [];
+  const hint = kind === 'knowledge' ? extra.trim() || text.split('\n')[0] : undefined;
+  const place = useCreateTarget(spec ?? CAPTURE_SPECS.note, appFolder, hint);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -110,6 +123,10 @@ export function QuickCaptureView({
     let result: Status;
     try {
       const value = extra.trim() || undefined;
+      // Untouched, each kind keeps its built-in file, so the one-tap path behaves as before.
+      const resolved = spec && place.custom ? resolveTarget(spec, place.target, paths) : null;
+      if (resolved && !resolved.ok) throw new Error(resolved.error);
+      const target = resolved?.ok ? resolved.path : undefined;
       if (kind === 'idea') {
         const res = await controller.quickIdea(text, value ? { slug: value } : {});
         result = res.ok
@@ -118,15 +135,16 @@ export function QuickCaptureView({
       } else {
         const res =
           kind === 'todo'
-            ? await controller.quickTodo(text, value, due, due && repeat)
+            ? await controller.quickTodo(text, value, due, due && repeat, target)
             : kind === 'inbox'
               ? await smartInbox(text, { controller })
               : kind === 'log'
-                ? await controller.quickLog(text, value)
+                ? await controller.quickLog(text, value, target)
                 : kind === 'knowledge'
-                  ? await controller.quickKnowledge(text, value)
-                  : await controller.quickNote(text);
+                  ? await controller.quickKnowledge(text, value, target)
+                  : await controller.quickNote(text, target);
         result = res.ok ? { ok: true, text: res.message } : { ok: false, text: res.error };
+        if (res.ok && spec) rememberFolder(spec.id, normalizeFolder(place.target.folder) ?? '');
       }
     } catch (err) {
       result = { ok: false, text: err instanceof Error ? err.message : String(err) };
@@ -140,6 +158,7 @@ export function QuickCaptureView({
       setExtra('');
       setDue(undefined);
       setRepeat(undefined);
+      place.reset();
       if (onDone) timer.current = setTimeout(onDone, DISMISS_DELAY_MS);
     } else {
       haptics.error();
@@ -151,7 +170,17 @@ export function QuickCaptureView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `run` closes over the fields tracked below
   useEffect(() => {
     onHeaderState?.({ canSubmit, busy, submit: run });
-  }, [canSubmit, busy, text, extra, due, repeat, onHeaderState]);
+  }, [
+    canSubmit,
+    busy,
+    text,
+    extra,
+    due,
+    repeat,
+    place.target.folder,
+    place.target.name,
+    onHeaderState,
+  ]);
 
   const clearStatus = () => setStatus(null);
 
@@ -198,6 +227,15 @@ export function QuickCaptureView({
           returnKeyType="done"
           onSubmitEditing={run}
           testID="capture-extra"
+        />
+      ) : null}
+      {spec ? (
+        <CreateTargetRow
+          spec={spec}
+          state={place}
+          appFolder={appFolder}
+          paths={paths}
+          onSubmit={run}
         />
       ) : null}
       {kind === 'todo' ? (

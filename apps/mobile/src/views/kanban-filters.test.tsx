@@ -105,6 +105,7 @@ describe('KanbanView search, filters and streams', () => {
   it('filters cards from the search field', async () => {
     render(<KanbanView controller={new KanbanBoardController(files())} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
     fireEvent.change(screen.getByTestId('board-search'), { target: { value: 'rent' } });
     await waitFor(() => expect(screen.queryByText('write docs')).toBeNull());
     expect(screen.getByText('pay rent')).toBeTruthy();
@@ -113,13 +114,14 @@ describe('KanbanView search, filters and streams', () => {
   it('applies due filters from the bottom sheet and resets them', async () => {
     render(<KanbanView controller={new KanbanBoardController(files())} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
-    fireEvent.click(screen.getByTestId('board-filter'));
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
+    fireEvent.click(screen.getByText('Sort & filter'));
     fireEvent.click(screen.getByText('Overdue'));
     fireEvent.click(screen.getByTestId('filter-done'));
     await waitFor(() => expect(screen.queryByText('write docs')).toBeNull());
     expect(screen.getByText('pay rent')).toBeTruthy();
-    expect(screen.getByLabelText('Sort and filter, 1 active')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('board-filter'));
+    expect(screen.getByLabelText('Filters, 1 active')).toBeTruthy();
+    fireEvent.click(screen.getByText('Sort & filter'));
     fireEvent.click(screen.getByTestId('filter-reset'));
     fireEvent.click(screen.getByTestId('filter-done'));
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
@@ -129,7 +131,7 @@ describe('KanbanView search, filters and streams', () => {
     const f = files();
     render(<KanbanView controller={new KanbanBoardController(f)} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
-    fireEvent.click(screen.getByText('Streams'));
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
     await waitFor(() => expect(screen.getByText('side quest')).toBeTruthy());
     expect(screen.getByText('side · 2')).toBeTruthy();
 
@@ -153,8 +155,9 @@ describe('KanbanView search, filters and streams', () => {
   it('shows closed items when the stream mode is switched in the sheet', async () => {
     render(<KanbanView controller={new KanbanBoardController(files())} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
-    fireEvent.click(screen.getByText('Streams'));
-    fireEvent.click(screen.getByTestId('board-filter'));
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
+    fireEvent.click(screen.getByText('Sort & filter'));
     fireEvent.click(screen.getByText('Closed'));
     fireEvent.click(screen.getByTestId('filter-done'));
     await waitFor(() => expect(screen.getByText('old thing')).toBeTruthy());
@@ -200,7 +203,7 @@ describe('KanbanView colour, reorder and recent chip', () => {
     const f = files();
     render(<KanbanView controller={new KanbanBoardController(f)} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
-    fireEvent.click(screen.getByText('Streams'));
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
     await waitFor(() => expect(screen.getByTestId('stream-color-side')).toBeTruthy());
     fireEvent.click(screen.getByTestId('stream-color-side'));
     fireEvent.click(screen.getByTestId('color-teal'));
@@ -213,7 +216,7 @@ describe('KanbanView colour, reorder and recent chip', () => {
     const f = files();
     render(<KanbanView controller={new KanbanBoardController(f)} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
-    fireEvent.click(screen.getByText('Streams'));
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
     await waitFor(() => expect(screen.getByTestId('stream-card-side-1')).toBeTruthy());
     vi.useFakeTimers();
     fireEvent.mouseDown(screen.getByTestId('stream-card-side-1'), {
@@ -238,7 +241,46 @@ describe('KanbanView colour, reorder and recent chip', () => {
     await waitFor(() => expect(screen.getByText('open')).toBeTruthy());
     fireEvent.click(screen.getByText('Done 0'));
     expect(screen.queryByText('stale')).toBeNull();
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
     fireEvent.click(screen.getByText('Last 2 weeks'));
     await waitFor(() => expect(screen.getByText('stale')).toBeTruthy());
+  });
+});
+
+describe('KanbanView chrome', () => {
+  it('hides filters by default, toggles them, and counts active ones', async () => {
+    render(<KanbanView controller={new KanbanBoardController(files())} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    expect(screen.queryByTestId('board-search')).toBeNull();
+    expect(screen.queryByText('Last 2 weeks')).toBeNull();
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
+    expect(screen.getByTestId('board-search')).toBeTruthy();
+    fireEvent.change(screen.getByTestId('board-search'), { target: { value: 'rent' } });
+    expect(screen.getByLabelText('Filters, 1 active')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
+    expect(screen.queryByTestId('board-search')).toBeNull();
+    // Hidden filters keep applying.
+    expect(screen.queryByText('write docs')).toBeNull();
+  });
+
+  it('toggles board and streams with an icon button', async () => {
+    render(<KanbanView controller={new KanbanBoardController(files())} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('Show streams'));
+    await waitFor(() => expect(screen.getByText('side quest')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('Show board'));
+    await waitFor(() => expect(screen.getByTestId('board-status')).toBeTruthy());
+  });
+
+  it('puts the due badge under the title', async () => {
+    render(<KanbanView controller={new KanbanBoardController(files())} />);
+    await waitFor(() => expect(screen.getByText('pay rent')).toBeTruthy());
+    const card = screen
+      .getAllByTestId('card-0')
+      .find((c) => within(c).queryByText('pay rent')) as HTMLElement;
+    expect(within(card).getByText('pay rent')).toBeTruthy();
+    const title = within(card).getByText('pay rent');
+    const badge = within(card).getByText(/Overdue/);
+    expect(title.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

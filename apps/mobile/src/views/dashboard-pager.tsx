@@ -10,14 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { focusFilter } from '../adapters/focus-filter.js';
 import { presentTile, type TileView } from '../components/widgets/tile-controllers.js';
 import { useEnsureFeeds, useFeedSnapshot } from '../files/use-feeds.js';
@@ -27,6 +20,7 @@ import {
   rememberDashboard,
   type TileFile,
 } from '../screens/dashboards.js';
+import { SyncIndicator } from '../sync/sync-indicator.js';
 import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import {
@@ -43,6 +37,7 @@ import { useInsets } from '../ui/insets.js';
 import { Animated } from '../ui/motion.js';
 import { type DashboardEditor, DashboardsSheet, EditTiles } from './dashboard-editor.js';
 import { Skeleton } from './dashboard-view.js';
+import { jumpSlot, pageAtOffset, pageOfSlot, slotOf } from './pager-loop.js';
 import { type Glance, glanceOf } from './tiles/glance/index.js';
 import { SquareTile, TILE_GAP, tileSide } from './tiles/square/square-tile.js';
 import { tileRoute, UnsupportedTile } from './tiles/summary-tile.js';
@@ -77,8 +72,6 @@ function Hint({ children }: { children: ReactNode }) {
 interface PageProps {
   page: DashboardPage;
   width: number;
-  /** The page on screen; its tiles stagger in when it becomes current. */
-  active: boolean;
   defaulted: boolean;
   now: Date;
   loading: boolean;
@@ -90,42 +83,13 @@ interface PageProps {
   /** Set on the current page while editing: its tiles show as an editable list. */
   edit?: { pages: readonly DashboardPage[]; editor: DashboardEditor };
   onStartEdit?: () => void;
-}
-
-const STAGGER_MS = 30;
-
-/** Page swipe: tiles rise in one after another, 30 ms apart (README animation notes). */
-function Stagger({
-  index,
-  active,
-  width,
-  children,
-}: {
-  index: number;
-  active: boolean;
-  width: number | '100%';
-  children: ReactNode;
-}) {
-  const reduced = useReducedMotion();
-  const progress = useSharedValue(active || reduced ? 1 : 0);
-  useEffect(() => {
-    if (reduced) return;
-    if (active) {
-      progress.set(0);
-      progress.set(withDelay(index * STAGGER_MS, withSpring(1, { damping: 18, stiffness: 220 })));
-    }
-  }, [active, index, progress, reduced]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 0.4 + progress.get() * 0.6,
-    transform: [{ translateY: (1 - progress.get()) * 14 }, { scale: 0.96 + progress.get() * 0.04 }],
-  }));
-  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
+  /** Wrap-around copy of a page: same content, but not addressable by test id. */
+  clone?: boolean;
 }
 
 function Page({
   page,
   width,
-  active,
   defaulted,
   now,
   loading,
@@ -136,6 +100,7 @@ function Page({
   onNavigate,
   edit,
   onStartEdit,
+  clone,
 }: PageProps) {
   const { colors, spacing, metrics } = useTheme();
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -187,7 +152,7 @@ function Page({
     );
 
   return (
-    <View style={{ width }} testID={`dashboard-page-${page.id}`}>
+    <View style={{ width }} testID={clone ? undefined : `dashboard-page-${page.id}`}>
       <ScrollView
         scrollEnabled={scrollEnabled}
         keyboardShouldPersistTaps="handled"
@@ -249,17 +214,12 @@ function Page({
               testID="dashboard-grid"
               style={{ flexDirection: 'row', flexWrap: 'wrap', gap: TILE_GAP }}
             >
-              {cells.map((cell, i) => (
-                <Stagger
-                  key={cell.item.path}
-                  index={i}
-                  active={active}
-                  width={cell.glance ? side : '100%'}
-                >
+              {cells.map((cell) => (
+                <View key={cell.item.path} style={{ width: cell.glance ? side : '100%' }}>
                   <ErrorBoundary what="this tile" resetKey={cell.item.content} onRetry={onRefresh}>
                     {renderCell(cell)}
                   </ErrorBoundary>
-                </Stagger>
+                </View>
               ))}
             </View>
           </>
@@ -310,12 +270,15 @@ function DashboardMenu({
   pages,
   index,
   onSelect,
+  onEdit,
   onClose,
 }: {
   visible: boolean;
   pages: DashboardPage[];
   index: number;
   onSelect: (i: number) => void;
+  /** Set when editing is possible; adds the Edit row. */
+  onEdit?: () => void;
   onClose: () => void;
 }) {
   const { colors, spacing, shape, metrics, platform } = useTheme();
@@ -390,6 +353,29 @@ function DashboardMenu({
               {i === index ? <Icon name="check" size={20} color={colors.accent} /> : null}
             </Pressable>
           ))}
+          {onEdit ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit dashboard"
+              testID="dashboard-edit"
+              onPress={onEdit}
+              android_ripple={platform === 'ios' ? undefined : { color: colors.pressed }}
+              style={({ pressed }) => ({
+                minHeight: metrics.rowHeight,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                borderTopWidth: 1,
+                borderTopColor: colors.separator,
+                backgroundColor: pressed && platform === 'ios' ? colors.fill : 'transparent',
+              })}
+            >
+              <Icon name="edit" size={20} color={colors.accent} />
+              <Text variant="body" color={colors.accent}>
+                Edit
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -431,9 +417,20 @@ export function DashboardPager({
   const { colors, spacing, metrics } = useTheme();
   const insets = useInsets();
   const { width } = useWindowDimensions();
-  const list = useRef<FlatList<DashboardPage>>(null);
   const items = pages.length > 0 ? pages : [PLACEHOLDER];
+  // Endless swipe: [last, ...pages, first] (see pager-loop.ts).
+  const slots =
+    items.length > 1
+      ? [
+          { page: items[items.length - 1] as DashboardPage, key: 'head', clone: true },
+          ...items.map((page) => ({ page, key: page.id, clone: false })),
+          { page: items[0] as DashboardPage, key: 'tail', clone: true },
+        ]
+      : items.map((page) => ({ page, key: page.id, clone: false }));
+  const list = useRef<FlatList<(typeof slots)[number]>>(null);
   const [currentId, setCurrentId] = useState<string | null>(lastDashboardId);
+  // Clones mount their content only while a drag is in flight, so a resting page is never duplicated.
+  const [cloneLive, setCloneLive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [dashboardsOpen, setDashboardsOpen] = useState(false);
@@ -453,14 +450,24 @@ export function DashboardPager({
     [items, current.id],
   );
 
-  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
-    settle(Math.round(e.nativeEvent.contentOffset.x / width));
+  // Title and dots follow the live offset, so they change as soon as the next page is half visible.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+    settle(pageAtOffset(e.nativeEvent.contentOffset.x, width, items.length));
+
+  // Landing on a wrap-around clone: jump (unanimated) to the identical real page.
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const slot = Math.round(e.nativeEvent.contentOffset.x / width);
+    settle(pageOfSlot(slot, items.length));
+    const to = jumpSlot(slot, items.length);
+    if (to !== null) list.current?.scrollToOffset({ offset: to * width, animated: false });
+    setCloneLive(false);
+  };
 
   const jumpTo = (i: number) => {
     setMenuOpen(false);
     // Set the page directly too: a programmatic scroll does not always report momentum end.
     settle(i);
-    list.current?.scrollToIndex({ index: i, animated: true });
+    list.current?.scrollToIndex({ index: slotOf(i, items.length), animated: true });
   };
 
   return (
@@ -470,13 +477,20 @@ export function DashboardPager({
           <Text variant="subheadline" tone="secondary" style={{ flex: 1 }}>
             {dateLine(now)}
           </Text>
+          <SyncIndicator />
           {editing ? null : (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Search"
               testID="dashboard-search"
-              hitSlop={(metrics.hitTarget - 22) / 2}
               onPress={() => onNavigate('/search')}
+              // The box itself is the 44pt target (no hitSlop): slop would reach into the title row below.
+              style={{
+                width: metrics.hitTarget,
+                height: metrics.hitTarget,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               <Icon name="search" size={22} />
             </Pressable>
@@ -490,25 +504,27 @@ export function DashboardPager({
               testID="dashboard-manage"
             />
           ) : null}
-          {canEdit ? (
+          {canEdit && editing ? (
             <Button
-              label={editing ? 'Done' : 'Edit'}
-              accessibilityLabel={editing ? 'Done editing' : 'Edit dashboard'}
-              variant={editing ? 'filled' : 'plain'}
+              label="Done"
+              accessibilityLabel="Done editing"
+              variant="filled"
               size="small"
-              onPress={() => setEditing((e) => !e)}
-              testID="dashboard-edit"
+              onPress={() => setEditing(false)}
+              testID="dashboard-done"
             />
           ) : null}
         </View>
-        {items.length > 1 ? (
+        {items.length > 1 || canEdit ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Choose dashboard, current ${current.name}`}
             testID="dashboard-title"
             onPress={() => setMenuOpen(true)}
-            hitSlop={8}
+            // Shrink-wrapped, no hitSlop: the target is the title text and chevron only.
             style={{
+              alignSelf: 'flex-start',
+              maxWidth: '100%',
               flexDirection: 'row',
               alignItems: 'center',
               gap: spacing.xs,
@@ -532,34 +548,44 @@ export function DashboardPager({
         // Remounting on resize or first real data places the list at the remembered page.
         key={`${width}:${pages.length > 0}`}
         ref={list}
-        data={items}
+        data={slots}
         horizontal
         pagingEnabled
         // Paging off while editing, so dragging a tile cannot swipe to another dashboard.
         scrollEnabled={!editing}
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(p) => p.id}
-        initialScrollIndex={index}
+        keyExtractor={(s) => s.key}
+        initialScrollIndex={slotOf(index, items.length)}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        onScroll={onScroll}
+        onScrollBeginDrag={() => setCloneLive(true)}
+        scrollEventThrottle={16}
         onMomentumScrollEnd={onMomentumScrollEnd}
         style={{ flex: 1 }}
-        renderItem={({ item, index: i }) => (
-          <Page
-            page={item}
-            width={width}
-            active={i === index}
-            defaulted={defaulted}
-            now={now}
-            loading={loading}
-            refreshing={refreshing}
-            error={error}
-            onRefresh={onRefresh}
-            onWrite={onWrite}
-            onNavigate={onNavigate}
-            {...(editing && editor && i === index && { edit: { pages: items, editor } })}
-            {...(canEdit && !editing && { onStartEdit: () => setEditing(true) })}
-          />
-        )}
+        renderItem={({ item: { page, clone } }) =>
+          clone && !cloneLive ? (
+            <View style={{ width }} />
+          ) : (
+            <Page
+              page={page}
+              clone={clone}
+              width={width}
+              defaulted={defaulted}
+              now={now}
+              loading={loading}
+              refreshing={refreshing}
+              error={error}
+              onRefresh={onRefresh}
+              onWrite={onWrite}
+              onNavigate={onNavigate}
+              {...(editing &&
+                editor &&
+                !clone &&
+                page.id === current.id && { edit: { pages: items, editor } })}
+              {...(canEdit && !editing && { onStartEdit: () => setEditing(true) })}
+            />
+          )
+        }
       />
       {editor ? (
         <DashboardsSheet
@@ -574,6 +600,12 @@ export function DashboardPager({
         pages={items}
         index={index}
         onSelect={jumpTo}
+        {...(canEdit && {
+          onEdit: () => {
+            setMenuOpen(false);
+            setEditing(true);
+          },
+        })}
         onClose={() => setMenuOpen(false)}
       />
     </View>

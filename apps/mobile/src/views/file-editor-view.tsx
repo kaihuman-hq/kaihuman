@@ -1,6 +1,15 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, ScrollView, TextInput, View } from 'react-native';
 import { tileKindForPath } from '../components/widgets/tile-controllers.js';
+import { EditHistory } from '../editor/edit-history.js';
+import {
+  continueList,
+  insertLink,
+  type Selection,
+  type TextEdit,
+  toggleLinePrefix,
+  toggleWrap,
+} from '../editor/markdown-edit.js';
 import { fileKindForPath, hasViewer } from '../files/file-kinds.js';
 import type {
   DirectoryEntry,
@@ -22,9 +31,12 @@ import {
   Section,
   Text,
   TextField,
+  useKeyboardVisible,
 } from '../ui/index.js';
 import { ActionLogFull } from './actionlog-full.js';
+import { EditorToolbar, type FormatAction } from './editor-toolbar.js';
 import { FileContentView, NoViewerNote } from './file-views.js';
+import { NewFileSheet } from './new-file-sheet.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -115,6 +127,7 @@ export function FileBrowserView({
   const [, setRev] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
@@ -206,6 +219,26 @@ export function FileBrowserView({
       ) : error ? (
         <Button label="Try again" variant="tinted" size="medium" onPress={() => void load()} />
       ) : null}
+      <Button
+        label="New file"
+        variant="tinted"
+        size="medium"
+        onPress={() => setCreating(true)}
+        testID="new-file"
+      />
+      {creating ? (
+        <NewFileSheet
+          folder={folder}
+          paths={controller.paths()}
+          onCreate={(path, content) => controller.createFile(path, content)}
+          onCreated={(path) => {
+            setCreating(false);
+            void load();
+            onOpenFile(path);
+          }}
+          onClose={() => setCreating(false)}
+        />
+      ) : null}
       {folder && entries.length > 0 ? (
         <View style={{ paddingTop: spacing.xs }}>
           <Button
@@ -223,14 +256,32 @@ export function FileBrowserView({
 /** `view` shows the native reader or tile; `source` is the raw text editor. */
 export type FileMode = 'view' | 'source';
 
+/** Quiet time after the last keystroke before the editor saves on its own. */
+export const AUTOSAVE_MS = 1500;
+
+const formatEdit = (action: FormatAction, text: string, sel: Selection): TextEdit => {
+  switch (action) {
+    case 'bold':
+      return toggleWrap(text, sel, '**', 'bold');
+    case 'italic':
+      return toggleWrap(text, sel, '_', 'italic');
+    case 'link':
+      return insertLink(text, sel);
+    default:
+      return toggleLinePrefix(text, sel, action);
+  }
+};
+
 export function FileEditorView({
   controller,
   path,
   mode = 'view',
+  autosaveMs = AUTOSAVE_MS,
 }: {
   controller: FileEditorController;
   path: string;
   mode?: FileMode;
+  autosaveMs?: number;
 }) {
   const theme = useTheme();
   const { colors, spacing, shape } = theme;
@@ -241,6 +292,31 @@ export function FileEditorView({
   const [saving, setSaving] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const history = useRef(new EditHistory()).current;
+  const selection = useRef<Selection>({ start: 0, end: 0 });
+  // Set only for a programmatic change (format, undo); cleared once the input reports back.
+  const [forcedSelection, setForcedSelection] = useState<Selection | undefined>();
+  const autosave = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const savingRef = useRef(false);
+  const latest = useRef<string | null>(null);
+  const keyboardVisible = useKeyboardVisible();
+
+  const opened = (s: FileEditorState) => {
+    history.reset();
+    latest.current = s.status === 'open' ? s.content : null;
+    setState(s);
+  };
+
+  // Declared before the load effect so its cleanup runs first: pending edits are flushed
+  // before `close()` drops them when the user leaves the screen.
+  useEffect(
+    () => () => {
+      clearTimeout(autosave.current);
+      const s = controller.state;
+      if (s.status === 'open' && s.dirty) void controller.save().catch(() => {});
+    },
+    [controller],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` re-runs the load on Retry
   useEffect(() => {
@@ -248,7 +324,7 @@ export function FileEditorView({
     controller
       .refresh()
       .then(() => controller.open(path))
-      .then(setState)
+      .then(opened)
       .catch((e: unknown) => {
         setError(messageOf(e));
         haptics.error();
@@ -268,7 +344,7 @@ export function FileEditorView({
     if (current.status !== 'open' || current.dirty) return;
     controller
       .open(path)
-      .then(setState)
+      .then(opened)
       .catch(() => {});
   }, [rev]);
 
@@ -278,7 +354,7 @@ export function FileEditorView({
     void controller
       .unlock(passphrase)
       .then((s) => {
-        setState(s);
+        opened(s);
         if (s.status === 'open') {
           haptics.success();
           setPassphrase('');
@@ -289,19 +365,70 @@ export function FileEditorView({
 
   // The outcome and the end of `saving` are set in one synchronous block so they render
   // together; otherwise the error showed while Save was still disabled and a retry tap was lost.
-  const save = async () => {
+  const save = async (quiet = false) => {
+    clearTimeout(autosave.current);
+    if (savingRef.current) {
+      scheduleAutosave();
+      return;
+    }
+    savingRef.current = true;
     setError(null);
     setSaving(true);
     try {
       await controller.save();
       setSaved(true);
-      haptics.success();
+      if (!quiet) haptics.success();
     } catch (e: unknown) {
       setError(messageOf(e));
       haptics.error();
     }
+    savingRef.current = false;
+    // `save()` restores the content it started with; keystrokes typed meanwhile go back on top.
+    const s = controller.state;
+    if (s.status === 'open' && latest.current !== null && latest.current !== s.content) {
+      controller.edit(latest.current);
+      setSaved(false);
+      scheduleAutosave();
+    }
     setSaving(false);
     sync();
+  };
+
+  const scheduleAutosave = () => {
+    clearTimeout(autosave.current);
+    autosave.current = setTimeout(() => void save(true), autosaveMs);
+  };
+
+  const current = (): TextEdit => ({
+    text: controller.state.status === 'open' ? controller.state.content : '',
+    selection: selection.current,
+  });
+
+  const apply = (text: string, sel: Selection | undefined, coalesce: boolean) => {
+    history.record(current(), Date.now(), coalesce);
+    commit(text, sel);
+  };
+
+  const commit = (text: string, sel: Selection | undefined) => {
+    latest.current = text;
+    controller.edit(text);
+    if (sel) {
+      selection.current = sel;
+      setForcedSelection(sel);
+    }
+    setSaved(false);
+    sync();
+    scheduleAutosave();
+  };
+
+  const undo = () => {
+    const prev = history.undo(current());
+    if (prev) commit(prev.text, prev.selection);
+  };
+
+  const redo = () => {
+    const next = history.redo(current());
+    if (next) commit(next.text, next.selection);
   };
 
   const pathLabel = (
@@ -363,6 +490,7 @@ export function FileEditorView({
   if (state.status === 'open' && mode === 'view' && hasViewer(kind.view)) {
     // Viewer writes take the sync engine's optimistic path: edit, then save.
     const write = (next: string) => {
+      latest.current = next;
       controller.edit(next);
       sync();
       void save();
@@ -407,49 +535,69 @@ export function FileEditorView({
 
   if (state.status === 'open') {
     const dirty = state.dirty;
+    const markdown = kind.view.type === 'markdown';
+    // Notes read better in the body face with room between lines; data files keep monospace.
+    const prose = markdown || kind.view.type === 'text';
+    const face = prose ? theme.type.body : theme.type.callout;
+    const lock = () => {
+      haptics.selection();
+      clearTimeout(autosave.current);
+      controller.lock();
+      setSaved(false);
+      sync();
+    };
     return (
       <Screen
         scroll={false}
         inset="none"
         keyboard
         footer={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <View style={{ flex: 1, gap: spacing.xxs }}>
-              {dirty ? (
-                <Badge label="Unsaved changes" tone="warning" />
-              ) : saved ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <Icon name="check" size={14} color={colors.success} weight="semibold" />
-                  <Text variant="footnote" tone="success">
-                    Saved
-                  </Text>
-                </View>
-              ) : (
-                <Text variant="footnote" tone="secondary">
-                  {state.encrypted ? 'Encrypted file' : 'No changes'}
-                </Text>
-              )}
-            </View>
-            {state.encrypted ? (
-              <Button
-                label="Lock"
-                variant="plain"
-                size="medium"
-                onPress={() => {
-                  haptics.selection();
-                  controller.lock();
-                  setSaved(false);
-                  sync();
-                }}
-              />
-            ) : null}
-            <Button
-              label="Save"
-              size="medium"
-              disabled={!dirty}
-              loading={saving}
-              onPress={() => void save()}
+          <View style={{ gap: spacing.sm }}>
+            <EditorToolbar
+              markdown={markdown}
+              canUndo={history.canUndo}
+              canRedo={history.canRedo}
+              keyboardVisible={keyboardVisible}
+              onUndo={undo}
+              onRedo={redo}
+              onFormat={(action) => {
+                const e = formatEdit(action, state.content, selection.current);
+                apply(e.text, e.selection, false);
+              }}
+              onDismissKeyboard={() => Keyboard.dismiss()}
             />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <View style={{ flex: 1, gap: spacing.xxs }} testID="save-state">
+                {dirty && saving ? (
+                  <Text variant="footnote" tone="secondary">
+                    Saving…
+                  </Text>
+                ) : dirty ? (
+                  <Badge label="Unsaved changes" tone="warning" />
+                ) : saved ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                    <Icon name="check" size={14} color={colors.success} weight="semibold" />
+                    <Text variant="footnote" tone="success">
+                      Saved
+                    </Text>
+                  </View>
+                ) : (
+                  <Text variant="footnote" tone="secondary">
+                    {state.encrypted ? 'Encrypted file' : 'No changes'}
+                  </Text>
+                )}
+              </View>
+              {state.encrypted && !keyboardVisible ? (
+                <Button label="Lock" variant="plain" size="medium" onPress={lock} />
+              ) : null}
+              <Button
+                label="Save"
+                size="medium"
+                disabled={!dirty}
+                loading={saving}
+                onPress={() => void save()}
+              />
+            </View>
           </View>
         }
       >
@@ -461,30 +609,37 @@ export function FileEditorView({
         <TextInput
           accessibilityLabel="Content"
           value={state.content}
+          selection={forcedSelection}
           multiline
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
+          autoCapitalize={prose ? 'sentences' : 'none'}
+          autoCorrect={prose}
+          spellCheck={prose}
           scrollEnabled
-          placeholder="Empty file"
+          placeholder={markdown ? 'Start writing…' : 'Empty file'}
           placeholderTextColor={colors.tertiaryLabel}
           selectionColor={colors.accent}
           cursorColor={colors.accent}
+          onSelectionChange={(e) => {
+            selection.current = e.nativeEvent.selection;
+            if (forcedSelection) setForcedSelection(undefined);
+          }}
           onChangeText={(text) => {
-            controller.edit(text);
-            setSaved(false);
-            sync();
+            const list = markdown ? continueList(state.content, text) : null;
+            if (list) apply(list.text, list.selection, false);
+            else apply(text, undefined, true);
           }}
           style={[
-            theme.type.callout,
+            face,
             {
               flex: 1,
               color: colors.label,
-              fontFamily: theme.fontFamily.mono,
+              fontFamily: prose ? undefined : theme.fontFamily.mono,
+              lineHeight: Math.round(face.fontSize * (prose ? 1.5 : 1.4)),
               backgroundColor: colors.surface,
               borderRadius: shape.md,
               marginHorizontal: spacing.lg,
-              padding: spacing.md,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.md,
               textAlignVertical: 'top',
               outlineWidth: 0,
               // A 'solid' style makes the zero width win over the browser's focus ring in the web preview.

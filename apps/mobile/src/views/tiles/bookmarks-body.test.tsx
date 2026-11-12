@@ -4,7 +4,7 @@ import { Alert, type AlertButton } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bookmarksView, parseBookmarksFile } from '../../components/widgets/tile-controllers.js';
 import type { Ctx } from './bodies.js';
-import { Bookmarks } from './bookmarks-body.js';
+import { BookmarkAddForm, Bookmarks } from './bookmarks-body.js';
 
 afterEach(() => {
   cleanup();
@@ -146,31 +146,27 @@ describe('Bookmarks body', () => {
   });
 
   it('add form takes optional title and tags', () => {
-    const apply = setup();
-    expect(screen.queryByLabelText('Bookmark URL')).toBeNull();
-    press('Add bookmark');
+    const apply = vi.fn<Ctx['apply']>(() => true);
+    const onDone = vi.fn();
+    render(<BookmarkAddForm ctx={{ content, now: NOW, apply, error: null }} onDone={onDone} />);
     type('Bookmark URL', 'https://new.test/');
     type('Title (optional)', 'Fresh');
     type('Tags (optional)', '#one, two');
     press('Save bookmark');
-    expect(written(apply)[0]).toMatchObject({
-      url: 'https://new.test/',
+    expect(written(apply, 0).find((b) => b.url === 'https://new.test/')).toMatchObject({
       title: 'Fresh',
       tags: ['one', 'two'],
     });
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('keeps the add form open when the url is rejected', () => {
     const apply = vi.fn<Ctx['apply']>(() => false);
-    render(
-      <Bookmarks
-        initial={bookmarksView(content, {}, NOW)}
-        ctx={{ content, now: NOW, apply, error: null }}
-      />,
-    );
-    press('Add bookmark');
+    const onDone = vi.fn();
+    render(<BookmarkAddForm ctx={{ content, now: NOW, apply, error: null }} onDone={onDone} />);
     type('Bookmark URL', 'nope');
     press('Save bookmark');
     expect(screen.getByLabelText('Bookmark URL')).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
   });
 });

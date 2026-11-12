@@ -2,7 +2,7 @@ import { Children, isValidElement, type ReactNode, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
 import {
-  Animated,
+  Button,
   Divider,
   Icon,
   type IconName,
@@ -11,12 +11,14 @@ import {
   SwipeReveal,
   Text,
   TextField,
-  usePop,
 } from '../../ui/index.js';
 
 export interface RowAction {
   label: string;
+  icon?: IconName;
   destructive?: boolean;
+  /** Swipe edge the button is revealed from; defaults to trailing. */
+  side?: 'leading' | 'trailing';
   onPress: () => void;
 }
 
@@ -164,27 +166,23 @@ export function ItemRow({
 /** A round check marker; filled when `on`. */
 export function CheckCircle({ on }: { on: boolean }) {
   const { colors } = useTheme();
-  const pop = usePop(on);
   return (
-    <Animated.View
+    <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[
-        {
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          borderWidth: on ? 0 : 2,
-          borderColor: colors.secondaryLabel,
-          backgroundColor: on ? colors.accentFill : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        pop,
-      ]}
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: on ? 0 : 2,
+        borderColor: colors.secondaryLabel,
+        backgroundColor: on ? colors.accentFill : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       {on ? <Icon name="check" size={14} color={colors.onAccentFill} weight="bold" /> : null}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -340,6 +338,67 @@ export function QuickAdd({
         <Icon name="add" size={22} color={colors.onAccentFill} weight="semibold" />
       </Pressable>
     </View>
+  );
+}
+
+/** Save and Cancel under an add form; every add sheet ends the same way. */
+export function FormButtons({
+  saveLabel,
+  onSave,
+  onCancel,
+  cancelLabel = 'Cancel',
+}: {
+  saveLabel: string;
+  onSave: () => void;
+  onCancel: () => void;
+  cancelLabel?: string;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flex: 1 }}>
+        <Button label={saveLabel} onPress={onSave} fullWidth />
+      </View>
+      <Button label={cancelLabel} variant="plain" onPress={onCancel} />
+    </View>
+  );
+}
+
+/** One field plus Save and Cancel: the add sheet for tiles whose entry is a single value. */
+export function FieldAddForm({
+  label,
+  saveLabel,
+  placeholder,
+  keyboardType,
+  onSave,
+  onCancel,
+}: {
+  label: string;
+  saveLabel: string;
+  placeholder?: string;
+  keyboardType?: 'default' | 'url';
+  /** Whether the value was accepted; a rejected value stays in the field. */
+  onSave: (value: string) => boolean;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const save = () => {
+    onSave(value);
+  };
+  return (
+    <>
+      <TextField
+        label={label}
+        value={value}
+        onChangeText={setValue}
+        placeholder={placeholder}
+        keyboardType={keyboardType}
+        autoCapitalize={keyboardType === 'url' ? 'none' : 'sentences'}
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={save}
+      />
+      <FormButtons saveLabel={saveLabel} onSave={save} onCancel={onCancel} />
+    </>
   );
 }
 

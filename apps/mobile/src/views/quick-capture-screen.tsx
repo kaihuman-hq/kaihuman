@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import type { QuickKind } from '../navigation/routes.js';
 import { QuickCaptureController } from '../screens/quick-capture.js';
 import { useTheme } from '../theme/theme.js';
-import { Button } from '../ui/index.js';
+import { Button, ErrorBoundary } from '../ui/index.js';
 import { CAPTURE_TITLES, type CaptureHeaderState, QuickCaptureView } from './quick-capture-view.js';
 
 /**
@@ -57,14 +57,17 @@ export function QuickCaptureScreen({
           }),
         }}
       />
-      <QuickCaptureView
-        controller={controller}
-        kind={kind}
-        initialText={text}
-        onDone={dismiss}
-        headerAction={headerAction}
-        onHeaderState={setHeader}
-      />
+      {/* A capture that fails to render shows an error card instead of closing the app. */}
+      <ErrorBoundary what="this capture">
+        <QuickCaptureView
+          controller={controller}
+          kind={kind}
+          initialText={text}
+          onDone={dismiss}
+          headerAction={headerAction}
+          onHeaderState={setHeader}
+        />
+      </ErrorBoundary>
     </>
   );
 }

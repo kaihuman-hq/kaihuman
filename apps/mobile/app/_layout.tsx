@@ -20,6 +20,7 @@ import {
 import { tokenHydrated } from '../src/runtime/token-sync.js';
 import { useTheme } from '../src/theme/theme.js';
 import { GestureRoot } from '../src/ui/gesture-root.js';
+import { RouteErrorBoundary } from '../src/ui/index.js';
 import { useSignalValue } from '../src/views/use-signal.js';
 
 const QUICK_ROUTES = [
@@ -32,6 +33,9 @@ const QUICK_ROUTES = [
   // The ＋ menu's one-field Track entry (`?path=`); not a deep link.
   'quick-entry',
 ];
+
+// Last line of defence: a render error no screen caught shows a retry card, not a closed app.
+export { RouteErrorBoundary as ErrorBoundary };
 
 export default function RootLayout() {
   const router = useRouter();
@@ -80,6 +84,22 @@ export default function RootLayout() {
               // The iOS sheet has a grabber and swipe; Android and web need an explicit close.
               headerRight: platform === 'ios' && Platform.OS !== 'web' ? undefined : CloseButton,
             }}
+          />
+        ))}
+        <Stack.Screen
+          name="business/index"
+          options={{ title: 'Business', headerLargeTitle: largeTitles, ...webBack('/more') }}
+        />
+        <Stack.Screen
+          name="business/client/[slug]"
+          options={{ title: 'Client', ...webBack('/business') }}
+        />
+        {/* Forms open as sheets with their own Cancel / Save row, like the quick-capture sheets. */}
+        {['business/time', 'business/payment'].map((name) => (
+          <Stack.Screen
+            key={name}
+            name={name}
+            options={{ presentation: 'modal', sheetGrabberVisible: true, headerShown: false }}
           />
         ))}
         <Stack.Screen name="scan" options={{ title: 'Scan', ...webBack('/capture') }} />

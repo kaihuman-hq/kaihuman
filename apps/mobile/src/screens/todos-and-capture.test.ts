@@ -1,14 +1,22 @@
-import { githubFileStore } from '@kaihuman/core';
+import { githubFileStore, githubProfileStore } from '@kaihuman/core';
 import { newIdea, parseActionLog, parseIdea, parseTodos } from '@kaihuman/formats';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { repoReady, whenRepoReady } from '../sync/repo-ready.js';
 import { KanbanBoardController } from './kanban-board.js';
-import { githubRepoFiles, QuickCaptureController, type RepoFiles } from './quick-capture.js';
+import {
+  githubRepoFiles,
+  QuickCaptureController,
+  REPO_NOT_READY,
+  type RepoFiles,
+} from './quick-capture.js';
 import { isoWeekLabel, TodoAnalyticsController } from './todo-analytics.js';
 
 const NOW = new Date('2026-09-24T10:00:00');
 
 class MemoryFiles implements RepoFiles {
   writes: string[] = [];
+  ready?: () => Promise<boolean>;
+  peek?: (path: string) => string | null;
   failWrites = new Set<string>();
   constructor(
     public store = new Map<string, string>(),
@@ -156,6 +164,25 @@ describe('QuickCaptureController', () => {
     expect(await c.quickKnowledge(' ')).toMatchObject({ ok: false });
   });
 
+  it('writes to a picked target instead of the built-in file', async () => {
+    const files = mem();
+    const c = capture(files);
+    expect(await c.quickNote('hi', 'journal/day.md')).toMatchObject({ path: 'journal/day.md' });
+    expect(await c.quickTodo('t', [], undefined, undefined, 'lists/a.todos.md')).toMatchObject({
+      path: 'lists/a.todos.md',
+    });
+    expect(await c.quickLog('did', [], 'logs/w.actionlog.md')).toMatchObject({
+      path: 'logs/w.actionlog.md',
+    });
+    expect(await c.quickKnowledge('src', undefined, 'kb/s.md')).toMatchObject({ path: 'kb/s.md' });
+    expect([...files.store.keys()].sort()).toEqual([
+      'journal/day.md',
+      'kb/s.md',
+      'lists/a.todos.md',
+      'logs/w.actionlog.md',
+    ]);
+  });
+
   it('surfaces save failures instead of reporting success', async () => {
     const files = mem();
     files.failWrites.add('.kh/inbox.todos.md');
@@ -181,6 +208,69 @@ describe('QuickCaptureController', () => {
     expect(await c.quickTodo('b')).toMatchObject({ ok: false });
     release();
     expect(await first).toMatchObject({ ok: true });
+  });
+});
+
+describe('capture before the repo is loaded (widget cold launch)', () => {
+  afterEach(() => {
+    githubProfileStore.currentRepo.value = null;
+    githubFileStore.loadedRepo.value = null;
+    githubFileStore.tree.value = [];
+    vi.useRealTimers();
+  });
+
+  const repo = {
+    id: 1,
+    name: 'kb',
+    full_name: 'me/kb',
+    private: true,
+    owner: { login: 'me', avatar_url: '' },
+    default_branch: 'main',
+    updated_at: '',
+  };
+
+  it('waits for the tree, then appends to the existing inbox', async () => {
+    const files = mem({ '.kh/inbox.todos.md': '- [ ] existing\n' });
+    let release: (ok: boolean) => void = () => undefined;
+    files.ready = () =>
+      new Promise<boolean>((r) => {
+        release = r;
+      });
+    const pending = new QuickCaptureController(files, () => NOW).quickTodo('from widget');
+    await Promise.resolve();
+    expect(files.writes).toEqual([]);
+    release(true);
+    expect(await pending).toMatchObject({ ok: true });
+    const texts = parseTodos(files.store.get('.kh/inbox.todos.md') ?? '').items.map((i) => i.text);
+    expect(texts).toEqual(['existing', 'from widget']);
+  });
+
+  it('fails without writing when the repo never loads', async () => {
+    const files = mem({ '.kh/inbox.todos.md': '- [ ] existing\n' });
+    files.ready = async () => false;
+    const c = new QuickCaptureController(files, () => NOW);
+    expect(await c.quickTodo('lost?')).toEqual({ ok: false, error: REPO_NOT_READY });
+    expect(await c.quickIdea('An idea')).toMatchObject({ ok: false, error: REPO_NOT_READY });
+    expect(files.writes).toEqual([]);
+  });
+
+  it('whenRepoReady resolves once the current repo tree is loaded, false on timeout', async () => {
+    expect(repoReady()).toBe(false);
+    const ready = whenRepoReady(1000);
+    githubProfileStore.currentRepo.value = repo;
+    // createFile's optimistic tree before loadTree ran is not the repo.
+    githubFileStore.tree.value = [
+      { path: '.kh/inbox.todos.md', mode: '', type: 'blob', sha: '', url: '' },
+    ];
+    expect(repoReady()).toBe(false);
+    githubFileStore.loadedRepo.value = 'me/kb';
+    expect(await ready).toBe(true);
+
+    githubFileStore.loadedRepo.value = null;
+    vi.useFakeTimers();
+    const late = whenRepoReady(1000);
+    vi.advanceTimersByTime(1000);
+    expect(await late).toBe(false);
   });
 });
 
@@ -250,6 +340,41 @@ describe('KanbanBoardController', () => {
     await c.load();
     return { c, files };
   };
+
+  it('applies an edit before the save settles and rolls back when it fails', async () => {
+    const files = mem({ '.kh/inbox.todos.md': INBOX, 'work.todos.md': WORK });
+    const { c } = await board(files);
+    let release = () => {};
+    const write = files.write.bind(files);
+    files.write = (p, content) =>
+      new Promise<void>((resolve, reject) => {
+        release = () => write(p, content).then(resolve, reject);
+      });
+    const seen: number[] = [];
+    c.subscribe(() => seen.push(c.columns().done.length));
+    const doneBefore = c.columns().done.length;
+    const pending = c.setStatus('.kh/inbox.todos.md', 0, 'done');
+    // Regression: the card moved only after the write resolved, so taps felt slow.
+    expect(c.columns().done).toHaveLength(doneBefore + 1);
+    release();
+    expect(await pending).toEqual({ ok: true });
+
+    files.failWrites.add('.kh/inbox.todos.md');
+    files.write = write;
+    const res = await c.setStatus('.kh/inbox.todos.md', 0, 'rejected');
+    expect(res.ok).toBe(false);
+    expect(c.columns().done).toHaveLength(doneBefore + 1);
+    expect(seen.at(-1)).toBe(doneBefore + 1);
+  });
+
+  it('paints from cached copies synchronously', () => {
+    const files = mem({ '.kh/inbox.todos.md': INBOX });
+    const c = new KanbanBoardController(files);
+    expect(c.loadCached()).toBe(false);
+    files.peek = (p) => files.store.get(p) ?? null;
+    expect(c.loadCached()).toBe(true);
+    expect(c.paths).toEqual(['.kh/inbox.todos.md']);
+  });
 
   it('aggregates files into status columns and always includes the inbox', async () => {
     const { c } = await board();

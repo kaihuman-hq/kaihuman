@@ -46,6 +46,7 @@ describe('KanbanView', () => {
       <KanbanView controller={new KanbanBoardController(files('- [ ] a #x\n- [ ] b #y\n'))} />,
     );
     await waitFor(() => expect(screen.getByText('a')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
     fireEvent.click(screen.getAllByText('#y')[0] as HTMLElement);
     expect(screen.queryByText('a')).toBeNull();
     expect(screen.getByText('b')).toBeTruthy();

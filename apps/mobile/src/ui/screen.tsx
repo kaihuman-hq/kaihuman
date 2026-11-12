@@ -1,17 +1,19 @@
-import { HeaderShownContext } from 'expo-router/react-navigation';
-import { createContext, type ReactNode, useContext } from 'react';
+import { HeaderHeightContext, HeaderShownContext } from 'expo-router/react-navigation';
+import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   RefreshControl,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   View,
 } from 'react-native';
 import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
+import { KeyboardLift, keyboardScrollProps } from './keyboard.js';
 import { Text } from './text.js';
+import { useKeyboardVisible } from './use-keyboard.js';
 
 export type ScreenInset = 'grouped' | 'none';
 
@@ -42,10 +44,18 @@ export interface ScreenProps {
   onRefresh?: () => void;
   /** Pinned below the content (e.g. a primary action). */
   footer?: ReactNode;
-  /** Lift content above the keyboard. */
+  /**
+   * Keep inputs reachable above the keyboard. A scrolling screen on iOS does this natively in its
+   * scroll view; anything else is lifted.
+   */
   keyboard?: boolean;
   /** Show the sync status line; login and capture screens turn it off. */
   syncStatus?: boolean;
+  /**
+   * Scroll back to the top whenever this changes (e.g. a new search query), so the first row sits
+   * fully below the header instead of under it.
+   */
+  scrollToTopKey?: string;
 }
 
 export function Screen({
@@ -58,9 +68,23 @@ export function Screen({
   footer,
   keyboard,
   syncStatus = true,
+  scrollToTopKey,
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useInsets();
+  const keyboardUp = useKeyboardVisible();
+  const headerHeight = useContext(HeaderHeightContext);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key is the trigger, not a value read
+  useEffect(() => {
+    if (scrollToTopKey === undefined) return;
+    // With automatic inset adjustment the resting offset is negative (-header height); a bare
+    // `y: 0` would hide the first row behind the bar, so ask the native view to re-apply the inset.
+    scrollRef.current?.scrollTo({
+      y: Platform.OS === 'ios' ? -(headerHeight ?? 0) : 0,
+      animated: false,
+    });
+  }, [scrollToTopKey]);
   const { spacing, colors } = theme;
   const margin = inset === 'grouped' ? theme.metrics.screenMargin : 0;
   // Native headers already show the title. The web preview hides tab-root headers, so only
@@ -69,11 +93,14 @@ export function Screen({
   const inlineTitle =
     Platform.OS === 'web' && title && !headerShown ? <ScreenTitle>{title}</ScreenTitle> : null;
 
+  // A pinned footer must rise with the keyboard, so only a plain iOS scroll view skips the lift.
+  const lifted = keyboard === true && (Platform.OS !== 'ios' || !scroll || footer !== undefined);
   const content = scroll ? (
     <ScrollView
+      ref={scrollRef}
       style={styles.flex}
       contentInsetAdjustmentBehavior="automatic"
-      keyboardShouldPersistTaps="handled"
+      {...keyboardScrollProps(lifted)}
       keyboardDismissMode="interactive"
       refreshControl={
         onRefresh ? (
@@ -116,8 +143,9 @@ export function Screen({
         <View
           style={{
             paddingHorizontal: theme.metrics.screenMargin,
-            paddingTop: spacing.md,
-            paddingBottom: insets.bottom + spacing.md,
+            paddingTop: keyboardUp ? spacing.sm : spacing.md,
+            // The home-indicator inset sits under the keyboard; keeping it left a gap above it.
+            paddingBottom: keyboardUp ? spacing.sm : insets.bottom + spacing.md,
             backgroundColor: colors.background,
             borderTopWidth: StyleSheet.hairlineWidth,
             borderTopColor: colors.separator,
@@ -130,14 +158,8 @@ export function Screen({
   );
 
   const root = { flex: 1, backgroundColor: colors.background } as const;
-  return keyboard ? (
-    <KeyboardAvoidingView
-      style={root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      enabled={Platform.OS === 'ios'}
-    >
-      {body}
-    </KeyboardAvoidingView>
+  return lifted ? (
+    <KeyboardLift style={root}>{body}</KeyboardLift>
   ) : (
     <View style={root}>{body}</View>
   );

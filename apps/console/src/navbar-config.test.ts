@@ -38,6 +38,7 @@ describe('navbar catalog', () => {
     expect(ids.has('knowledge')).toBe(true);
     expect(ids.has('graph')).toBe(true);
     expect(ids.has('ideas')).toBe(true);
+    expect(ids.has('tasks')).toBe(true);
   });
 
   it('offers Business in settings but not in the default navbar', () => {

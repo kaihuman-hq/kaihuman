@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { computed, effect, signal } from '@preact/signals';
+import { batch, computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
 import { demoMode } from '../demo-mode.js';
 import { viteEnv } from '../env.js';
@@ -18,15 +18,37 @@ const GithubProfileSchema = z.object({
 export type GithubProfile = z.infer<typeof GithubProfileSchema>;
 
 const STORAGE_KEY_TOKEN = 'lifeos_gh_token';
+const REFRESH_RECORD = 'refresh';
+
+/** Expiring GitHub App user tokens: the access token lasts hours, the refresh token months. */
+interface RefreshRecord {
+  refreshToken: string;
+  /** Epoch ms when the access token expires; null when GitHub did not say. */
+  expiresAt: number | null;
+}
+
+/** A sign-in or refresh result. Without `refreshToken` the token is treated as non-expiring. */
+export interface AuthSession {
+  accessToken: string;
+  refreshToken?: string | null;
+  /** Seconds until `accessToken` expires, as GitHub's `expires_in`. */
+  expiresIn?: number | null;
+}
 
 export class AuthStore {
   // Signals
   token = signal<string | null>(getCoreStorage().getItem(STORAGE_KEY_TOKEN));
   user = signal<GithubProfile | null>(null);
+  /** Present only for expiring tokens; rotated on every refresh, so always persist the latest. */
+  refreshToken = signal<string | null>(null);
+  /** Epoch ms when `token` expires, or null when it does not (OAuth app tokens, PATs). */
+  tokenExpiresAt = signal<number | null>(null);
   isAuthenticated = computed(() => !!this.token.value);
+  /** Resolves once persisted auth state (token, profile, refresh token) has been restored. */
+  readonly ready: Promise<void>;
 
   constructor() {
-    this.init();
+    this.ready = this.init();
   }
 
   private async init() {
@@ -39,6 +61,7 @@ export class AuthStore {
       // We were explicitly logged out, so ignore any token in DB to prevent zombie sessions
       await db.deleteRecord('auth', 'token');
       await db.deleteRecord('auth', 'user');
+      await db.deleteRecord('auth', REFRESH_RECORD);
       // We can clear the flag now, or keep it. Clearing it is safe as we've nuked the DB token.
       getCoreStorage().removeItem('lifeos_logged_out');
 
@@ -47,12 +70,19 @@ export class AuthStore {
     } else {
       const token = await db.getRecord<string>('auth', 'token');
       const user = await db.getRecord<GithubProfile>('auth', 'user');
+      const refresh = await db.getRecord<RefreshRecord>('auth', REFRESH_RECORD);
 
       // Only restore from DB if handleCallback() hasn't already set a fresh token.
       // handleCallback() runs synchronously during render (before this async resumes),
       // so a non-null token here means we already have something fresher than the DB.
       if (token && !this.token.value) this.token.value = token;
       if (user) this.user.value = user;
+      // The refresh token belongs to the persisted access token; a fresher callback token owns its own.
+      const persisted = token ?? getCoreStorage().getItem(STORAGE_KEY_TOKEN);
+      if (refresh?.refreshToken && persisted && this.token.value === persisted) {
+        this.refreshToken.value = refresh.refreshToken;
+        this.tokenExpiresAt.value = refresh.expiresAt ?? null;
+      }
 
       // Fallback to localStorage if DB empty (migration path)
       if (!this.token.value && getCoreStorage().getItem(STORAGE_KEY_TOKEN)) {
@@ -78,6 +108,22 @@ export class AuthStore {
       saveToken();
     });
 
+    // Without the refresh token an expiring session ends hours after sign-in.
+    effect(() => {
+      const refreshToken = this.refreshToken.value;
+      const expiresAt = this.tokenExpiresAt.value;
+      if (demoMode.value) return;
+      const db = getCoreStorage();
+      void (
+        refreshToken
+          ? db.putRecord('auth', REFRESH_RECORD, {
+              refreshToken,
+              expiresAt,
+            } satisfies RefreshRecord)
+          : db.deleteRecord('auth', REFRESH_RECORD)
+      ).catch((err: unknown) => logger.error('Failed to persist refresh token:', err));
+    });
+
     // Fetch user if token exists but user is missing (restore session)
     effect(() => {
       if (this.token.value && !this.user.value) {
@@ -98,6 +144,33 @@ export class AuthStore {
       };
       saveUser();
     });
+  }
+
+  /**
+   * Reads the persisted session again when none is loaded. On iOS a background launch while the
+   * phone is locked cannot read the Keychain, so the session looks absent until the next unlock.
+   * True when a session was restored.
+   */
+  async restore(): Promise<boolean> {
+    await this.ready;
+    if (this.token.value) return false;
+    const db = getCoreStorage();
+    if (db.getItem('lifeos_logged_out')) return false;
+    const token =
+      (await db.getRecord<string>('auth', 'token')) ?? db.getItem(STORAGE_KEY_TOKEN) ?? null;
+    if (!token || this.token.value) return false;
+    const refresh = await db.getRecord<RefreshRecord>('auth', REFRESH_RECORD);
+    const user = await db.getRecord<GithubProfile>('auth', 'user');
+    if (this.token.value) return false;
+    batch(() => {
+      if (refresh?.refreshToken) {
+        this.refreshToken.value = refresh.refreshToken;
+        this.tokenExpiresAt.value = refresh.expiresAt ?? null;
+      }
+      if (user && !this.user.value) this.user.value = user;
+      this.token.value = token;
+    });
+    return true;
   }
 
   login() {
@@ -123,6 +196,8 @@ export class AuthStore {
     // 3. Update state - this triggers the effect to clean DB, and updates UI
     this.token.value = null;
     this.user.value = null;
+    this.refreshToken.value = null;
+    this.tokenExpiresAt.value = null;
 
     // 4. Do NOT force reload. ProtectedRoute checks isAuthenticated and will show Login.
   }
@@ -165,10 +240,26 @@ export class AuthStore {
   private applyCallbackParams(params: URLSearchParams): boolean {
     const accessToken = params.get('access_token');
     if (!accessToken) return false;
+    const expiresIn = Number(params.get('expires_in'));
+    this.setSession({
+      accessToken,
+      refreshToken: params.get('refresh_token'),
+      expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null,
+    });
+    return true;
+  }
+
+  /** Starts or renews a session; a session without a refresh token clears any earlier one. */
+  setSession(session: AuthSession, now: number = Date.now()): void {
     // Clear logout flag on successful login
     getCoreStorage().removeItem('lifeos_logged_out');
-    this.token.value = accessToken;
-    return true;
+    const refreshToken = session.refreshToken || null;
+    batch(() => {
+      this.refreshToken.value = refreshToken;
+      this.tokenExpiresAt.value =
+        refreshToken && session.expiresIn ? now + session.expiresIn * 1000 : null;
+      this.token.value = session.accessToken;
+    });
   }
 
   private async fetchUser() {
@@ -186,7 +277,8 @@ export class AuthStore {
 
       if (!res.ok) {
         logger.error('Failed to fetch user:', res.status, res.statusText);
-        if (res.status === 401) {
+        // An expiring token that ran out is renewed with its refresh token by the app, not ended.
+        if (res.status === 401 && !this.refreshToken.value) {
           logger.warn('Token invalid, logging out.');
           this.logout();
         }

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { View } from 'react-native';
 import { Button } from './button.js';
 import { Card } from './card.js';
 import { Text } from './text.js';
@@ -73,4 +74,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
       );
     return this.props.children;
   }
+}
+
+/**
+ * expo-router's route-level fallback (exported as `ErrorBoundary` from a layout). Catches a
+ * render error in any screen or sheet below it that no closer boundary caught, so the app
+ * shows a retry card instead of closing.
+ */
+export function RouteErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  return (
+    <View style={{ flex: 1, padding: 16, justifyContent: 'center' }} testID="route-error">
+      <InlineError what="this screen" message={errorMessage(error)} onRetry={() => void retry()} />
+    </View>
+  );
 }

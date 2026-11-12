@@ -11,7 +11,7 @@ afterEach(cleanup);
 const NOW = new Date(2026, 10, 10, 12, 0);
 
 describe('DueSheet', () => {
-  it('offers Today and Tomorrow, and only offers Clear when a due is set', () => {
+  it('offers the quick presets, and only offers Clear when a due is set', () => {
     const onSelect = vi.fn();
     const { unmount } = render(
       <DueSheet
@@ -26,6 +26,10 @@ describe('DueSheet', () => {
     expect(onSelect).toHaveBeenLastCalledWith({ date: '2026-11-10' });
     fireEvent.click(screen.getByTestId('due-tomorrow'));
     expect(onSelect).toHaveBeenLastCalledWith({ date: '2026-11-11' });
+    fireEvent.click(screen.getByTestId('due-next-saturday'));
+    expect(onSelect).toHaveBeenLastCalledWith({ date: '2026-11-14' });
+    fireEvent.click(screen.getByTestId('due-next-monday'));
+    expect(onSelect).toHaveBeenLastCalledWith({ date: '2026-11-16' });
     expect(screen.queryByTestId('due-clear-all')).toBeNull();
     unmount();
 
@@ -59,6 +63,17 @@ describe('DueSheet', () => {
 });
 
 describe('DueEditor', () => {
+  it('sets a quick date and keeps the chosen time', () => {
+    const onChange = vi.fn();
+    render(
+      <DueEditor value={{ date: '2026-11-12', time: '09:30' }} onChange={onChange} now={NOW} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Next Saturday' }));
+    expect(onChange).toHaveBeenLastCalledWith({ date: '2026-11-14', time: '09:30' });
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+    expect(onChange).toHaveBeenLastCalledWith({ date: '2026-11-10', time: '09:30' });
+  });
+
   it('shows the due, a time toggle, and clears', () => {
     const onChange = vi.fn();
     render(<DueEditor value={{ date: '2026-11-12' }} onChange={onChange} now={NOW} />);

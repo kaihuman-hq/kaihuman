@@ -38,6 +38,7 @@ import { QuickTodoPage } from './pages/QuickTodoPage';
 import { SharedPage } from './pages/SharedPage';
 import { ShortcutsPage } from './pages/ShortcutsPage';
 import { StreamsBoardPage } from './pages/StreamsBoardPage';
+import { TasksBoardPage } from './pages/TasksBoardPage';
 import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
 import { WikiPage } from './pages/WikiPage';
 
@@ -86,6 +87,7 @@ export const App = () => {
         <ProtectedRoute path="/board" component={KanbanBoardPage} />
         <ProtectedRoute path="/stream" component={StreamsBoardPage} />
         <ProtectedRoute path="/streams" component={StreamsBoardPage} />
+        <ProtectedRoute path="/tasks" component={TasksBoardPage} />
         <ProtectedRoute path="/analytics" component={TodoAnalyticsPage} />
         <ProtectedRoute path="/action-log" component={ActionLogViewPage} />
         <ProtectedRoute path="/quick-todo" component={QuickTodoPage} />

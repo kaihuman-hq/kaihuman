@@ -45,6 +45,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('expo-router/react-navigation', () => ({
   HeaderShownContext: createContext(false),
+  HeaderHeightContext: createContext(undefined),
 }));
 
 // Reanimated needs the native worklet runtime. Animations resolve instantly to their target value
@@ -89,6 +90,9 @@ vi.mock('react-native-reanimated', async () => {
     withSpring: settle(),
     withDelay: (_ms: number, v: unknown) => v,
     withSequence: (...v: unknown[]) => v[v.length - 1],
+    withRepeat: (v: unknown) => v,
+    cancelAnimation: () => {},
+    Easing: { linear: 'linear' },
   };
 });
 
@@ -118,16 +122,25 @@ vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
         renderRightActions?.({ value: 0 }, translation, methods),
         createElement('div', {
           'data-testid': testID ? `${testID}-willopen` : undefined,
-          onClick: () => onSwipeableWillOpen?.('right', methods),
+          // gesture-handler 3 names the travel direction: opening the trailing buttons is 'left'.
+          onClick: () => onSwipeableWillOpen?.('left', methods),
         }),
       );
     },
   };
 });
 
+/** Callbacks of the last `usePanGesture`; tests call them as the native recognizer would. */
+export const lastPan: { config: Record<string, any> } = { config: {} };
+
 vi.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children, style }: Record<string, any>) =>
     createElement('div', { style }, children),
+  GestureDetector: ({ children }: Record<string, any>) => children,
+  usePanGesture: (config: Record<string, any>) => {
+    lastPan.config = config;
+    return config;
+  },
 }));
 
 // react-native-svg ships untranspiled native code that jsdom cannot load.

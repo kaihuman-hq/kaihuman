@@ -6,7 +6,8 @@ import type { FeedSnapshot, TravelView } from '../../components/widgets/tile-con
 import { markRssRead, rssView, travelView } from '../../components/widgets/tile-controllers.js';
 import { swipeTranslation } from '../../ui/test-setup.js';
 import type { Ctx } from './bodies.js';
-import { Rss, relativeDate, Travel } from './more-bodies.js';
+import { Rss, RssAddForm, relativeDate, Travel } from './more-bodies.js';
+import { TripAddForm } from './travel-body.js';
 
 const store = vi.hoisted(() => {
   let snap: Record<string, unknown> = {};
@@ -151,6 +152,48 @@ describe('Rss', () => {
     });
   });
 
+  describe('read later', () => {
+    const realOS = Platform.OS;
+    afterEach(() => {
+      (Platform as { OS: string }).OS = realOS;
+    });
+    const withReadLater = (readLater: Ctx['readLater']): Ctx => ({ ...ctx(feedsFile), readLater });
+
+    it('adds a leading swipe action that saves title, url and source, with feedback', async () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      const readLater = vi.fn(async () => 'added' as const);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={withReadLater(readLater)} />);
+      fireEvent.click(screen.getAllByTestId('swipe-action-Read later')[0] as HTMLElement);
+      expect(readLater).toHaveBeenCalledWith({
+        title: 'Fresh two',
+        url: 'https://a.test/2',
+        source: 'Alpha',
+      });
+      expect(openBrowserAsync).not.toHaveBeenCalled();
+      expect((await screen.findByTestId('rss-note')).textContent).toContain('Saved to Read later');
+    });
+
+    it('tells about duplicates and failures', async () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      const readLater = vi.fn(async () => 'duplicate' as const);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={withReadLater(readLater)} />);
+      fireEvent.click(screen.getAllByTestId('swipe-action-Read later')[0] as HTMLElement);
+      expect((await screen.findByTestId('rss-note')).textContent).toContain('Already');
+      readLater.mockRejectedValueOnce(new Error('offline') as never);
+      fireEvent.click(screen.getAllByTestId('swipe-action-Read later')[0] as HTMLElement);
+      expect((await screen.findByText(/Could not save/)).textContent).toContain('Could not save');
+    });
+
+    it('offers no action without a save handler', () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={ctx(feedsFile)} />);
+      expect(screen.queryByTestId('swipe-action-Read later')).toBeNull();
+    });
+  });
+
   it('shows loading and per-feed errors', () => {
     store.set({
       'https://a.test/feed': { items: [], fetchedAt: 0, loading: false, error: 'HTTP 500' },
@@ -165,12 +208,17 @@ describe('Rss', () => {
 
   it('adds a feed by url with a fresh id and rejects a bad one', () => {
     const apply = vi.fn((r: unknown) => typeof r === 'string' || (r as { ok: boolean }).ok);
-    render(<Rss view={rssView('', {}, NOW)} ctx={ctx('', apply)} />);
+    const onDone = vi.fn();
+    render(<RssAddForm ctx={ctx('', apply)} onDone={onDone} />);
     const field = screen.getByLabelText('Feed URL');
+    fireEvent.change(field, { target: { value: 'not a url' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save feed' }));
+    expect(onDone).not.toHaveBeenCalled();
     fireEvent.change(field, { target: { value: 'https://new.test/rss' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add feed' }));
-    const result = (apply.mock.calls[0] as unknown as [{ ok: boolean; content: string }])[0];
+    fireEvent.click(screen.getByRole('button', { name: 'Save feed' }));
+    const result = (apply.mock.calls.at(-1) as unknown as [{ ok: boolean; content: string }])[0];
     expect(result.ok).toBe(true);
+    expect(onDone).toHaveBeenCalledOnce();
     expect(JSON.parse(result.content).feedOptions[0]).toMatchObject({
       url: 'https://new.test/rss',
     });
@@ -195,9 +243,8 @@ describe('Travel', () => {
 
   it('adds a trip from the form', () => {
     const apply = vi.fn(() => true);
-    render(<Travel view={travelView('', NOW)} ctx={ctx('', apply)} />);
-    expect(screen.getByText('No trips planned.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Add trip' }));
+    const onDone = vi.fn();
+    render(<TripAddForm ctx={ctx('', apply)} onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('Trip name'), { target: { value: 'Oslo' } });
     fireEvent.change(screen.getByLabelText('Start (YYYY-MM-DD)'), {
       target: { value: '2026-12-01' },
@@ -208,6 +255,12 @@ describe('Travel', () => {
       title: 'Oslo',
       start: '2026-12-01',
     });
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it('shows the empty line when there are no trips', () => {
+    render(<Travel view={travelView('', NOW)} ctx={ctx('')} />);
+    expect(screen.getByText('No trips planned.')).toBeTruthy();
   });
 
   it('renders a view built by hand', () => {

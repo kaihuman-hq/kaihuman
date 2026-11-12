@@ -7,9 +7,9 @@ import {
   collectionDetail,
 } from '../../components/widgets/collection-tile.js';
 import { useTheme } from '../../theme/theme.js';
-import { Button, haptics, SegmentedControl, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, useDisclosure } from './parts.js';
+import { haptics, SegmentedControl, Text, TextField } from '../../ui/index.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, FormButtons, ItemRow } from './parts.js';
 
 const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
@@ -22,6 +22,50 @@ const FILTERS: readonly { value: CollectionFilter; label: string }[] = [
 
 const BAR_AREA = 48;
 
+/** Whether the file has columns an entry can be typed into. */
+export const collectionHasInputs = (content: string, now: Date) =>
+  collectionDetail(content, now, 'ALL').inputColumns.length > 0;
+
+export function CollectionAddForm({ ctx, onDone }: AddFormProps) {
+  const columns = useMemo(
+    () => collectionDetail(ctx.content, ctx.now, 'ALL').inputColumns,
+    [ctx.content, ctx.now],
+  );
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const today = localDate(ctx.now);
+  // Date fields start on today because that is what an entry nearly always is.
+  const fieldValue = (name: string, type: string) => draft[name] ?? (type === 'date' ? today : '');
+  const save = () => {
+    const values = Object.fromEntries(columns.map((c) => [c.name, fieldValue(c.name, c.type)]));
+    if (ctx.apply(addCollectionEntry(ctx.content, values, ctx.now))) {
+      haptics.success();
+      onDone();
+    } else haptics.error();
+  };
+  return (
+    <>
+      {columns.map((c, i) => (
+        <TextField
+          key={c.name}
+          label={c.unit ? `${c.name} (${c.unit})` : c.name}
+          value={fieldValue(c.name, c.type)}
+          onChangeText={(t) => setDraft((d) => ({ ...d, [c.name]: t }))}
+          autoFocus={i === 0 && c.type !== 'date'}
+          keyboardType={
+            c.type === 'number'
+              ? 'decimal-pad'
+              : c.type === 'date'
+                ? 'numbers-and-punctuation'
+                : 'default'
+          }
+          helper={c.type === 'date' ? 'YYYY-MM-DD' : undefined}
+        />
+      ))}
+      <FormButtons saveLabel="Save entry" onSave={save} onCancel={onDone} />
+    </>
+  );
+}
+
 export function Collection({ ctx }: { ctx: Ctx }) {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<CollectionFilter>('ALL');
@@ -29,23 +73,6 @@ export function Collection({ ctx }: { ctx: Ctx }) {
     () => collectionDetail(ctx.content, ctx.now, filter),
     [ctx.content, ctx.now, filter],
   );
-  const form = useDisclosure();
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  const today = localDate(ctx.now);
-  // Date fields start on today because that is what an entry nearly always is.
-  const fieldValue = (name: string, type: string) => draft[name] ?? (type === 'date' ? today : '');
-
-  const save = () => {
-    const values = Object.fromEntries(
-      detail.inputColumns.map((c) => [c.name, fieldValue(c.name, c.type)]),
-    );
-    if (ctx.apply(addCollectionEntry(ctx.content, values, ctx.now))) {
-      haptics.success();
-      setDraft({});
-      form.hide();
-    } else haptics.error();
-  };
-
   return (
     <>
       <SegmentedControl options={FILTERS} value={filter} onChange={setFilter} />
@@ -125,33 +152,6 @@ export function Collection({ ctx }: { ctx: Ctx }) {
           ))}
         </View>
       ) : null}
-
-      {detail.inputColumns.length === 0 ? null : form.open ? (
-        <View style={{ gap: 12 }}>
-          {detail.inputColumns.map((c) => (
-            <TextField
-              key={c.name}
-              label={c.unit ? `${c.name} (${c.unit})` : c.name}
-              value={fieldValue(c.name, c.type)}
-              onChangeText={(t) => setDraft((d) => ({ ...d, [c.name]: t }))}
-              keyboardType={
-                c.type === 'number'
-                  ? 'decimal-pad'
-                  : c.type === 'date'
-                    ? 'numbers-and-punctuation'
-                    : 'default'
-              }
-              helper={c.type === 'date' ? 'YYYY-MM-DD' : undefined}
-            />
-          ))}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button label="Save entry" size="medium" onPress={save} />
-            <Button label="Cancel" size="medium" variant="plain" onPress={form.hide} />
-          </View>
-        </View>
-      ) : (
-        <Button label="Add entry" icon="add" size="medium" variant="tinted" onPress={form.show} />
-      )}
     </>
   );
 }

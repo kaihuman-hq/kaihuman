@@ -14,6 +14,7 @@ export { type MenuItem, StatusBar, type StatusBarProps } from './LifeOS/Organism
 export * from './LifeOS/Organisms/Widgets/CommandPaletteSettingsWidget';
 export * from './LifeOS/Organisms/Widgets/ConsumptionLogic';
 export * from './LifeOS/Organisms/Widgets/ConsumptionWidget';
+export { DuePicker, DueQuickPicks } from './LifeOS/Organisms/Widgets/DuePicker';
 export * from './LifeOS/Organisms/Widgets/StocksLogic';
 export * from './LifeOS/Organisms/Widgets/StocksWidget';
 export * from './LifeOS/Organisms/WikiView';

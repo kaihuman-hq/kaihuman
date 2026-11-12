@@ -15,6 +15,13 @@ How the app keeps GitHub data fresh. Screens import from `src/sync/index.ts` onl
 4. **Every read hit the network.** `githubContentFiles.read()` called `openFile()`, one GET per
    file per load, even when the tree said the file had not changed.
 
+## Widget captures (root cause, 2026-11-10)
+
+A widget "+" cold-launches the app into the capture sheet before the first `loadTree`. Reads then
+returned null and saves created files from scratch, which that `loadTree` discarded. Captures
+(`QuickCaptureController`) and widget-queue replays (`WidgetBridge.reconcile`) now wait for
+`repoReady()` (`repo-ready.ts`); the queue is left untouched until then.
+
 ## Public API (stable; other sessions call it)
 
 ```ts

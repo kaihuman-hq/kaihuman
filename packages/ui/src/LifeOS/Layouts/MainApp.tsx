@@ -160,6 +160,7 @@ export interface MainAppProps {
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 
   onBoardClick?: () => void;
+  onTasksClick?: () => void;
   onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
   onKnowledgeClick?: () => void;
@@ -251,6 +252,7 @@ export const MainApp = ({
   githubToken,
   onCheckPath,
   onBoardClick,
+  onTasksClick,
   onActionLogClick,
   onShortcutsClick,
   onKnowledgeClick,
@@ -857,11 +859,13 @@ abbreviations: undefined
         <TodoWidget
           content={tile.rawContent}
           mode={mode}
+          storageKey={String(tile.id)}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
           onOpenAdd={() => {
             setFocusedViewMode('ADD');
             setActiveTileId(tile.id);
           }}
+          onOpenBoard={onTasksClick}
         />
       );
     }
@@ -1381,6 +1385,7 @@ abbreviations: undefined
       setShowFiles(true);
     },
     board: onBoardClick,
+    tasks: onTasksClick,
     shortcuts: onShortcutsClick,
     wiki: onWikiClick,
     knowledge: onKnowledgeClick,
@@ -2119,6 +2124,7 @@ abbreviations: undefined
                   },
                   ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
                   ...(onBoardClick ? [{ label: 'Stream', onClick: onBoardClick }] : []),
+                  ...(onTasksClick ? [{ label: 'Tasks', onClick: onTasksClick }] : []),
                   ...(onActionLogClick ? [{ label: 'Action Log', onClick: onActionLogClick }] : []),
                   ...(onKnowledgeClick
                     ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]
@@ -2981,6 +2987,7 @@ const FocusedTileInternal = ({
                 <TodoWidget
                   content={tile.rawContent as string}
                   mode="FOCUS"
+                  storageKey={String(tile.id)}
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}

@@ -588,6 +588,68 @@ describe('ios widget target', () => {
       }
     });
 
+    type Catalog = {
+      sourceLanguage: string;
+      strings: Record<
+        string,
+        { localizations?: Record<string, { stringUnit: { value: string } }> }
+      >;
+    };
+    const catalog = (name: string): Catalog =>
+      JSON.parse(readFileSync(join(intentsDir, name), 'utf8')) as Catalog;
+    // The catalogs' placeholder syntax: `${name}` (spelled with \u0024 so it is not a template).
+    const token = (name: string): string => `\u0024{${name}}`;
+    const params = (s: string): string[] =>
+      [...s.matchAll(/\$\{(\w+)\}/g)].map((m) => m[1] ?? '').sort();
+
+    // A German Siri ignores English-only phrases (TestFlight: "no phrase works").
+    it('translates every phrase to German, keeping the app name and parameters', () => {
+      const { sourceLanguage, strings } = catalog('AppShortcuts.xcstrings');
+      expect(sourceLanguage).toBe('en');
+      const keys = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)]
+        .flatMap((m) => (m[1] ?? '').match(/"[^"]*"/g) ?? [])
+        .map((p) =>
+          p
+            .slice(1, -1)
+            .replaceAll('\\(.applicationName)', token('applicationName'))
+            .replace(/\\\(\\\.\$(\w+)\)/g, (_m, name: string) => token(name)),
+        );
+      expect(keys.length).toBeGreaterThan(9);
+      expect(Object.keys(strings).sort()).toEqual([...keys].sort());
+      for (const key of keys) {
+        const de = strings[key]?.localizations?.de?.stringUnit.value ?? '';
+        expect(de, key).toContain(token('applicationName'));
+        expect(params(de), key).toEqual(params(key));
+        expect(de, key).not.toBe(key);
+      }
+    });
+
+    it('translates short titles, intent titles and dialogs to German', () => {
+      const { strings } = catalog('Localizable.xcstrings');
+      const sources = readdirSync(intentsDir)
+        .filter((f) => f.endsWith('.swift'))
+        .map((f) => readFileSync(join(intentsDir, f), 'utf8'))
+        .join('\n');
+      const wanted = [
+        ...[...shortcuts.matchAll(/shortTitle: "([^"]+)"/g)].map((m) => m[1] ?? ''),
+        ...['AddTodoIntent', 'WhatsNextIntent', 'CompleteTodoIntent', 'AddNoteIntent']
+          .concat(['AddLogIntent', 'SearchKaihumanIntent', 'DueTodayIntent', 'OpenItemIntent'])
+          .map((name) => {
+            const body = sources.slice(sources.indexOf(`struct ${name}`));
+            return /static let title: LocalizedStringResource = "([^"]+)"/.exec(body)?.[1] ?? name;
+          }),
+      ];
+      expect(wanted).toHaveLength(17);
+      for (const key of wanted) {
+        expect(strings[key]?.localizations?.de?.stringUnit.value, key).toBeTruthy();
+      }
+      for (const [key, entry] of Object.entries(strings)) {
+        expect(params(key)).toEqual([]);
+        const de = entry.localizations?.de?.stringUnit.value ?? '';
+        expect(de.match(/%(@|lld)/g), key).toEqual(key.match(/%(@|lld)/g));
+      }
+    });
+
     const siri = readFileSync(join(intentsDir, 'SiriIntents.swift'), 'utf8');
     const entity = readFileSync(join(intentsDir, 'ItemEntity.swift'), 'utf8');
 

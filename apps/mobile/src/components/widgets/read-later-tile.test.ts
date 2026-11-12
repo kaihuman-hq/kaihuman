@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { deleteReadLaterItem, markReadLaterNew, readLaterView } from './tile-controllers.js';
+import {
+  ALREADY_SAVED,
+  addReadLaterItem,
+  deleteReadLaterItem,
+  markReadLaterNew,
+  readLaterView,
+} from './tile-controllers.js';
 
 const NOW = new Date(2026, 10, 9, 12);
 const file = JSON.stringify({
@@ -47,5 +53,39 @@ describe('deleteReadLaterItem', () => {
   });
   it('rejects unknown ids', () => {
     expect(deleteReadLaterItem(file, 'zzz').ok).toBe(false);
+  });
+});
+
+describe('addReadLaterItem', () => {
+  const item = { title: 'Post', url: 'https://x.test/p', source: 'X Blog' };
+  it('prepends a new item with title as name and source as tag', () => {
+    const r = addReadLaterItem(file, item, NOW);
+    if (!r.ok) throw new Error(r.error);
+    const [first] = JSON.parse(r.content).items;
+    expect(first).toMatchObject({
+      url: 'https://x.test/p',
+      name: 'Post',
+      status: 'new',
+      tags: ['X Blog'],
+      createdAt: NOW.getTime(),
+    });
+    expect(JSON.parse(r.content).items).toHaveLength(3);
+  });
+  it('starts a missing file', () => {
+    const r = addReadLaterItem('', item, NOW);
+    if (!r.ok) throw new Error(r.error);
+    expect(JSON.parse(r.content).items).toHaveLength(1);
+  });
+  it('skips a url already on the list, and an empty source adds no tag', () => {
+    expect(addReadLaterItem(file, { ...item, url: 'https://b.test/' }, NOW)).toEqual({
+      ok: false,
+      error: ALREADY_SAVED,
+    });
+    const r = addReadLaterItem('', { ...item, source: '' }, NOW);
+    if (!r.ok) throw new Error(r.error);
+    expect(JSON.parse(r.content).items[0].tags).toEqual([]);
+  });
+  it('rejects a non-http link', () => {
+    expect(addReadLaterItem('', { ...item, url: 'javascript:1' }, NOW).ok).toBe(false);
   });
 });

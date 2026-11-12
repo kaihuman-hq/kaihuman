@@ -10,11 +10,13 @@ export {
   errorMessage,
   InlineError,
   type InlineErrorProps,
+  RouteErrorBoundary,
 } from './error-boundary.js';
 export { Fab, type FabProps } from './fab.js';
 export { GithubMark, type GithubMarkProps } from './github-mark.js';
 export { haptics } from './haptics.js';
 export { Icon, type IconName, type IconProps } from './icon.js';
+export { KeyboardLift, keyboardScrollProps } from './keyboard.js';
 export {
   type IconTone,
   ListRow,
@@ -30,10 +32,10 @@ export {
   FadeInView,
   MotionItem,
   MotionList,
-  usePop,
   usePressScale,
 } from './motion.js';
 export { Screen, type ScreenProps, ScreenTitle } from './screen.js';
 export { SegmentedControl, type SegmentedControlProps } from './segmented.js';
 export { Text, type TextProps, type TextTone } from './text.js';
 export { TextField, type TextFieldProps } from './text-field.js';
+export { useKeyboardVisible } from './use-keyboard.js';

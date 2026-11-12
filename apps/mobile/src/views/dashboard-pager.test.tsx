@@ -58,6 +58,15 @@ describe('DashboardPager with the demo seed', () => {
     expect(screen.getByLabelText('Page 1 of 4')).toBeTruthy();
   });
 
+  it('keeps search a 44pt target that the title cannot cover', async () => {
+    await setup();
+    const search = getComputedStyle(screen.getByTestId('dashboard-search'));
+    expect(Number.parseFloat(search.width)).toBeGreaterThanOrEqual(44);
+    expect(Number.parseFloat(search.height)).toBeGreaterThanOrEqual(44);
+    // Shrink-wrapped title: it never spans the row, so it cannot sit under the search icon.
+    expect(getComputedStyle(screen.getByTestId('dashboard-title')).alignSelf).toBe('flex-start');
+  });
+
   it('lists dashboards in the menu and jumping changes the title', async () => {
     await setup();
     fireEvent.click(screen.getByTestId('dashboard-title'));
@@ -217,6 +226,8 @@ describe('DashboardPager RSS tile', () => {
     });
     const tile = await screen.findByTestId(/^square-.*\.rss\.json$/);
     expect(await within(tile).findByText('2')).toBeTruthy();
-    expect(within(tile).getByText('Item a')).toBeTruthy();
+    expect(within(tile).getByText('unread')).toBeTruthy();
+    // The glance is a count and a few figures; item titles live in the detail view.
+    expect(within(tile).queryByText('Item a')).toBeNull();
   });
 });

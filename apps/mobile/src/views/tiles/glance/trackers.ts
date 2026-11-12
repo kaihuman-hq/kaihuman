@@ -1,9 +1,7 @@
 import { localDate, parseHabitData } from '@kaihuman/formats';
-import { parseConsumption, serializeConsumption } from '@kaihuman/formats/consumption';
 import {
   addBudgetTransaction,
   addCollectionEntry,
-  addConsumptionReading,
   BUDGET_CATEGORIES,
   type BudgetView,
   type ConsumptionView,
@@ -19,6 +17,7 @@ import {
   timeHistoryView,
   toggleHabitToday,
 } from '../../../components/widgets/tile-controllers.js';
+import { addHref } from './lists.js';
 import { tileTitle } from './name.js';
 import type { Glance, GlanceInput, GlanceTone } from './types.js';
 
@@ -162,39 +161,20 @@ export function timerGlance(input: GlanceInput, view: TimerView): Glance {
 
 const COUNT_UNITS = new Set(['', 'cup', 'cups', 'x', '×', 'count', 'pcs', 'times']);
 
-/** Adds one to today's reading of `key`, replacing today's row so the one-per-day rule holds. */
-const addOne = (content: string, key: string, now: Date) => {
-  const today = localDate(now);
-  const { data } = parseConsumption(content);
-  const todays = data.entries.find((e) => e.date === today && !e.interpolated);
-  const latest = data.entries
-    .filter((e) => !e.interpolated && Number.isFinite(e.readings[key]))
-    .at(-1)?.readings[key];
-  const next = (todays?.readings[key] ?? latest ?? 0) + 1;
-  if (!todays) {
-    return addConsumptionReading(content, today, { [key]: String(next) }, now);
-  }
-  const kept = { ...data, entries: data.entries.filter((e) => e.date !== today) };
-  const readings = { ...todays.readings, [key]: next };
-  // Re-added through the add form's mutator so the file is written exactly as the web would.
-  const text = serializeConsumption(kept);
-  return addConsumptionReading(
-    text,
-    today,
-    Object.fromEntries(
-      Object.entries(readings)
-        .filter(([, v]) => Number.isFinite(v))
-        .map(([k, v]) => [k, String(v)]),
-    ),
-    now,
-  );
-};
-
 export function consumptionGlance(input: GlanceInput, view: ConsumptionView): Glance {
   const title = tileTitle(input.path, 'Consumption');
   const meter = view.meters[0];
+  // The full reading form (date and every meter) is the one way in, so a +1 or a one-meter
+  // field never writes a reading the user did not see.
+  const action = {
+    kind: 'open',
+    icon: 'add',
+    label: meter ? `Add ${title} reading` : 'Add meter',
+    href: addHref(input.path),
+    track: true,
+  } as const;
   if (!meter) {
-    return { title, icon: 'gauge', tint: 'blue', hero: '--', label: 'no readings' };
+    return { title, icon: 'gauge', tint: 'blue', hero: '--', label: 'no readings', action };
   }
   const today = localDate(input.now);
   const latest = view.recent[0];
@@ -215,15 +195,7 @@ export function consumptionGlance(input: GlanceInput, view: ConsumptionView): Gl
           : ''
       }`,
       viz: { kind: 'pills', total, filled: Math.min(Math.round(count), total) },
-      action: {
-        kind: 'tap',
-        icon: 'add',
-        label: `${title} +1`,
-        run: (content, now) => {
-          const r = addOne(content, meter.key, now);
-          return r.ok ? r.content : content;
-        },
-      },
+      action,
     };
   }
   const use = latest?.use[meter.key] ?? null;
@@ -249,15 +221,7 @@ export function consumptionGlance(input: GlanceInput, view: ConsumptionView): Gl
     label: use !== null || meter.lastPeriodUse !== null ? 'last reading' : 'this year',
     delta,
     viz: spark.length > 1 ? { kind: 'spark', values: spark, tone: 'info', fill: true } : undefined,
-    action: {
-      kind: 'field',
-      icon: 'add',
-      label: `${title} reading`,
-      placeholder: 'Meter reading',
-      keyboard: 'decimal-pad',
-      submit: (content, value, now) =>
-        addConsumptionReading(content, localDate(now), { [meter.key]: value }, now),
-    },
+    action,
   };
 }
 
@@ -265,9 +229,13 @@ export function consumptionGlance(input: GlanceInput, view: ConsumptionView): Gl
 
 export function collectionGlance(input: GlanceInput, view: DataCollectionView): Glance {
   const title = tileTitle(input.path, 'Data');
-  const series = view.series[0];
+  // A sum/avg column is the figure the file exists for, so it beats the first typed column.
+  const series = view.series.find((s) => s.aggregate) ?? view.series[0];
   const base = { title, icon: 'table' as const, tint: 'olive' as const };
   if (!series) return { ...base, hero: '--', label: `${view.rowCount} rows` };
+  const typed =
+    view.series.find((s) => !s.aggregate)?.column ??
+    view.columns.find((c) => c.type === 'number')?.name;
   const window = series.points.slice(-30).map((p) => p.y);
   const change = (window.at(-1) ?? 0) - (window[0] ?? 0);
   const dateCol = view.columns.find((c) => c.type === 'date');
@@ -275,7 +243,9 @@ export function collectionGlance(input: GlanceInput, view: DataCollectionView): 
     ...base,
     hero: num(series.latest),
     unit: series.unit || undefined,
-    label: `${view.rowCount} rows`,
+    label: series.aggregate
+      ? `${series.aggregate} · ${view.rowCount} rows`
+      : `${view.rowCount} rows`,
     delta:
       window.length > 1
         ? {
@@ -285,22 +255,24 @@ export function collectionGlance(input: GlanceInput, view: DataCollectionView): 
         : undefined,
     viz:
       window.length > 1 ? { kind: 'spark', values: window, tone: 'accent', fill: true } : undefined,
-    action: {
-      kind: 'field',
-      icon: 'add',
-      label: `Add ${title}`,
-      placeholder: series.column,
-      keyboard: 'decimal-pad',
-      submit: (content, value, now) =>
-        addCollectionEntry(
-          content,
-          {
-            ...(dateCol ? { [dateCol.name]: localDate(now) } : {}),
-            [series.column]: value,
-          },
-          now,
-        ),
-    },
+    ...(typed && {
+      action: {
+        kind: 'field',
+        icon: 'add',
+        label: `Add ${title}`,
+        placeholder: typed,
+        keyboard: 'decimal-pad',
+        submit: (content, value, now) =>
+          addCollectionEntry(
+            content,
+            {
+              ...(dateCol ? { [dateCol.name]: localDate(now) } : {}),
+              [typed]: value,
+            },
+            now,
+          ),
+      },
+    }),
   };
 }
 

@@ -6,6 +6,12 @@ const device = vi.hoisted(() => ({
   files: new Map<string, string>(),
   keychain: new Map<string, string>(),
   shared: new Map<string, string>(),
+  /** Locked before first unlock (or a WHEN_UNLOCKED item while locked): every access throws. */
+  locked: false,
+}));
+const appState = vi.hoisted(() => ({
+  current: 'active',
+  listeners: new Set<(state: string) => void>(),
 }));
 
 // Native edges only; core, the stores, token sync and the bootstrap itself run for real.
@@ -40,14 +46,20 @@ vi.mock('../sync/expo-cache-fs.js', () => ({
     };
   },
 }));
-vi.mock('expo-secure-store', () => ({
-  AFTER_FIRST_UNLOCK: 0,
-  getItem: (k: string) => device.keychain.get(k) ?? null,
-  setItem: (k: string, v: string) => void device.keychain.set(k, v),
-  getItemAsync: async (k: string) => device.keychain.get(k) ?? null,
-  setItemAsync: async (k: string, v: string) => void device.keychain.set(k, v),
-  deleteItemAsync: async (k: string) => void device.keychain.delete(k),
-}));
+vi.mock('expo-secure-store', () => {
+  const open = () => {
+    if (device.locked) throw new Error('errSecInteractionNotAllowed');
+    return device.keychain;
+  };
+  return {
+    AFTER_FIRST_UNLOCK: 0,
+    getItem: (k: string) => open().get(k) ?? null,
+    setItem: (k: string, v: string) => void open().set(k, v),
+    getItemAsync: async (k: string) => open().get(k) ?? null,
+    setItemAsync: async (k: string, v: string) => void open().set(k, v),
+    deleteItemAsync: async (k: string) => void open().delete(k),
+  };
+});
 vi.mock('../../modules/kaihuman-shared/index.js', () => ({
   KaihumanShared: {
     readSharedFile: (n: string) => device.shared.get(n) ?? null,
@@ -60,7 +72,15 @@ vi.mock('../../modules/kaihuman-shared/index.js', () => ({
 vi.mock('../../modules/kaihuman-intelligence/index.js', () => ({ KaihumanIntelligence: null }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios', select: (o: Record<string, unknown>) => o.ios ?? o.default },
-  AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+  AppState: {
+    get currentState() {
+      return appState.current;
+    },
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      appState.listeners.add(listener);
+      return { remove: () => appState.listeners.delete(listener) };
+    },
+  },
   Linking: { openSettings: async () => {} },
 }));
 vi.mock('expo-constants', () => ({ default: { expoConfig: null } }));
@@ -111,6 +131,9 @@ afterEach(() => {
   device.files.clear();
   device.keychain.clear();
   device.shared.clear();
+  device.locked = false;
+  appState.current = 'active';
+  appState.listeners.clear();
 });
 
 describe('cold start', () => {
@@ -179,6 +202,91 @@ describe('cold start', () => {
     };
     expect(next.route.resolveStartRoute(session)).toBe('/dashboard');
     next.stop();
+  });
+
+  it('renews an expired GitHub App token before the first sync instead of losing the login', async () => {
+    // Regression: only access_token was kept, so the session ended once its 8 hours were up.
+    const first = await launch();
+    first.core.githubProfileStore.currentRepo.value = repo as never;
+    expect(
+      first.core.authStore.handleCallbackUrl(
+        'kaihuman://auth/callback?access_token=ghu_old&refresh_token=ghr_old&expires_in=60',
+      ),
+    ).toBe(true);
+    await flush();
+    first.stop();
+
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
+      calls.push(String(input));
+      // GitHub rejects the expired token; that must not end the session.
+      if (String(input) === 'https://api.github.com/user')
+        return new Response('{}', { status: 401 });
+      if (String(input) !== 'https://auth.kaihuman.com/refresh') return new Promise(() => {});
+      expect(JSON.parse(String(init?.body))).toEqual({ refresh_token: 'ghr_old' });
+      return Response.json({
+        access_token: 'ghu_new',
+        refresh_token: 'ghr_new',
+        expires_in: 28800,
+      });
+    });
+    try {
+      const next = await launch();
+      await flush();
+      expect(calls.filter((c) => c === 'https://auth.kaihuman.com/refresh')).toHaveLength(1);
+      expect(next.core.authStore.token.value).toBe('ghu_new');
+      expect(next.core.authStore.refreshToken.value).toBe('ghr_new');
+      await flush();
+      // The rotated refresh token survives the next restart, and only in the Keychain.
+      const keychain = [...device.keychain.values()].join('');
+      expect(keychain).toContain('ghr_new');
+      expect(keychain).not.toContain('ghr_old');
+      expect([...device.files.values()].join('')).not.toContain('ghr_');
+      next.stop();
+    } finally {
+      vi.stubGlobal('fetch', () => new Promise(() => {}));
+    }
+  });
+
+  it('keeps the session through a background launch while the Keychain is locked', async () => {
+    // Regression: background sync launched the app while the phone was locked; the Keychain
+    // read failed, the token read as "none" and the user found the login screen when opening it.
+    const first = await launch();
+    first.core.githubProfileStore.currentRepo.value = repo as never;
+    first.core.authStore.handleCallbackUrl(
+      'kaihuman://auth/callback?access_token=ghu_saved&refresh_token=ghr_saved&expires_in=28800',
+    );
+    await flush();
+    first.stop();
+
+    device.locked = true;
+    appState.current = 'background';
+    const next = await launch();
+    const { authStore } = next.core;
+    expect(authStore.token.value).toBeNull();
+    // No route is decided on a session that could not be read.
+    expect(next.tokenSync.tokenHydrated.value).toBe(false);
+
+    device.locked = false;
+    appState.current = 'active';
+    for (const listener of [...appState.listeners]) listener('active');
+    await flush();
+    expect(authStore.token.value).toBe('ghu_saved');
+    expect(authStore.refreshToken.value).toBe('ghr_saved');
+    expect(authStore.tokenExpiresAt.value).toBeGreaterThan(Date.now());
+    expect(next.tokenSync.tokenHydrated.value).toBe(true);
+    const session = {
+      token: authStore.token.value,
+      repo: next.core.githubProfileStore.currentRepo.value,
+    };
+    expect(next.route.resolveStartRoute(session)).toBe('/dashboard');
+    next.stop();
+
+    // Nothing was deleted while locked: the next cold start still has the whole session.
+    const later = await launch();
+    expect(later.core.authStore.token.value).toBe('ghu_saved');
+    expect(later.core.authStore.refreshToken.value).toBe('ghr_saved');
+    later.stop();
   });
 
   it('never writes the token into the plain cache files', async () => {

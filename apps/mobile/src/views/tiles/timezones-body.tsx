@@ -10,21 +10,15 @@ import {
   yearProgress,
 } from '../../components/widgets/tile-controllers.js';
 import { Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, Meter, Rows, Stat, StatRow, useDisclosure } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { EmptyLine, ItemRow, Meter, Rows, Stat, StatRow } from './parts.js';
 import { useLiveNow } from './use-live-now.js';
 
 /** Hermes has no `crypto.randomUUID`; ids only need to be unique within one small file. */
 const newId = (): string => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-function AddZone({ ctx }: { ctx: Ctx }) {
+export function ZoneAddForm({ ctx, onDone }: AddFormProps) {
   const [query, setQuery] = useState('');
-  const form = useDisclosure();
-  if (!form.open) {
-    return (
-      <Button label="Add time zone" icon="add" size="medium" variant="tinted" onPress={form.show} />
-    );
-  }
   const choices = searchZones(query);
   return (
     <View style={{ gap: 8 }}>
@@ -33,6 +27,7 @@ function AddZone({ ctx }: { ctx: Ctx }) {
         placeholder="Berlin, Tokyo, America/Denver"
         value={query}
         onChangeText={setQuery}
+        autoFocus
       />
       {query.trim() && choices.length === 0 ? <EmptyLine>No matching zones.</EmptyLine> : null}
       <Rows>
@@ -46,14 +41,13 @@ function AddZone({ ctx }: { ctx: Ctx }) {
             onPress={() => {
               if (ctx.apply(addTimezone(ctx.content, c.name, newId(), ctx.now))) {
                 haptics.success();
-                setQuery('');
-                form.hide();
+                onDone();
               } else haptics.error();
             }}
           />
         ))}
       </Rows>
-      <Button label="Cancel" size="medium" variant="plain" onPress={form.hide} />
+      <Button label="Cancel" size="medium" variant="plain" onPress={onDone} />
     </View>
   );
 }
@@ -118,7 +112,6 @@ export function Clocks({ clocks: initial, ctx }: { clocks: WorldClock[]; ctx: Ct
           })}
         </Rows>
       )}
-      <AddZone ctx={ctx} />
     </>
   );
 }

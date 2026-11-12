@@ -38,11 +38,6 @@ import {
 } from './kanban-filter-sheet.js';
 import { StreamsList } from './kanban-streams.js';
 
-const VIEWS = [
-  { value: 'board', label: 'Board' },
-  { value: 'streams', label: 'Streams' },
-] as const satisfies readonly { value: BoardView; label: string }[];
-
 const LABEL: Record<TodoStatus, string> = {
   backlog: 'Backlog',
   'in-progress': 'In progress',
@@ -134,7 +129,8 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const [focusNotice, setFocusNotice] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Cached cards paint at once; the spinner is only for a board with nothing cached yet.
+  const [loading, setLoading] = useState(() => !controller.loadCached());
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
@@ -148,6 +144,8 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     return DEFAULT_OPTIONS;
   });
   const [filterOpen, setFilterOpen] = useState(false);
+  // Filters stay hidden by default so the cards own the screen.
+  const [showFilters, setShowFilters] = useState(false);
   const [dueFor, setDueFor] = useState<BoardItem | null>(null);
 
   const reload = useCallback(async () => {
@@ -155,10 +153,16 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
       await controller.load();
       setLoadError(null);
     } catch (err: unknown) {
-      setLoadError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      // A failed revalidation keeps the cached cards on screen and says so above them.
+      if (controller.paths.length > 0) setError(msg);
+      else setLoadError(msg);
     }
     setVersion((v) => v + 1);
   }, [controller]);
+
+  // Optimistic edits (and their rollbacks) re-render before the save settles.
+  useEffect(() => controller.subscribe(() => setVersion((v) => v + 1)), [controller]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
@@ -266,7 +270,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const columns = controller.columns();
   const tags = controller.tags;
   const cards = columns[status];
-  const filterCount = activeOptionCount(options, view, tag);
+  const filterCount = activeOptionCount(options, view, tag) + (search.trim() ? 1 : 0);
   const statusOptions = TODO_STATUSES.map((s) => ({
     value: s,
     label: `${SEGMENT[s]} ${columns[s].length}`,
@@ -361,17 +365,23 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
               subtitle={item.tags.length ? item.tags.map((t) => `#${t}`).join(' ') : undefined}
               swipeActions={actions}
               onPress={onOpenTodo ? () => onOpenTodo(`${filePath}#${itemIndex}`) : undefined}
+              meta={
+                badge ? (
+                  <>
+                    {badge.repeat ? (
+                      <Icon
+                        name="repeat"
+                        size={14}
+                        color={colors.secondaryLabel}
+                        accessibilityLabel={`Repeats ${badge.repeat}`}
+                      />
+                    ) : null}
+                    <Badge tone={badge.tone} label={badge.label} />
+                  </>
+                ) : undefined
+              }
               accessory={
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  {badge?.repeat ? (
-                    <Icon
-                      name="repeat"
-                      size={14}
-                      color={colors.secondaryLabel}
-                      accessibilityLabel={`Repeats ${badge.repeat}`}
-                    />
-                  ) : null}
-                  {badge ? <Badge tone={badge.tone} label={badge.label} /> : null}
                   <Pressable
                     testID={`move-${itemIndex}-${advance.to}`}
                     accessibilityRole="button"
@@ -419,25 +429,24 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     <View style={{ flex: 1 }}>
       <Screen title="Board" refreshing={refreshing} onRefresh={onRefresh}>
         {loading || loadError ? null : <BoardFile paths={controller.paths} />}
-        <SegmentedControl testID="board-view" options={VIEWS} value={view} onChange={setView} />
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <View style={{ flex: 1 }}>
-            <TextField
-              label="Search todos"
-              testID="board-search"
-              placeholder="Text, tag or milestone"
-              value={search}
-              onChangeText={(text) => applyFilter({ search: text })}
-              returnKeyType="search"
-            />
+            {view === 'board' ? (
+              <SegmentedControl
+                testID="board-status"
+                options={statusOptions}
+                value={status}
+                onChange={setStatus}
+              />
+            ) : (
+              <Text variant="headline">Streams</Text>
+            )}
           </View>
           <Pressable
-            testID="board-filter"
+            testID="board-view-toggle"
             accessibilityRole="button"
-            accessibilityLabel={
-              filterCount > 0 ? `Sort and filter, ${filterCount} active` : 'Sort and filter'
-            }
-            onPress={() => setFilterOpen(true)}
+            accessibilityLabel={view === 'board' ? 'Show streams' : 'Show board'}
+            onPress={() => setView(view === 'board' ? 'streams' : 'board')}
             android_ripple={{ color: colors.pressed, borderless: true, radius: 24 }}
             style={({ pressed }) => ({
               width: metrics.hitTarget,
@@ -447,50 +456,82 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
               opacity: pressed ? 0.5 : 1,
             })}
           >
-            <Icon name="filter" size={22} color={filterCount > 0 ? colors.accent : colors.label} />
+            <Icon name={view === 'board' ? 'list' : 'board'} size={22} color={colors.label} />
+          </Pressable>
+          <Pressable
+            testID="board-filters-toggle"
+            accessibilityRole="button"
+            accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} active` : 'Filters'}
+            onPress={() => setShowFilters((v) => !v)}
+            android_ripple={{ color: colors.pressed, borderless: true, radius: 24 }}
+            style={({ pressed }) => ({
+              width: metrics.hitTarget,
+              height: metrics.hitTarget,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.5 : 1,
+            })}
+          >
+            <Icon
+              name={'filter'}
+              size={22}
+              color={showFilters || filterCount > 0 ? colors.accent : colors.label}
+            />
             {filterCount > 0 ? <Badge tone="accent" count={filterCount} /> : null}
           </Pressable>
         </View>
-        {view === 'board' ? (
-          <SegmentedControl
-            testID="board-status"
-            options={statusOptions}
-            value={status}
-            onChange={setStatus}
-          />
-        ) : null}
-        {view === 'board' ? (
-          <Chip
-            label="Last 2 weeks"
-            icon="clock"
-            selected={options.recent[status]}
-            onPress={() =>
-              applyFilter({
-                options: {
-                  ...options,
-                  recent: { ...options.recent, [status]: !options.recent[status] },
-                },
-              })
-            }
-          />
-        ) : null}
-        {view === 'board' && tags.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0, marginHorizontal: -metrics.screenMargin }}
-            contentContainerStyle={{ paddingHorizontal: metrics.screenMargin, gap: spacing.sm }}
-          >
-            <Chip label="All" selected={tag === undefined} onPress={() => pickTag(undefined)} />
-            {tags.map((t) => (
+        {showFilters ? (
+          <View style={{ gap: spacing.sm }}>
+            <TextField
+              label="Search todos"
+              testID="board-search"
+              placeholder="Text, tag or milestone"
+              value={search}
+              onChangeText={(text) => applyFilter({ search: text })}
+              returnKeyType="search"
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               <Chip
-                key={t}
-                label={`#${t}`}
-                selected={tag === t}
-                onPress={() => pickTag(tag === t ? undefined : t)}
+                label="Sort & filter"
+                icon="sort"
+                selected={activeOptionCount(options, view, tag) > 0}
+                onPress={() => setFilterOpen(true)}
               />
-            ))}
-          </ScrollView>
+              {view === 'board' ? (
+                <Chip
+                  label="Last 2 weeks"
+                  icon="clock"
+                  selected={options.recent[status]}
+                  onPress={() =>
+                    applyFilter({
+                      options: {
+                        ...options,
+                        recent: { ...options.recent, [status]: !options.recent[status] },
+                      },
+                    })
+                  }
+                />
+              ) : null}
+            </View>
+            {view === 'board' && tags.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ flexGrow: 0, marginHorizontal: -metrics.screenMargin }}
+                contentContainerStyle={{ paddingHorizontal: metrics.screenMargin, gap: spacing.sm }}
+              >
+                <Chip label="All" selected={tag === undefined} onPress={() => pickTag(undefined)} />
+                {tags.map((t) => (
+                  <Chip
+                    key={t}
+                    label={`#${t}`}
+                    selected={tag === t}
+                    onPress={() => pickTag(tag === t ? undefined : t)}
+                  />
+                ))}
+              </ScrollView>
+            ) : null}
+          </View>
         ) : null}
         {error ? (
           <Text variant="footnote" tone="danger" accessibilityRole="summary">

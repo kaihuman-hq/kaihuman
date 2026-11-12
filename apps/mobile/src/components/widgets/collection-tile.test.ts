@@ -38,6 +38,20 @@ describe('collectionDetail', () => {
     expect(d.series[0]?.max).toBeLessThan(80);
   });
 
+  it('keeps sum/avg columns as series, marked as aggregates', () => {
+    const f = [
+      'name::When,type::date;name::A,type::number;name::Total,type::auto:number:sum',
+      '2026-11-01;1;1',
+      '2026-11-02;2;2',
+    ].join('\n');
+    const d = collectionDetail(f, NOW, 'ALL');
+    expect(d.series.map((s) => [s.column, s.aggregate, s.latest])).toEqual([
+      ['A', undefined, 2],
+      ['Total', 'sum', 2],
+    ]);
+    expect(d.inputColumns.map((c) => c.name)).toEqual(['When', 'A']);
+  });
+
   it('ignores the filter when there is no date column', () => {
     const f = 'name::A,type::number\n1\n2';
     expect(collectionDetail(f, NOW, '6M').rowCount).toBe(2);

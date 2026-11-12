@@ -70,6 +70,7 @@ export class IdeasScreenController {
   private readonly now: () => Date;
   private readonly author: string;
   private ideas = new Map<IdeaSlug, IdeaEntry>();
+  private readonly listeners = new Set<() => void>();
   filters: IdeaFilters = { status: 'open', query: '', product: null, sort: 'activity' };
 
   constructor({ files, now, author }: IdeasDeps = {}) {
@@ -183,8 +184,30 @@ export class IdeasScreenController {
   private async edit(slug: IdeaSlug, change: (text: string, now: Date) => string): Promise<void> {
     const path = ideaPath(slug);
     const next = change(await this.files.read(path), this.now());
-    await this.files.write(path, next);
+    // Optimistic: the list shows the change at once; a failed save puts the old entry back.
+    const before = this.ideas.get(slug);
     this.ideas.set(slug, this.entry(slug, next));
+    this.changed();
+    try {
+      await this.files.write(path, next);
+    } catch (err) {
+      if (before) this.ideas.set(slug, before);
+      else this.ideas.delete(slug);
+      this.changed();
+      throw err;
+    }
+  }
+
+  /** Called after every optimistic change and rollback; returns unsubscribe. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private changed(): void {
+    for (const l of this.listeners) l();
   }
 
   private matching(filters: IdeaFilters): IdeaEntry[] {

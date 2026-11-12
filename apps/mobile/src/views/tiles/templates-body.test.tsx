@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Share } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Ctx } from './bodies.js';
-import { Templates } from './templates-body.js';
+import { TemplateAddForm, Templates } from './templates-body.js';
 
 afterEach(() => {
   cleanup();
@@ -65,13 +65,14 @@ describe('Templates', () => {
 
   it('saves a new prompt with its tags', () => {
     const apply = vi.fn(() => true);
-    render(<Templates ctx={ctx(PROMPTS, apply)} kind="prompt" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add prompt' }));
+    const onDone = vi.fn();
+    render(<TemplateAddForm ctx={ctx(PROMPTS, apply)} kind="prompt" onDone={onDone} />);
     fireEvent.change(screen.getByLabelText('New prompt title'), { target: { value: 'Haiku' } });
     fireEvent.change(screen.getByLabelText('New prompt text'), { target: { value: 'Write one' } });
     fireEvent.change(screen.getByLabelText('New prompt tags'), { target: { value: '#fun, art' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save prompt' }));
     const result = (apply.mock.calls[0] as unknown as [{ ok: true; content: string }])[0];
     expect(result.content).toContain('## Haiku #fun #art');
+    expect(onDone).toHaveBeenCalledOnce();
   });
 });

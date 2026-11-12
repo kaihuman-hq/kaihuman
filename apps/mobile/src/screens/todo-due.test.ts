@@ -10,6 +10,7 @@ import { KanbanBoardController } from './kanban-board.js';
 import { QuickCaptureController, type RepoFiles } from './quick-capture.js';
 import {
   completionNotice,
+  DUE_PRESETS,
   dateFromDue,
   dueBadge,
   dueFromDate,
@@ -43,6 +44,41 @@ describe('dueFromPreset', () => {
       date: '2027-01-01',
     });
     expect(dueFromPreset('tomorrow', new Date(2026, 1, 28, 8, 0))).toEqual({ date: '2026-03-01' });
+  });
+});
+
+describe('next weekday presets', () => {
+  // NOW is Tuesday 2026-11-10.
+  it('picks the next Saturday and Monday strictly after today', () => {
+    expect(dueFromPreset('next-saturday', NOW)).toEqual({ date: '2026-11-14' });
+    expect(dueFromPreset('next-monday', NOW)).toEqual({ date: '2026-11-16' });
+  });
+
+  it('skips a full week when today is that day', () => {
+    expect(dueFromPreset('next-saturday', new Date(2026, 10, 14, 9))).toEqual({
+      date: '2026-11-21',
+    });
+    expect(dueFromPreset('next-monday', new Date(2026, 10, 16, 23, 59))).toEqual({
+      date: '2026-11-23',
+    });
+  });
+
+  it('crosses month and year ends', () => {
+    expect(dueFromPreset('next-monday', new Date(2026, 11, 31, 8))).toEqual({
+      date: '2027-01-04',
+    });
+    expect(dueFromPreset('next-saturday', new Date(2026, 11, 26, 8))).toEqual({
+      date: '2027-01-02',
+    });
+  });
+
+  it('lists the presets in menu order', () => {
+    expect(DUE_PRESETS.map((p) => p.label)).toEqual([
+      'Today',
+      'Tomorrow',
+      'Next Saturday',
+      'Next Monday',
+    ]);
   });
 });
 

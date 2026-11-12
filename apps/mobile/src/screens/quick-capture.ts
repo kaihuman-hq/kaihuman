@@ -17,7 +17,8 @@ import {
   type TodoRepeat,
 } from '@kaihuman/formats';
 import { syncActions } from '../sync/actions.js';
-import { canServeFromCache } from '../sync/revalidate.js';
+import { githubCacheReader } from '../sync/cache-read.js';
+import { whenRepoReady } from '../sync/repo-ready.js';
 import { setDueOnData, setRepeatOnData } from './todo-due.js';
 
 /**
@@ -30,10 +31,16 @@ export interface RepoFiles {
   exists(path: string): boolean;
   /** `.todos.md` paths in the repo tree. */
   todoPaths(): string[];
+  /** Every file path in the repo tree, for the folder picker and name collision checks. */
+  paths?(): string[];
   /** Content of a file, or null when it does not exist. */
   read(path: string): Promise<string | null>;
   /** Creates or overwrites; rejects when the save fails. */
   write(path: string, content: string): Promise<void>;
+  /** The in-memory copy, synchronously, for a first paint before `read` settles. */
+  peek?(path: string): string | null;
+  /** Waits until reads see the repo's real files; false when it is still not loaded. */
+  ready?(): Promise<boolean>;
 }
 
 export const githubRepoFiles: RepoFiles = {
@@ -44,15 +51,13 @@ export const githubRepoFiles: RepoFiles = {
       .peek()
       .filter((t) => t.type === 'blob' && t.path.endsWith('.todos.md'))
       .map((t) => t.path),
-  async read(path) {
-    const open = githubFileStore.openFiles.peek()[path];
-    const item = githubFileStore.tree.peek().find((t) => t.path === path);
-    if (!open || !canServeFromCache(open, item, githubFileStore.dirtyFiles.peek().has(path))) {
-      if (!item) return null;
-      await githubFileStore.openFile(path);
-    }
-    return githubFileStore.openFiles.peek()[path]?.content ?? null;
-  },
+  paths: () =>
+    githubFileStore.tree
+      .peek()
+      .filter((t) => t.type === 'blob')
+      .map((t) => t.path),
+  read: (path) => githubCacheReader.read(path, { requireInTree: true }),
+  peek: (path) => githubFileStore.openFiles.peek()[path]?.content ?? null,
   async write(path, content) {
     if (githubFileStore.openFiles.peek()[path]) {
       // Optimistic: the edit is stored locally and the outbox pushes it, so a slow or missing
@@ -64,7 +69,10 @@ export const githubRepoFiles: RepoFiles = {
     }
     syncActions().notifyLocalWrite();
   },
+  ready: () => whenRepoReady(),
 };
+
+export const REPO_NOT_READY = 'Your repo is still loading. Try again in a moment.';
 
 export type CaptureResult =
   | { ok: true; path: string; message: string }
@@ -93,7 +101,7 @@ export class QuickCaptureController {
   private busy = false;
 
   constructor(
-    private readonly files: RepoFiles = githubRepoFiles,
+    readonly files: RepoFiles = githubRepoFiles,
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
@@ -102,6 +110,8 @@ export class QuickCaptureController {
     if (this.busy) return { ok: false, error: 'Another capture is still saving' };
     this.busy = true;
     try {
+      // A widget cold-launches the app straight into a capture sheet, before the tree is loaded.
+      if (this.files.ready && !(await this.files.ready())) throw new Error(REPO_NOT_READY);
       return { ok: true, path, message: await work() };
     } catch (err) {
       return { ok: false, error: message(err) };
@@ -121,14 +131,18 @@ export class QuickCaptureController {
     });
   }
 
-  /** `repeat` only applies with a `due`: a rule counts from the due date. */
+  /**
+   * `repeat` only applies with a `due`: a rule counts from the due date. `target` is a path the
+   * user picked in the sheet; without one each kind keeps its inbox file.
+   */
   quickTodo(
     text: string,
     tags?: string | string[],
     due?: TodoDue,
     repeat?: TodoRepeat,
+    target?: string,
   ): Promise<CaptureResult> {
-    const path = `${this.files.appFolder()}/inbox.todos.md`;
+    const path = target ?? `${this.files.appFolder()}/inbox.todos.md`;
     return this.append(
       path,
       (current) => {
@@ -149,8 +163,8 @@ export class QuickCaptureController {
   }
 
   /** Newest line first, like the console's dump file, so the latest thought is on top. */
-  quickNote(text: string): Promise<CaptureResult> {
-    const path = `${this.files.appFolder()}/dump.md`;
+  quickNote(text: string, target?: string): Promise<CaptureResult> {
+    const path = target ?? `${this.files.appFolder()}/dump.md`;
     const trimmed = text.trim();
     if (!trimmed) return Promise.resolve({ ok: false, error: 'Nothing to add' });
     return this.append(
@@ -163,9 +177,9 @@ export class QuickCaptureController {
   /** Set by `kaihuman://quick-log?idea=<slug>`: log entries then go to that idea's log. */
   targetIdea: string | null = null;
 
-  quickLog(description: string, tags?: string | string[]): Promise<CaptureResult> {
+  quickLog(description: string, tags?: string | string[], target?: string): Promise<CaptureResult> {
     if (this.targetIdea) return this.logToIdea(this.targetIdea, description);
-    const path = `${this.files.appFolder()}/inbox.actionlog.md`;
+    const path = target ?? `${this.files.appFolder()}/inbox.actionlog.md`;
     return this.append(
       path,
       (current) =>
@@ -201,6 +215,7 @@ export class QuickCaptureController {
     if (this.busy) return fail('Another capture is still saving');
     this.busy = true;
     try {
+      if (this.files.ready && !(await this.files.ready())) return fail(REPO_NOT_READY);
       let handoffs: IdeaHandoff[];
       try {
         handoffs = parseIdeaHandoffs(text);
@@ -250,14 +265,14 @@ export class QuickCaptureController {
   }
 
   /** Drops a raw source into `.kh/raw/` for the knowledge-base ingest skill to process. */
-  quickKnowledge(text: string, title?: string): Promise<CaptureResult> {
+  quickKnowledge(text: string, title?: string, target?: string): Promise<CaptureResult> {
     const body = text.trim();
     if (!body) return Promise.resolve({ ok: false, error: 'Nothing to add' });
     const now = this.clock();
     const heading = title?.trim() || body.split('\n')[0]?.trim() || 'note';
     const base = `${this.files.appFolder()}/raw/${localDate(now)}-${slugifyIdeaTitle(heading)}`;
-    let path = `${base}.md`;
-    for (let n = 2; this.files.exists(path); n++) path = `${base}-${n}.md`;
+    let path = target ?? `${base}.md`;
+    if (!target) for (let n = 2; this.files.exists(path); n++) path = `${base}-${n}.md`;
     const content = `---\ntitle: ${JSON.stringify(heading)}\ncaptured: ${now.toISOString()}\nsource: mobile\nprocessed: false\n---\n\n${body}\n`;
     return this.run(path, async () => {
       await this.files.write(path, content);

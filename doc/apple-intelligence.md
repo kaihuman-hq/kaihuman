@@ -1,6 +1,6 @@
 # Siri, Spotlight and Apple Intelligence in the mobile app
 
-Status: 10 November 2026. Written for `apps/mobile` (Expo SDK 58, React Native 0.88, iOS app + `KaihumanWidgets` extension built by `plugins/with-kaihuman-widgets.ts`). There is no Swift compiler on the Linux CI: Swift sources are checked by source-text tests (`src/ios-widget.test.ts`, `src/targets.test.ts`) and must be compiled on a Mac or EAS.
+Status: 11 November 2026. Written for `apps/mobile` (Expo SDK 58, React Native 0.88, iOS app + `KaihumanWidgets` extension built by `plugins/with-kaihuman-widgets.ts`). There is no Swift compiler on the Linux CI: Swift sources are checked by source-text tests (`src/ios-widget.test.ts`, `src/targets.test.ts`) and must be compiled on a Mac or EAS.
 
 ## What ships now
 
@@ -20,6 +20,24 @@ Status: 10 November 2026. Written for `apps/mobile` (Expo SDK 58, React Native 0
 | Writing Tools | Free: RN `TextInput` is a `UITextView`/`UITextField`, so iOS 18.1+ offers Writing Tools in every editor | — |
 
 Phrases (each must contain the app name): "Add a todo in kaihuman", "Add a note in kaihuman", "Log in kaihuman", "Search kaihuman", "What's due today in kaihuman", "What's next in kaihuman", "Complete ‹todo› in kaihuman", "Add to kaihuman inbox", "Open ‹item› in kaihuman".
+
+German phrases (Siri language Deutsch): "Füge in kaihuman ein Todo hinzu", "Neues Todo in kaihuman", "Neue Notiz in kaihuman", "Protokolliere in kaihuman", "Durchsuche kaihuman", "Was steht heute in kaihuman an", "Was ist als Nächstes in kaihuman", "Erledige ‹todo› in kaihuman", "Zum kaihuman Eingang hinzufügen", "Öffne ‹item› in kaihuman".
+
+### Localization
+
+- Siri matches only phrases in the **Siri language**. With English-only phrases, a German Siri matched nothing, and English phrases did not work either, because Siri does not fall back to another language.
+- `targets/ios-app-intents/AppShortcuts.xcstrings` (String Catalog, source language `en`, plus `de`): one key per phrase. The key is the Swift phrase with `\(.applicationName)` written as `${applicationName}` and `\(\.$todo)` as `${todo}`. Each translation must keep `${applicationName}` and the same parameters. A catalog maps one phrase to one translation, so add an English phrase to add a German one.
+- `targets/ios-app-intents/Localizable.xcstrings`: short titles, intent titles and dialogs (`%@` for a `String` interpolation, `%lld` for an `Int`). Widget-only strings are not translated.
+- The plugin adds both catalogs to the app target's Resources phase (file type `text.json.xcstrings`), adds `en` and `de` to the project's `knownRegions`, and sets `CFBundleLocalizations = [en, de]` in Info.plist. Tests: `src/targets.test.ts`, `src/ios-widget.test.ts`.
+- New language: add it to `APP_LOCALIZATIONS` in the plugin and a translation for every key in both catalogs.
+
+### Siri troubleshooting
+
+1. Open the app once after each install or TestFlight update. iOS registers App Shortcuts at install, but parameter values ("Open ‹item›", "Erledige ‹todo›") come only after `updateAppShortcutParameters()` runs at launch.
+2. Open the Shortcuts app and look for kaihuman under App Shortcuts. If kaihuman is missing, the build has no `AppShortcutsProvider` in the app target, and no phrase can work.
+3. Settings > Apps > kaihuman > Siri: turn on "Use with Siri" (Ask Siri) and "Learn from this app".
+4. The Siri language (Settings > Siri > Language) must be a language that the app localizes (now `en` and `de`). Phrases in other languages do not match.
+5. Say the phrase exactly as written first. Siri accepts small variations only after it learns the shortcut.
 
 ### Search adapter
 
@@ -83,7 +101,7 @@ With Expo, this needs a small Expo module (Swift) that wraps `LanguageModelSessi
 
 - Quick actions: cold launch and warm (backgrounded) launch for each of the 5 items. Especially check that warm launch routes exactly once.
 - Spotlight: items appear after a sync, and a tap opens the todo or note.
-- Siri phrases: every phrase above, the follow-up question for Search, and "What's due today" without opening the app.
+- Siri phrases: every phrase above, in English and German Siri, the follow-up question for Search, and "What's due today" without opening the app.
 - Lock Screen: Due today (3 families), Habits circular/inline streak.
 - Controls: Capture opens the capture tab. The Focus timer toggle starts a Live Activity on the next todo, stops it, and shows the right state after the app starts or ends a session itself.
 - Action button bound to the Focus timer control and to an App Shortcut.

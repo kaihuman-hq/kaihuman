@@ -1,15 +1,6 @@
 import type { TodoDue, TodoRepeat, TodoStatus } from '@kaihuman/formats';
 import { type ReactNode, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  Switch,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, Share, Switch, View } from 'react-native';
 import {
   addMilestoneTo,
   addTodoTask,
@@ -32,11 +23,21 @@ import {
 } from '../../components/widgets/todos-tile.js';
 import { dueBadge, retargetRepeat } from '../../screens/todo-due.js';
 import { useTheme } from '../../theme/theme.js';
-import { Badge, Button, Chip, haptics, Icon, Text, TextField } from '../../ui/index.js';
+import {
+  Badge,
+  Button,
+  Chip,
+  ErrorBoundary,
+  haptics,
+  Icon,
+  KeyboardLift,
+  Text,
+  TextField,
+} from '../../ui/index.js';
 import { DueEditor } from '../due-editor.js';
 import { DueSheet } from '../due-sheet.js';
-import type { Ctx } from './bodies.js';
-import { CheckCircle, EmptyLine, ItemRow, QuickAdd, type RowAction, Rows } from './parts.js';
+import type { AddFormProps, Ctx } from './bodies.js';
+import { CheckCircle, EmptyLine, FormButtons, ItemRow, type RowAction, Rows } from './parts.js';
 
 /** A bottom sheet that scrolls and lifts above the keyboard; tapping outside closes it. */
 function Sheet({
@@ -51,10 +52,7 @@ function Sheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} visible>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardLift inModal>
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}
@@ -77,12 +75,12 @@ function Sheet({
               <Text variant="headline" numberOfLines={2} accessibilityRole="header">
                 {title}
               </Text>
-              {children}
+              <ErrorBoundary what="this sheet">{children}</ErrorBoundary>
               <Button label="Close" variant="plain" fullWidth onPress={onClose} />
             </ScrollView>
           </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
+      </KeyboardLift>
     </Modal>
   );
 }
@@ -495,25 +493,28 @@ const NEXT_ACTIONS: Record<TodoStatus, readonly { status: TodoStatus; label: str
   rejected: [{ status: 'backlog', label: 'Reopen' }],
 };
 
-export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
-  const { colors, spacing } = useTheme();
+/** The tile's ＋ sheet: task text plus the web form's tags, milestone, due, repeat and prompt file. */
+export function TodoAddForm({ ctx, onDone }: AddFormProps) {
   const [text, setText] = useState('');
   const [details, setDetails] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [tag, setTag] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
-  const [open, setOpen] = useState<Open>(null);
-
-  const view = showAll ? todosView(ctx.content, ctx.now, Number.POSITIVE_INFINITY) : initial;
-  const activeTag = tag && view.tags.includes(tag) ? tag : null;
-  const rows = filterByTag(view.rows, activeTag);
-  const target =
-    open && open.kind !== 'milestones' ? view.rows.find((r) => r.index === open.index) : undefined;
-
+  const [fileError, setFileError] = useState<string | null>(null);
+  const view = todosView(ctx.content, ctx.now, Number.POSITIVE_INFINITY);
   const promptFiles =
     ctx.path && ctx.createFile
       ? { dir: dirOf(ctx.path), canOpen: Boolean(ctx.openFile) }
       : undefined;
+  // Stays open when the prompt file fails, so the error is still on screen.
+  const createPromptFile = async (file: string, openAfter: boolean) => {
+    try {
+      setFileError(null);
+      await ctx.createFile?.(file, '');
+      onDone();
+      if (openAfter) ctx.openFile?.(file);
+    } catch (e) {
+      setFileError(`Could not create ${file}: ${e instanceof Error ? e.message : 'failed'}`);
+    }
+  };
   const add = () => {
     const pending = normalizeTag(draft.newTag);
     const tags = pending ? [...draft.tags, pending] : draft.tags;
@@ -529,22 +530,61 @@ export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
     });
     if (ctx.apply(result)) {
       haptics.success();
-      setText('');
-      setDraft(EMPTY_DRAFT);
-      setDetails(false);
       if (promptFile) void createPromptFile(promptFile, draft.openAfter);
+      else onDone();
     } else haptics.error();
   };
-  const [fileError, setFileError] = useState<string | null>(null);
-  const createPromptFile = async (file: string, openAfter: boolean) => {
-    try {
-      setFileError(null);
-      await ctx.createFile?.(file, '');
-      if (openAfter) ctx.openFile?.(file);
-    } catch (e) {
-      setFileError(`Could not create ${file}: ${e instanceof Error ? e.message : 'failed'}`);
-    }
-  };
+  return (
+    <>
+      <TextField
+        label="New task"
+        placeholder="What needs doing?"
+        value={text}
+        onChangeText={setText}
+        autoCapitalize="sentences"
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={add}
+      />
+      <Button
+        label={details ? 'Hide details' : 'Details: tags, milestone, due, repeat'}
+        icon={details ? 'chevronDown' : 'chevronRight'}
+        variant="plain"
+        size="small"
+        testID="todo-details-toggle"
+        onPress={() => setDetails(!details)}
+      />
+      {details ? (
+        <AddDetails
+          view={view}
+          draft={draft}
+          setDraft={setDraft}
+          now={ctx.now}
+          taskText={text}
+          promptFiles={promptFiles}
+        />
+      ) : null}
+      {fileError ? (
+        <Text variant="footnote" tone="danger" accessibilityRole="summary">
+          {fileError}
+        </Text>
+      ) : null}
+      <FormButtons saveLabel="Add task" onSave={add} onCancel={onDone} />
+    </>
+  );
+}
+
+export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
+  const { colors, spacing } = useTheme();
+  const [tag, setTag] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [open, setOpen] = useState<Open>(null);
+
+  const view = showAll ? todosView(ctx.content, ctx.now, Number.POSITIVE_INFINITY) : initial;
+  const activeTag = tag && view.tags.includes(tag) ? tag : null;
+  const rows = filterByTag(view.rows, activeTag);
+  const target =
+    open && open.kind !== 'milestones' ? view.rows.find((r) => r.index === open.index) : undefined;
 
   const actionsFor = (r: TodoRow): RowAction[] => [
     ...NEXT_ACTIONS[r.status].map((a) => ({
@@ -677,37 +717,6 @@ export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
           />
         ) : null}
       </Wrap>
-      <QuickAdd
-        label="New task"
-        placeholder="What needs doing?"
-        value={text}
-        onChangeText={setText}
-        onSubmit={add}
-        addLabel="Add task"
-      />
-      <Button
-        label={details ? 'Hide details' : 'Details: tags, milestone, due, repeat'}
-        icon={details ? 'chevronDown' : 'chevronRight'}
-        variant="plain"
-        size="small"
-        testID="todo-details-toggle"
-        onPress={() => setDetails(!details)}
-      />
-      {details ? (
-        <AddDetails
-          view={view}
-          draft={draft}
-          setDraft={setDraft}
-          now={ctx.now}
-          taskText={text}
-          promptFiles={promptFiles}
-        />
-      ) : null}
-      {fileError ? (
-        <Text variant="footnote" tone="danger" accessibilityRole="summary">
-          {fileError}
-        </Text>
-      ) : null}
 
       {open?.kind === 'milestones' ? (
         <MilestoneSheet view={view} ctx={ctx} onClose={() => setOpen(null)} />

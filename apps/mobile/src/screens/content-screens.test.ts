@@ -57,6 +57,34 @@ describe('IdeasScreenController', () => {
     return { map, ctl: new IdeasScreenController({ files, now: () => NOW }) };
   };
 
+  it('shows a status change before the save settles and rolls it back on failure', async () => {
+    const { map, files } = memoryFiles({ '.kh/ideas/alpha.md': idea('Alpha', daysAgo(1)) });
+    let release = () => {};
+    let fail = false;
+    const slow: ContentFiles = {
+      ...files,
+      write: (path, content) =>
+        fail
+          ? Promise.reject(new Error('offline'))
+          : new Promise<void>((resolve) => {
+              release = () => void files.write(path, content).then(resolve);
+            }),
+    };
+    const ctl = new IdeasScreenController({ files: slow, now: () => NOW });
+    await ctl.load();
+    const statuses: string[] = [];
+    ctl.subscribe(() => statuses.push(ctl.get('alpha' as IdeaSlug)?.idea.status ?? ''));
+    const pending = ctl.setStatus('alpha' as IdeaSlug, 'committed', 'Go');
+    // Regression: the list changed only after the write resolved.
+    await vi.waitFor(() => expect(statuses).toEqual(['committed']));
+    release();
+    await pending;
+    expect(map.get('.kh/ideas/alpha.md')).toContain('committed');
+    fail = true;
+    await expect(ctl.setStatus('alpha' as IdeaSlug, 'parked')).rejects.toThrow('offline');
+    expect(statuses.slice(1)).toEqual(['parked', 'committed']);
+  });
+
   it('lists open ideas by activity with levels and chips', async () => {
     const { ctl } = setup();
     await ctl.load();
@@ -256,7 +284,12 @@ describe('FileEditorController', () => {
       'z.csv': 'x,y',
     });
     const pw = passwords();
-    return { map, pw, ctl: new FileEditorController({ files, passwords: pw, crypto: fakeCrypto }) };
+    return {
+      map,
+      pw,
+      files,
+      ctl: new FileEditorController({ files, passwords: pw, crypto: fakeCrypto }),
+    };
   };
 
   it('traverses directories, folders first', () => {
@@ -344,5 +377,49 @@ describe('FileEditorController', () => {
     await ctl.deleteFile('b.md');
     expect(map.has('b.md')).toBe(false);
     expect(ctl.state.status).toBe('closed');
+  });
+
+  // Regression: a re-read that a sync revision started finished after the user typed, replaced
+  // the edit with the older copy and cleared `dirty`, so Save did nothing.
+  it('keeps an edit made while a re-open is still reading', async () => {
+    const { ctl, files } = setup();
+    await ctl.open('a.md');
+    let release: (content: string) => void = () => {};
+    vi.spyOn(files, 'read').mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const reopen = ctl.open('a.md');
+    ctl.edit('# typed');
+    release('# remote');
+    expect(await reopen).toMatchObject({ content: '# typed', dirty: true });
+    expect(ctl.state).toMatchObject({ content: '# typed', dirty: true });
+  });
+
+  // Regression: text typed while a save was writing was dropped when the save marked the file
+  // clean with the content it had started from.
+  it('keeps text typed during a save dirty, and saves it next time', async () => {
+    const { ctl, files, map } = setup();
+    await ctl.open('a.md');
+    let finish: () => void = () => {};
+    const write = files.write;
+    vi.spyOn(files, 'write').mockImplementationOnce(async (path, content) => {
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      await write(path, content);
+    });
+    ctl.edit('# first');
+    const saving = ctl.save();
+    ctl.edit('# first and more');
+    finish();
+    await saving;
+    expect(map.get('a.md')).toBe('# first');
+    expect(ctl.state).toMatchObject({ content: '# first and more', dirty: true });
+    await ctl.save();
+    expect(map.get('a.md')).toBe('# first and more');
+    expect(ctl.state).toMatchObject({ dirty: false });
   });
 });

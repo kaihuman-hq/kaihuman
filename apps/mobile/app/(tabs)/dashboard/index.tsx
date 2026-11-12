@@ -5,6 +5,7 @@ import { type DashboardPage, loadDashboards, takeLatest } from '../../../src/scr
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { setLoadedTiles, tileWrite } from '../../../src/screens/loaded-tiles.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
+import { optimisticWrite } from '../../../src/sync/optimistic.js';
 import type { DashboardEditor } from '../../../src/views/dashboard-editor.js';
 import { DashboardPager } from '../../../src/views/dashboard-pager.js';
 import { useSignalValue } from '../../../src/views/use-signal.js';
@@ -98,11 +99,20 @@ export default function Dashboard() {
         editor={editor}
         onNavigate={(href) => router.push(href as never)}
         onCreateFile={(path, content) => githubContentFiles.create(path, content)}
-        onWrite={async (path, content) => {
-          await githubContentFiles.write(path, content);
-          setPages((prev) => prev.map(patchFile(path, content)));
-          setNow(new Date());
-        }}
+        onWrite={(path, content) =>
+          optimisticWrite({
+            apply: () => {
+              const before = pages.flatMap((p) => p.files).find((f) => f.path === path)?.content;
+              setPages((prev) => prev.map(patchFile(path, content)));
+              setNow(new Date());
+              return before;
+            },
+            write: () => githubContentFiles.write(path, content),
+            rollback: (before) => {
+              if (before !== undefined) setPages((prev) => prev.map(patchFile(path, before)));
+            },
+          })
+        }
       />
     </>
   );

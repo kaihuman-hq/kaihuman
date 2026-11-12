@@ -156,6 +156,97 @@ describe('FileEditorView', () => {
   });
 });
 
+describe('FileEditorView source editor', () => {
+  const field = async () => (await screen.findByLabelText('Content')) as HTMLTextAreaElement;
+  const press = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+
+  it('formats markdown from the toolbar, with undo and redo', async () => {
+    const { files } = memory({ 'n.md': 'milk' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="n.md" mode="source" />);
+    const input = await field();
+    expect(screen.getByRole('button', { name: 'Undo' }).getAttribute('aria-disabled')).toBe('true');
+    press('Checkbox');
+    expect(input.value).toBe('- [ ] milk');
+    press('Heading');
+    expect(input.value).toBe('# milk');
+    press('Undo');
+    expect(input.value).toBe('- [ ] milk');
+    press('Undo');
+    expect(input.value).toBe('milk');
+    press('Redo');
+    expect(input.value).toBe('- [ ] milk');
+  });
+
+  it('continues a list on enter', async () => {
+    const { files } = memory({ 'n.md': '- a' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="n.md" mode="source" />);
+    const input = await field();
+    fireEvent.change(input, { target: { value: '- a\n' } });
+    expect(input.value).toBe('- a\n- ');
+  });
+
+  it('shows only undo/redo for non-markdown files', async () => {
+    const { files } = memory({ 'c.json': '{}' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="c.json" mode="source" />);
+    await field();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Bold' })).toBeNull();
+  });
+
+  it('autosaves after a pause in typing', async () => {
+    const { map, files } = memory({ 'n.md': 'old' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="n.md" mode="source" autosaveMs={10} />);
+    fireEvent.change(await field(), { target: { value: 'new' } });
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(await screen.findByText('Saved')).toBeTruthy();
+    expect(map.get('n.md')).toBe('new');
+  });
+
+  it('keeps typing done while a save is in flight', async () => {
+    let finish = () => {};
+    const { map, files } = memory(
+      { 'n.md': 'a' },
+      {
+        write: (p, c) =>
+          new Promise<void>((resolve) => {
+            finish = () => {
+              map.set(p, c);
+              resolve();
+            };
+          }),
+      },
+    );
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(
+      <FileEditorView controller={controller} path="n.md" mode="source" autosaveMs={60_000} />,
+    );
+    const input = await field();
+    fireEvent.change(input, { target: { value: 'ab' } });
+    press('Save');
+    expect(screen.getByText('Saving…')).toBeTruthy();
+    fireEvent.change(input, { target: { value: 'abc' } });
+    await act(async () => finish());
+    expect(map.get('n.md')).toBe('ab');
+    expect(input.value).toBe('abc');
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('saves pending edits when the screen closes', async () => {
+    const { map, files } = memory({ 'n.md': 'old' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    const view = render(
+      <FileEditorView controller={controller} path="n.md" mode="source" autosaveMs={60_000} />,
+    );
+    fireEvent.change(await field(), { target: { value: 'kept' } });
+    view.unmount();
+    await waitFor(() => expect(map.get('n.md')).toBe('kept'));
+  });
+});
+
 vi.mock('../files/feed-store.js', () => ({
   feedStore: { snapshot: () => ({}), subscribe: () => () => {}, ensure: async () => {} },
 }));
@@ -238,5 +329,37 @@ describe('MoreView layout', () => {
     for (const t of ['Analytics', 'Wiki', 'Knowledge', 'Files', 'Repositories', 'Sign out']) {
       expect(screen.getByText(t)).toBeTruthy();
     }
+  });
+});
+
+describe('FileBrowserView new file', () => {
+  it('creates a file of the picked kind in the open folder and opens it', async () => {
+    const { map, files } = memory({ 'work/a.md': '1', 'home/b.md': '2' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    const onOpenFile = vi.fn();
+    render(<FileBrowserView controller={controller} onOpenFile={onOpenFile} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'work' }));
+    fireEvent.click(screen.getByTestId('new-file'));
+    fireEvent.click(screen.getByTestId('new-file-kind-habit'));
+    expect((screen.getByLabelText('Folder') as HTMLInputElement).value).toBe('work');
+    fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'sleep' } });
+    fireEvent.click(screen.getByTestId('new-file-create'));
+    await waitFor(() => expect(onOpenFile).toHaveBeenCalledWith('work/sleep.habit.csv'));
+    expect(map.get('work/sleep.habit.csv')).toBe('id,title,frequency,target,history\n');
+    expect(screen.queryByTestId('new-file-sheet')).toBeNull();
+  });
+
+  it('refuses a name that is taken and keeps the sheet open', async () => {
+    const { files } = memory({ 'work/a.md': '1' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    const onOpenFile = vi.fn();
+    render(<FileBrowserView controller={controller} onOpenFile={onOpenFile} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'work' }));
+    fireEvent.click(screen.getByTestId('new-file'));
+    fireEvent.click(screen.getByTestId('new-file-kind-note'));
+    fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'a' } });
+    fireEvent.click(screen.getByTestId('new-file-create'));
+    expect(await screen.findByText('A file with that name already exists.')).toBeTruthy();
+    expect(onOpenFile).not.toHaveBeenCalled();
   });
 });

@@ -2,9 +2,15 @@ import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import PickerModule, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { type ComponentType, useState } from 'react';
 import { Switch, View } from 'react-native';
-import { dateFromDue, dueFromDate, dueSummary } from '../screens/todo-due.js';
+import {
+  DUE_PRESETS,
+  dateFromDue,
+  dueFromDate,
+  dueFromPreset,
+  dueSummary,
+} from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
-import { Button, Text } from '../ui/index.js';
+import { Button, Chip, Text } from '../ui/index.js';
 import { RepeatEditor } from './repeat-editor.js';
 
 type Picking = 'date' | 'time' | null;
@@ -62,6 +68,23 @@ export function DueEditor({
       <Text variant="subheadline" tone="secondary">
         Due
       </Text>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+        {DUE_PRESETS.map(({ preset, label }) => {
+          const date = dueFromPreset(preset, now).date;
+          return (
+            <Chip
+              key={preset}
+              label={label}
+              selected={value?.date === date}
+              onPress={() => {
+                setPicking(null);
+                // A quick date keeps the time already chosen.
+                onChange({ date, ...(value?.time && { time: value.time }) });
+              }}
+            />
+          );
+        })}
+      </View>
       <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
         <Button
           label={value ? dueSummary({ date: value.date }) : 'Set due date'}

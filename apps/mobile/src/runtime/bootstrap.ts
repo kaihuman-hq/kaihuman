@@ -1,4 +1,5 @@
 import { authStore, demoMode, getCoreStorage, githubFileStore } from '@kaihuman/core';
+import Constants from 'expo-constants';
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
@@ -17,6 +18,7 @@ import { checkGithubToken, recoverAuth } from '../sync/auth-recovery.js';
 import { registerBackgroundSync } from '../sync/background.js';
 import { setRescheduleNotifications } from '../sync/notifications-hook.js';
 import { startSync } from '../sync/runtime.js';
+import { createTokenRefresher, refreshEndpointFor } from '../sync/token-refresh.js';
 import { installCryptoPolyfill } from './crypto-polyfill.js';
 import { createNativeContainer } from './native-container.js';
 import { type LinkDeps, startLinkHandling } from './pending-url.js';
@@ -32,6 +34,12 @@ export function setNotificationNavigator(navigate: (href: string) => void): void
 }
 
 let ready: Promise<unknown> = Promise.resolve();
+
+// Same source as app/login.tsx; the worker's `/refresh` sits next to its `/login`.
+const DEFAULT_GATEWAY = 'https://auth.kaihuman.com/login';
+const authGateway = (): string =>
+  ((Constants as { expoConfig?: { extra?: Record<string, unknown> } | null }).expoConfig?.extra
+    ?.authGatewayUrl as string | undefined) ?? DEFAULT_GATEWAY;
 
 /** Resolves once the Keychain token has been loaded into the auth store. */
 export const bootstrapReady = (): Promise<unknown> => ready;
@@ -57,13 +65,33 @@ export function bootstrap(): () => void {
       set: (token) => SecureStore.setItemAsync(SECURE_TOKEN_KEY, token, secureOptions),
       remove: () => SecureStore.deleteItemAsync(SECURE_TOKEN_KEY, secureOptions),
     },
+    foreground: () => AppState.currentState === 'active',
+    restore: () => authStore.restore(),
   });
   ready = stopToken.ready;
+  // A background launch on a locked phone could not read the Keychain; the unlock that brings
+  // the app to the foreground makes it readable again.
+  const unlockSub = AppState.addEventListener('change', (state) => {
+    if (state === 'active') void stopToken.retry();
+  });
+  const refresher = createTokenRefresher({
+    endpoint: refreshEndpointFor(authGateway()),
+    session: () =>
+      demoMode.peek()
+        ? { refreshToken: null, expiresAt: null }
+        : {
+            refreshToken: authStore.refreshToken.peek(),
+            expiresAt: authStore.tokenExpiresAt.peek(),
+          },
+    save: (session) => authStore.setSession(session),
+  });
   // Every sync run (foreground or background) re-plans local notifications from fresh todos.
   setRescheduleNotifications(rescheduleNotifications);
   const stopSync = startSync({
     bridge,
     tokenReady: ready,
+    // The refresh token is restored asynchronously with the rest of core's auth state.
+    ensureFreshToken: () => authStore.ready.then(() => refresher.ensureFresh()),
     // The token lives in three places (core's key, core's auth record, the widgets' Keychain item);
     // after a 401 any copy GitHub still accepts beats signing the user out.
     recoverAuth: () =>
@@ -80,6 +108,7 @@ export function bootstrap(): () => void {
           authStore.token.value = token;
         },
         signOut: () => authStore.logout(),
+        refresh: () => refresher.refresh(),
       }),
   });
   void registerBackgroundSync();
@@ -115,6 +144,7 @@ export function bootstrap(): () => void {
     stopSync();
     stopBridge();
     stopNotifications();
+    unlockSub.remove();
     stopToken();
     active = null;
   };

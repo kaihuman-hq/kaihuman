@@ -32,6 +32,7 @@ import {
   FULL_SWIPE_COLLAPSE_MS,
   FULL_SWIPE_SLIDE_MS,
   isFullSwipe,
+  shouldRunFullSwipe,
 } from './swipe-logic.js';
 import { Text } from './text.js';
 
@@ -332,7 +333,7 @@ export function SwipeReveal({
         overshootRight={fullSwipe}
         onSwipeableWillOpen={(direction) => {
           const t = translation.current?.get() ?? 0;
-          if (outermost && direction === 'right' && isFullSwipe(t, width.get())) {
+          if (outermost && shouldRunFullSwipe(direction, t, width.get())) {
             runFullSwipe(outermost);
           } else {
             haptics.selection();
@@ -371,6 +372,8 @@ export function SwipeReveal({
 export interface ListRowProps {
   title: string;
   subtitle?: string;
+  /** Extra content under the title/subtitle (e.g. a due badge), inside the text column. */
+  meta?: ReactNode;
   value?: string;
   icon?: IconName;
   /** iOS: coloured tile behind the glyph. Android: tinted glyph. Overrides the two below. */
@@ -416,6 +419,7 @@ function showActions(title: string, actions: readonly SwipeAction[], ios: boolea
 export function ListRow({
   title,
   subtitle,
+  meta,
   value,
   icon,
   iconTone,
@@ -521,7 +525,7 @@ export function ListRow({
           flexDirection: 'row',
           alignItems: 'center',
           gap: ICON_GAP,
-          paddingVertical: subtitle ? spacing.sm + 2 : spacing.sm,
+          paddingVertical: subtitle || meta ? spacing.sm + 2 : spacing.sm,
           paddingRight: metrics.screenMargin,
           minHeight: metrics.rowHeight,
         }}
@@ -535,6 +539,19 @@ export function ListRow({
             <Text variant={ios ? 'footnote' : 'subheadline'} tone="secondary" numberOfLines={2}>
               {subtitle}
             </Text>
+          ) : null}
+          {meta ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.sm,
+                alignSelf: 'flex-start',
+                marginTop: spacing.xs,
+              }}
+            >
+              {meta}
+            </View>
           ) : null}
         </View>
         {value ? (

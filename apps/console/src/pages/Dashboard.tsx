@@ -351,6 +351,7 @@ export const Dashboard = () => {
             }
           }}
           onBoardClick={() => route('/stream')}
+          onTasksClick={() => route('/tasks')}
           onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
           onKnowledgeClick={() => route('/knowledge')}

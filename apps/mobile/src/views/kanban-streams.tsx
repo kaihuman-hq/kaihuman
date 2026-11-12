@@ -19,6 +19,7 @@ import {
   contentKeys,
   EmptyState,
   type IconName,
+  KeyboardLift,
   ListRow,
   Section,
   type SwipeAction,
@@ -222,27 +223,29 @@ function Sheet({
   const { colors, spacing, shape } = useTheme();
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} visible>
-      <Pressable
-        accessibilityLabel="Close"
-        onPress={onClose}
-        style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' }}
-      >
+      <KeyboardLift>
         <Pressable
-          accessible={false}
-          style={{
-            backgroundColor: colors.surface,
-            padding: spacing.lg,
-            gap: spacing.md,
-            borderTopLeftRadius: shape.lg,
-            borderTopRightRadius: shape.lg,
-          }}
+          accessibilityLabel="Close"
+          onPress={onClose}
+          style={{ flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' }}
         >
-          <Text variant="headline" numberOfLines={2}>
-            {title}
-          </Text>
-          {children}
+          <Pressable
+            accessible={false}
+            style={{
+              backgroundColor: colors.surface,
+              padding: spacing.lg,
+              gap: spacing.md,
+              borderTopLeftRadius: shape.lg,
+              borderTopRightRadius: shape.lg,
+            }}
+          >
+            <Text variant="headline" numberOfLines={2}>
+              {title}
+            </Text>
+            {children}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardLift>
     </Modal>
   );
 }

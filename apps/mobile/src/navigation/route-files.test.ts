@@ -22,6 +22,13 @@ describe('expo-router route files', () => {
     }
   });
 
+  it('opens the widget "+" on the same New todo sheet as the in-app add', () => {
+    const inbox = readFileSync(`${appDir}quick-inbox.tsx`, 'utf8');
+    const todo = readFileSync(`${appDir}quick-todo.tsx`, 'utf8');
+    expect(inbox).toContain('<QuickCaptureScreen kind="todo" />');
+    expect(todo).toContain('<QuickCaptureScreen kind="todo" />');
+  });
+
   it('presents every quick-capture route as a sheet in the root stack', () => {
     const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
     for (const kind of Object.keys(quickKinds)) expect(root).toContain(`'quick-${kind}'`);
@@ -58,12 +65,10 @@ describe('expo-router route files', () => {
     expect(readFileSync(`${appDir}_layout.tsx`, 'utf8')).toContain('name="search"');
   });
 
-  it('keeps search as a hidden tab route and a header button on every tab root', () => {
-    expect(existsSync(`${appDir}(tabs)/search/index.tsx`)).toBe(true);
-    // The redesign tab bar has no Search tab; the route stays so /search links resolve.
-    expect(readFileSync(`${appDir}(tabs)/_layout.tsx`, 'utf8')).toMatch(
-      /name="search" options=\{\{[^}]*href: null/,
-    );
+  it('serves search only from the root stack, with a header button on every tab root', () => {
+    // A hidden (tabs)/search would win `/search` and be redirected away (route-resolution.test.ts).
+    expect(existsSync(`${appDir}(tabs)/search`)).toBe(false);
+    expect(readFileSync(`${appDir}(tabs)/_layout.tsx`, 'utf8')).not.toContain('name="search"');
     for (const tab of ['dashboard', 'board', 'capture', 'ideas', 'more']) {
       expect(readFileSync(`${appDir}(tabs)/${tab}/_layout.tsx`, 'utf8')).toContain('<SearchButton');
     }

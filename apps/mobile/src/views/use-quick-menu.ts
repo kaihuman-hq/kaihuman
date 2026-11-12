@@ -73,7 +73,7 @@ export function useQuickMenu(navigate: (href: string) => void) {
     else toggle();
   }, [last, run, toggle]);
 
-  const menu: Omit<QuickMenuProps, 'bottomOffset'> = {
+  const menu: Omit<QuickMenuProps, 'bottomOffset' | 'progress'> = {
     open,
     capture: CAPTURE_ACTIONS,
     track,

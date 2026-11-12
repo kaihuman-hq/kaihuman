@@ -1,5 +1,182 @@
 # Progress
 
+## 2026-11-12 — Mobile: dashboard pager updates live and swipes endlessly
+
+- The dashboard name and page dots now follow the live scroll offset (`onScroll`, throttled 16 ms) and change as soon as the next page is half visible, instead of after the swipe settles.
+- Endless swipe: with 2+ dashboards the list renders `[last, ...pages, first]`; landing on a clone silently jumps (unanimated) to the identical real page. Clones mount their tiles only while a drag is in flight, so a resting page is never duplicated.
+- Index maths lives in `apps/mobile/src/views/pager-loop.ts`; tests in `pager-loop.test.ts` (slot mapping, live offset to page, clone jumps). Existing pager tests pass unchanged.
+
+## 2026-11-12 — Mobile: Search results start at the top, large "Search" title
+
+- Typing in Search left the list scrolled down, so the first results hid behind the iOS header. `Screen` has a new `scrollToTopKey`; when it changes the scroll view resets to its resting offset (minus the header height on iOS, so the automatic inset is respected). `SearchView` passes the trimmed query.
+- The Search screen sets `title: 'Search'` and `headerLargeTitle` explicitly on iOS so the large title survives the native search bar; the web preview draws it inline via `Screen title`.
+- Test: `search-view.test.tsx` (scroll reset fires when the query changes, not on an identical rerender).
+
+## 2026-11-12 — Mobile: quick menu grows out of the tab bar
+
+- The ＋ quick menu now springs up from the tab bar's top edge (full-width sheet in the bar's surface colour, clipped at the bar so it rises out of it) instead of popping in as a floating card. The scrim fades with the sheet.
+- The ＋ rides the sheet's top edge as it opens and turns 135° into the ×; closing reverses both. One shared progress value drives the sheet, the travelling ＋ and the tab bar ＋'s hand-over.
+- Swipe down on the sheet follows the finger (upward over-pull resists) and closes on a fast flick or a long enough pull, otherwise springs back; the close spring keeps the finger's velocity. Built on `react-native-reanimated` + `react-native-gesture-handler` v3 (`usePanGesture`), no new deps.
+- Pure motion math in `apps/mobile/src/views/quick-menu-motion.ts` (snap decision, drag resistance, rise/turn fraction, release hand-off) with unit tests; `quick-menu.test.tsx` covers the ＋ close, swipe close and snap-back.
+
+## 2026-11-12 — Console: quick link from the dashboard todo tile to `/tasks`
+
+- The dashboard todo tile header has a small muted "↗" icon button (`aria-label="Open Tasks board"`) next to the "N ACTIVE" count; it routes to the Tasks board. Hidden unless `onOpenBoard` is passed (wired from `MainApp`'s existing `onTasksClick`), so the widget stays standalone-safe. No new dashboard chrome; works at mobile width (12px icon in the existing header row; the collapsed mobile tile is unchanged).
+- Test: `TodoWidget.views.test.tsx` (link present and fires `onOpenBoard`; absent without it).
+
+## 2026-11-12 — Console: Tasks board (`/tasks`)
+
+- New full-page board over every `.todos.md` list (TickTick-style). Sidebar: smart lists **Today** (incl. overdue), **Next 7 Days** (overdue through day 7) and **Inbox** with open counts; **Lists** (name, colour dot, open count); **Tags** (stable colour dot from the todo palette, count); **Completed** at the bottom. No Trash: the data model has none.
+- Main pane: view title, sort toggle (due time / list), "…" menu (open list file, Kanban, Stream), an "Add task to "<list>"" row (Inbox for smart views; tag views add the tag), and compact rows: checkbox (completes; recurring todos advance), title with links, then list name, repeat icon, clock and due time in blue, red when overdue.
+- Mobile: the sidebar hides behind the header menu icon. Reachable from the magic menu and as a configurable navbar item (`tasks`).
+- Logic in `packages/formats/src/task-board.ts`, built on the date views from `todo-views.ts`. Tests: `task-board.test.ts` (bucketing, sorting, counts, labels), `apps/console/src/pages/TasksBoardPage.test.tsx` (render, complete, add, mobile sidebar).
+
+## 2026-11-12 — Console: version files are no longer regenerated locally
+
+- `pnpm dev` / `pnpm build` ran `generate-version.js`, which rewrote `src/version.ts` (new build time) and left a git diff each time.
+- `generate-version.js` now only writes when `CI` or `GITHUB_ACTIONS` is set, or with `--force` / `GENERATE_VERSION=1`. GitHub Actions sets `CI`, so the deploy workflow still produces the right version. `bump-version.js` passes `--force`, so `version:bump` and `build:prod` still work locally.
+- Test: `scripts/generate-version.test.ts` covers the gate.
+
+## 2026-11-12 — Mobile: adding a todo from a dashboard tile closed the app
+
+- Report: on iOS (TestFlight), adding a todo from the dashboard todo tile's ＋ closed the app. It did not reproduce in jsdom: every add path (`todo-add` sheet, tile detail, tile-card ＋ sheet, dashboard and detail re-render) adds with no errors, and there is no device crash log yet. So the native cause is not confirmed.
+- Most likely cause: `TodoAddSheet` "Add" wrote first and closed the `formSheet` in the same tick. The write's fan-out (store signals, sync, dashboard reload, keyboard hide) then landed on a sheet that was being torn down. The route also called `setContent` after it unmounted, and a failed save became an unhandled rejection (`void onWrite`). Also, `todo-add`, the todos tile detail and the tile ＋ sheet bodies had no error boundary, so a render error in them closed the app.
+- Fix: `TodoAddSheet` builds the next text, closes, then saves. A failed save gives error haptics. The `todo-add` route skips state updates after unmount and wraps the sheet in `ErrorBoundary`. The tile detail wraps `TodosDetailView`. `TileSheet` (the ＋ sheet for all 14 add kinds, plus the other tile sheets) and the todos tile's `Sheet` have a boundary inside the `Modal`, so a failing form shows an error card and the sheet still closes. The root layout exports `RouteErrorBoundary` as expo-router's `ErrorBoundary`, so no uncaught render error closes the app.
+- Other 13 add forms: they share `AddEntrySheet` → `TileSheet`, so the boundary covers them. They write through `optimisticWrite`, which already handles errors.
+- Tests: `views/todo-add-sheet.test.tsx` (close before write; a failed save does not reject unhandled), `tiles/add-entry.test.tsx` (a failing form stays inside the sheet), `ui/error-boundary.test.tsx` (route fallback). All three fail without the fix.
+
+## 2026-11-12 — Mobile: dashboard header search no longer fights the dashboards dropdown
+
+- Search was hard to tap on the dashboard. Cause: the search icon was a bare 22pt `Pressable` leaning on `hitSlop` (11pt each side), and the dashboards dropdown below it was full-width with its own `hitSlop={8}`; the two slop areas overlapped, so taps near the icon often hit the dropdown.
+- Fix (`views/dashboard-pager.tsx`): search is a real `hitTarget` (44pt) box with no `hitSlop`, so the header row is 44pt tall; the dropdown is shrink-wrapped (`alignSelf: 'flex-start'`, `maxWidth: '100%'`, no `hitSlop`), so it only covers its title and chevron, and a long dashboard name still truncates.
+- Test: `dashboard-pager.test.tsx` checks the search box is ≥44pt and the title is shrink-wrapped.
+
+## 2026-11-12 — Console: todo date views and due quick picks
+
+- Every todo list (dashboard todo tiles, incl. the default `inbox.todos.md`, and the focused todo view) has view tabs **Today / Tomorrow / Next 7 days / All** with open-item counts. Today shows an **Overdue** section first (earlier dates and passed times today, red count on the tab), then items due today; Next 7 days groups by day (today + 6); All is the previous list. Dated views show open items only and keep the tag filter.
+- The chosen view is remembered per list (`localStorage` key `kh.todo-view.<tile id>`, falls back to All when storage is unavailable).
+- Setting a due date: click a row's due badge, or the "DUE" chip (always in focus mode, on hover in tiles), for Today / Tomorrow / Next week (next Monday) / date picker / clear; a time already set is kept. The todo Add form and the `/quick-todo` inbox page got the same quick picks.
+- File format unchanged (`::due::`). Code: `packages/formats/src/todo-views.ts` (`todoViewSections`, `todoViewCounts`, `dueQuickPick`, `addDays`), `addTodoEntry` takes an optional `due`; UI `DuePicker` / `DueQuickPicks` (`packages/ui/.../Widgets/DuePicker.tsx`), `TodoWidget` `storageKey` prop.
+- Tests: `todo-views.test.ts`, `TodoWidget.views.test.tsx`, `QuickTodoPage.test.tsx` (inbox due).
+
+## 2026-11-11 — Mobile: login survives a background launch on a locked phone
+
+- iOS still asked for a new sign-in now and then, the PWA never. Cause: background sync (expo-background-task) launches the app while the phone is locked; Keychain items that are not readable then (legacy `WHEN_UNLOCKED` items, or any item before the first unlock after a reboot) failed to read, core started with no token and no refresh token, `startTokenSync` marked the session hydrated, and the user who opened the app later found the login screen. The secure driver also cached a `null` for the core's "clean-up" delete, so nothing read the Keychain again. The PWA's localStorage/IndexedDB has no lock state, so it never sees an empty session.
+- Fix: `createSecureKeyValueDriver` tracks unreadable keys per key (one readable item no longer unlocks deletes of another) and never caches a delete of an unread key; `startTokenSync` decides nothing after a failed read in the background (`foreground` dep) and `retry()`s when the app comes to the foreground; new core `AuthStore.restore()` re-reads the token, refresh token and expiry (not after a sign-out). `bootstrap.ts` wires both to `AppState` `active`.
+- Checked, unchanged: refresh runs before syncs, on foreground and in 401 recovery; concurrent refreshes share one request; network failures never sign out; expiry parsing. The auth-worker is unchanged (no deploy needed).
+- Tests: `runtime/cold-start.test.ts` (locked background launch, then unlock), `sync/persistent-storage.test.ts`, core `auth.store.test.ts`.
+
+## 2026-11-11 — Mobile: RSS "Read later" swipe
+
+- RSS items had no way to save for later. Swiping an item left-to-right (leading edge, right-swipe stays "Mark read") now reveals "Read later", which adds the item to `<app folder>/.readitlater.json` exactly like the console (`name` = title, status `new`, deduped by url; the feed title goes in `tags`, as the format has no source field). A missing file is created.
+- Optimistic: haptic + inline note ("Saved to Read later") show at once, the save runs in the background; a duplicate switches the note to "Already in Read later", a failure to an error haptic and "Could not save".
+- Code: `addReadLaterItem` (pure, `read-later-tile.ts`), `saveToReadLater` (`screens/save-read-later.ts`), `Ctx.readLater`, `Tile` prop `onSaveReadLater` wired in the tile detail screen. `RowAction` gained `icon`/`side`. Tests for all three layers.
+
+## 2026-11-11 — Mobile: fix crash on create, new file from the file browser
+
+- Crash: opening a quick capture (todo, note, log, knowledge) killed the iOS app. Cause: `useCreateTarget` returned a new `target` object every render, and `QuickCaptureView`'s header-state effect listed `place.target` as a dependency. The effect calls `onHeaderState`, which the capture screen stores with `useState`, so each run re-rendered the screen and ran the effect again: an endless update loop. Fix: `target` is memoized on folder and name, and the effect depends on `place.target.folder` / `place.target.name`.
+- Error boundaries: `QuickCaptureScreen` wraps the capture in `ErrorBoundary` ("Couldn't show this capture"), and the add-tile "Or create one" form and the new-file sheet have their own, so a failing create form shows an error card instead of closing the app.
+- File browser: **New file** opens `NewFileSheet` (kind list: note plus every `NEW_TILE_FILES` kind), then the shared `CreateTargetRow` with the open folder pre-selected (`useCreateTarget` takes a `startFolder`). Creates via `FileEditorController.createFile`, refreshes and opens the file. Pure rules in `src/screens/new-file.ts` (`NEW_FILE_KINDS`, `newFile`); `FileEditorController.paths()` lists the tree.
+- Tests: `views/capture.test.tsx` (header state settles; fails without the fix), `views/quick-capture-screen.test.tsx` (boundary), `views/files-more.test.tsx` (new file in open folder, taken name), `screens/new-file.test.ts`.
+
+## 2026-11-11 — Mobile: business (clients, time, timer, payments)
+
+- The app had no business part. New **More → Business** (`/business`): running timer card (stop → prefilled log-time sheet, discard), start timer by client, hours today/week/month, Needs attention (overdue invoices, retainers due, contract dates, unbilled time), open invoices, clients by stage with open amount and unbilled hours.
+- Client page (`/business/client/[slug]`): add todo / log line, start timer (with project), log time, invoices (open ones → record payment), recent time, links to the client's notes/todos/log files.
+- Sheets: log time (`/business/time`, `1.5`/`1:30`/`90m`, per-field errors) and record payment (`/business/payment`, empty amount = open amount).
+- Data layer `src/business/` (`load`, `summary`, `forms`, `write`, `use-business`) reuses `@kaihuman/formats/business` (`loadBusinessRepo`, `logTime`, `startTimer`, `cancelTimer`, `addClientTodo`/`Log`, `recordPayment`, `deriveInvoiceStatus`, `retainersDue`, `contractReminders`). Reads come from the local cache and writes go file by file through the offline outbox (additions before the timer delete), not as one atomic commit like the console.
+- Skipped (console only): enable set-up, draft editor / issue / credit notes, offer decisions, expenses and receipt upload, contracts form, pipeline stage change, share links, e-invoices, VAT / CSV / year export, client and project creation.
+- Tests: `src/business/business.test.ts` (forms, load, summary, writes against the demo seed), `src/views/business-views.test.tsx`, More row in `navigation-views.test.tsx`.
+
+## 2026-11-11 — Mobile: iOS 17 minimum for German Siri phrases
+
+- iOS CI failed: `AppShortcuts.xcstrings is only supported for iOS 17.0 and above` (app target was 16.4). `plugins/with-kaihuman-widgets.ts` now raises every build configuration to `APP_DEPLOYMENT_TARGET` 17.0 (`raiseDeploymentTarget`) and sets `ios.deploymentTarget` in Podfile properties. Widgets already needed 17.0.
+- Test: `src/targets.test.ts` checks no deployment target stays below 17 in the real-project fixture.
+
+## 2026-11-11 — Mobile: one ＋ add sheet for every tile, calm RSS tile
+
+- Tile detail views had their add form at the bottom, so adding meant scrolling past every entry. Now one pattern: a ＋ in the detail header (top right) opens a keyboard-safe bottom sheet (`TileSheet`) with that kind's add form. The bottom inline forms are gone.
+- Registry `src/views/tiles/add-entry.tsx` (`ADD_ENTRIES`, `addEntryFor`, `AddEntrySheet`): todos, events, action log, world clocks, read later, bookmarks, budget, stocks, consumption (reading/meter switch; meter only when the file has none), data collection (only with input columns), prompts, commands, RSS, travel. Habit and timer act with one tap; board overview and palette settings have no entries. Each body exports its form as `XAddForm({ ctx, onDone })`; shared `FormButtons` and `FieldAddForm` in `parts.tsx`.
+- `Tile` takes `adding`/`onAddingChange`: the detail screen owns the header ＋; without them (file viewer) the card header shows its own ＋. `?add=1` from a dashboard tile opens the sheet at once (replaces `Ctx.startAdding`). Todos detail keeps its full-height add screen and drops its bottom "New todo" button.
+- Not changed: kanban (parallel work), idea detail log and knowledge notes (not tiles; their add fields are at the top), full action log view (add field already at the top).
+- Sheets sat too high over the keyboard: React context reaches into a `Modal`, so `KeyboardLift` added the header height there too. `KeyboardLift inModal` (helper `liftOffset`) for `TileSheet`, the todos sheet, the CSV table sheet and the dashboard editor sheet.
+- RSS dashboard tile: only the unread count, no item title. Rows: feeds, unread new today, newest item age, top feed by unread. No animation.
+- Tests: `tiles/add-entry.test.tsx`, `glance/lists.test.ts`, body and tile tests updated to the sheet.
+
+## 2026-11-11 — Mobile: board declutter
+
+- Card: due badge (and repeat icon) now sit under the title via new `ListRow` `meta` slot, not right-aligned.
+- Filters (search, Sort & filter, Last 2 weeks, tags) hidden by default; header filter icon toggles them and shows an active-count badge (search counts too). Filters keep applying while hidden.
+- Board/Streams segmented control replaced by an icon toggle beside the filter icon.
+- Tests: `kanban-filters.test.tsx` (chrome), `board-analytics.test.tsx`.
+
+## 2026-11-11 — Mobile: choose the folder and name of new files
+
+- Quick capture (todo, note, log, knowledge) and the dashboard add-tile picker now let the user place the new file. Pure rules in `src/files/create-target.ts` (`resolveTarget`, `repoFolders`, `slugifyName`, per-kind `CAPTURE_SPECS` / `tileSpec`, remembered folder per kind under `kh_mobile_create_folders`); shared UI `src/views/create-target-row.tsx` (`useCreateTarget`, `CreateTargetRow`).
+- Fast path unchanged: an untouched capture sheet writes its built-in file (`inbox.todos.md`, `dump.md`, `inbox.actionlog.md`, `raw/<date>-<title>.md`). The row "Saves to …" opens a folder field with matching existing folders (a typed path creates a new subfolder) and a file name. Collisions: todo/note/log append to the existing file, knowledge takes the next free `-2` name, tile files are refused.
+- `QuickCaptureController.quickTodo/quickNote/quickLog/quickKnowledge` take an optional target path; `RepoFiles.paths()` lists the tree. `newTileFile` takes a folder and uses the shared rules; its name is prefilled with today's date.
+- Ideas keep their fixed `ideas/` path (the idea tools find them there); the smart inbox routes by content. No create flow exists on mobile for wiki pages or dashboards (dashboards are config entries, not files).
+- Tests: `src/files/create-target.test.ts`, `src/views/capture.test.tsx`, `src/views/dashboard-editor.test.tsx`, `src/screens/todos-and-capture.test.ts`.
+
+## 2026-11-11 — Mobile: German Siri phrases
+
+- No Siri phrase worked on a German-Siri iPhone (TestFlight). Cause: App Shortcut phrases were English only; Siri matches only phrases in the Siri language. The Swift sources were already compiled into the app target (checked; the test against a real pbxproj covers it).
+- New String Catalogs in `targets/ios-app-intents`: `AppShortcuts.xcstrings` (every phrase, `en` + `de`) and `Localizable.xcstrings` (short titles, intent titles, dialogs).
+- `plugins/with-kaihuman-widgets.ts`: adds the catalogs to the app's Resources phase (`text.json.xcstrings`), adds `en`/`de` to `knownRegions`, and sets `CFBundleLocalizations` (`withIosLocalizations`, `APP_LOCALIZATIONS`).
+- `doc/apple-intelligence.md`: German phrases, localization rules, Siri troubleshooting.
+- Tests: `src/targets.test.ts`, `src/ios-widget.test.ts`.
+
+## 2026-11-11 — Mobile: file saves, optimistic edits, lasting login, cached screens, search
+
+- File edits lost: `FileEditorController.open()` replaced text typed while a sync-triggered re-open was reading; `save()` marked text typed during the write as clean; `githubContentFiles.write()` silently did nothing when a sync had dropped the open copy (core `updateFileContent` only logs). The editor now keeps in-flight edits, re-opens before writing, and errors instead of showing "Saved".
+- Slow state changes (RSS mark read, habits, todos): screens awaited the save before showing the change. New `src/sync/optimistic.ts`; the dashboard, tile detail, board (`KanbanBoardController.commit`), todo detail and ideas apply at once, save in the background and roll back on a failed save.
+- Login lost after ~a day: expiring GitHub tokens were never refreshed (auth-worker dropped `refresh_token`; a 401 signed out). auth-worker forwards the refresh token and has `POST /refresh`; core `AuthStore` keeps `refreshToken`/`tokenExpiresAt` in the Keychain; mobile `src/sync/token-refresh.ts` renews before syncs and in 401 recovery instead of signing out.
+- Boards always loading: every mount waited for the network (`refresh()` awaited a sync; `read()` refetched a stale copy before returning). Reads are now stale-while-revalidate (`src/sync/cache-read.ts`, core `restoreCached`): memory or on-device copy at once, refetch behind it, re-render on change. `refresh()` no longer waits when a tree is cached. The board paints cached cards synchronously (`loadCached`) and keeps them on a failed revalidation.
+- Search opened nothing: `/search` resolved to a hidden tab (`app/(tabs)/search`, `href: null`), which expo-router does not render and redirects to the first tab. Removed the hidden tab, so `/search` is the root-stack screen. Regression test `src/navigation/route-resolution.test.ts` uses expo-router's own route resolution. Note: `/capture` is also a hidden tab and likely has the same problem.
+- Tests: `content-ports`, `content-screens`, `todos-and-capture`, `todo-detail`, `optimistic`, `token-refresh`, `auth-recovery`, `cold-start`, core `auth.store`, auth-worker `index`.
+
+## 2026-11-11 — Mobile: collection sum on tiles, consumption add form, keyboard, open file
+
+- Data collection tile showed the first number column of the newest row even when the file has a sum column. Cause: `dataCollectionView` only built series from `number` columns, so `auto:number:sum` / `auto:number:avg` were dropped. Those columns are now series marked `aggregate`; the square tile shows the aggregate (label `sum · N rows`) and its quick entry still types into the first number column. The detail view lists the aggregate too. Blank cells no longer count as 0. No iOS/Android widget shows data collections, so no native change.
+- Consumption tile ＋ now opens the detail view on the full "Add reading" form (date + every meter; "Add meter" when the file has none) instead of a +1 or a one-meter field. Also listed in the ＋ menu Track entries. `/dashboard/tile?…&add=1` (already built for events and trips) is now read and passed as `Ctx.startAdding`.
+- Fields under the keyboard: Expo 58 is always edge-to-edge on Android, so the window does not resize and the disabled `KeyboardAvoidingView` left forms under the keyboard; on iOS the header height was not offset and the scroll view never scrolled to the focused field. New shared `src/ui/keyboard.tsx` (`KeyboardLift`, `keyboardScrollProps`): padding on both platforms with the header offset, and on iOS scroll screens `automaticallyAdjustKeyboardInsets` (scrolls the focused field into view). Used by `Screen`, `TileSheet`, the todos sheet, the dashboard editor sheet, the CSV table sheet and the kanban stream sheet.
+- Tile detail: an "Open file" button in the header for every tile (todos too), and the file name under the tile heading links to the editor.
+- Tests: `trackers.test.ts`, `collection-tile.test.ts`, `consumption-body.test.tsx`, `quick-menu.test.ts`, `dashboard-tiles.test.tsx`, `ui/keyboard.test.tsx`.
+
+## 2026-11-11 — Mobile: passive sync icon, Edit in the dashboards menu, PWA app icon
+
+- Sync status is passive: the "Updated …/Syncing…/Offline" caption is gone. `SyncIndicator` (`src/sync/sync-indicator.tsx`) puts a small refresh icon in the dashboard top bar that turns only while a sync runs. `SyncStatusBanner` now shows only the storage warning, conflicts and errors.
+- Dashboards: Edit moved into the dashboards menu (tap the title); the top right shows only Search (Done appears while editing). The title opens the menu even with a single dashboard so Edit stays reachable.
+- App icon is now the console PWA mark (`apps/console/public/logo.svg`): `assets/icon.svg` regenerated to a 1024 px PNG without alpha; the Android adaptive foreground uses the same mark in the safe zone on an Ink (`#0C0D0C`) background. No splash asset is configured, so nothing else changes.
+
+## 2026-11-11 — Mobile: better file editor
+
+- Toolbar above the keyboard: undo/redo for every file; heading (cycles # → ## → ### → plain), bold, italic, bulleted list, checkbox and link for markdown. Hide-keyboard button while it is up. Pure text edits in `src/editor/markdown-edit.ts`, undo stack in `src/editor/edit-history.ts` (quick typing folds into one step).
+- Enter on a list line continues the list (`- `, `- [ ] `, `1.` → `2.`); Enter on an empty item ends it.
+- Autosave 1.5 s after the last keystroke, plus explicit Save; status reads Unsaved changes → Saving… → Saved. Pending edits are saved when the screen closes. Keystrokes typed during a save are kept (the controller's `save()` restores the content it started with; the view re-applies the newer text).
+- Notes (`.md`, `.txt`) use the body font with 1.5 line height, sentence capitalisation and autocorrect; data files keep monospace.
+- Keyboard-safe footer: `Screen` drops the home-indicator inset while the keyboard is up (`useKeyboardVisible`), so the toolbar sits right on the keyboard.
+- Markdown header toggle reads Edit / Preview.
+- No change to the sync/save layer. Tests: `src/editor/markdown-edit.test.ts`, `src/views/files-more.test.tsx`.
+
+## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
+
+- RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.
+- Todos: quick due presets Today, Tomorrow, Next Saturday, Next Monday (next such day strictly after today) in the add sheet, the board Due sheet and the due editor (todo detail, quick capture). `DUE_PRESETS` / `dueFromPreset` in `src/screens/todo-due.ts`, with tests.
+- Motion: removed the dashboard tile entrance stagger, hero roll-in, tile press scale, quick-action pop and checkbox pop; the ＋ button no longer spins (shows × while open); the ＋ menu opens and closes without scrim fade, sheet spring or item stagger; the Android FAB has no press scale. Row exit/layout fades and the full-swipe slide-out stay.
+
+## 2026-11-10 — Mobile: widget capture lost, widget add sheet, stale widget values
+
+- Widget "+" (`kaihuman://quick-inbox`) now opens the same "New todo" sheet as the in-app add (`/quick-todo`) instead of the one-field inbox sheet.
+- Lost widget todos: the widget cold-launches the app into the capture sheet before the repo tree loads. The inbox read returned null, the save created a new inbox with only that line, and the first `loadTree` (repo "switch" from null) cleared open files. Captures now wait for the tree (`src/sync/repo-ready.ts`, 20 s, then an error and the text stays).
+- Lost widget queue: bootstrap replayed `pending-widget-mutations.json` before the repo loaded, emptied the file and dropped every item it could not apply. `WidgetBridge.reconcile` now waits until every todo file is open, and puts failed replays back in the queue.
+- Stale or missing widget values: a headless/background run opened only todo files, so habit, timer and idea widgets lost their data. `load()` now opens those files first. No snapshot is written before the repo tree is loaded.
+- Tests: `mobile-adapters.test.ts`, `todos-and-capture.test.ts`, `route-files.test.ts`.
+
+## 2026-11-10 — Mobile iOS: fix EAS build error in the scan intent
+
+- `VisualIntelligenceIntents.swift`: the EAS Xcode SDK types `SemanticContentDescriptor.pixelBuffer` as `CVReadOnlyPixelBuffer`, while CI's iOS 26.5 SDK still uses `CVPixelBuffer`. An overload for each type, so the file compiles with both.
+
 ## 2026-11-10 — Mobile iOS: fix widget bundle compile error
 
 - `KaihumanWidgets.swift`: `WidgetBundleBuilder` has no if/else, and `#unavailable` crashed the Swift compiler. The focus Live Activity now registers once, in the iOS 18 block, so iOS 17 has no Live Activity. Found by the first macOS CI builds.
@@ -12,6 +189,7 @@
 - Scan to entry (1.3): new Scan screen (`/scan`, More tab) turns a document camera scan into a budget line, trip, todo or meter reading. Visual Intelligence `IntentValueQuery` (`targets/ios-app-intents/VisualIntelligenceIntents.swift`) offers the four kinds in the camera and screenshot search; picking one opens `kaihuman://scan?kind=&text=`.
 - Weekly review (2.1): new screen (`/weekly-review`, More tab) builds done todos, habit streaks, time tracked, spend and open loops in TS, has the model write prose (PCC when available, else on-device) above the facts, and writes `logs/weekly-review-<date>.md` (never overwrites) and opens it. Without a model it writes a fixed template. The PCC model API is not wired yet (iOS 27 SDK API unverified), so `server` reports unavailable.
 - Needs a Mac build and device test: no Swift compiler on CI; Swift is covered by source-text tests (`src/intelligence/native-sources.test.ts`).
+
 ## 2026-11-10 — Mobile: Siri App Schemas, app skills and open-ended queries (proposal 1.2)
 
 - Spotlight/Siri file (`spotlight-items.json`) now has log entries (kind `log`, link `kaihuman://files/<log>#<n>`) and a `date` (`YYYY-MM-DD`: log day, todo due day). `SearchDoc` gained `date`.
@@ -22,6 +200,7 @@
 - Siri AI app skills: `targets/ios-app-intents/skills/{todos,notes,log}/SKILL.md` (format and bundling unverified; not copied into the app yet).
 - View Annotations: not done (RN views are not SwiftUI). See `doc/apple-intelligence.md`.
 - Tests: `src/app-schemas.test.ts` (Swift/SKILL.md source text, plugin), spotlight and deep-link cases.
+
 ## 2026-11-10 — Mobile iOS: Focus session on every surface, Focus filters, extra-large Today, digest intent
 
 Proposals 2.3 and 2.5 of `doc/apple-proposals.md`. No Swift compiler in this environment: the Swift is checked by source-text tests (`apple-surfaces.test.ts`) and **must be built and tried on a device** before release.

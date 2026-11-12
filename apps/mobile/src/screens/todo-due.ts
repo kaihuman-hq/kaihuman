@@ -15,7 +15,15 @@ import {
   type Weekday,
 } from '@kaihuman/formats';
 
-export type DuePreset = 'today' | 'tomorrow';
+export type DuePreset = 'today' | 'tomorrow' | 'next-saturday' | 'next-monday';
+
+/** Quick due choices in menu order. */
+export const DUE_PRESETS: readonly { preset: DuePreset; label: string }[] = [
+  { preset: 'today', label: 'Today' },
+  { preset: 'tomorrow', label: 'Tomorrow' },
+  { preset: 'next-saturday', label: 'Next Saturday' },
+  { preset: 'next-monday', label: 'Next Monday' },
+];
 
 export interface DueBadge {
   label: string;
@@ -37,8 +45,18 @@ const shortDate = (date: string, year = false): string => {
 const addDays = (now: Date, days: number) =>
   new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, 12);
 
+/** Days from `now` to the next `weekday` (0 = Sunday), strictly after today: 1..7. */
+const daysUntil = (now: Date, weekday: number) => ((weekday - now.getDay() + 6) % 7) + 1;
+
+const PRESET_DAYS: Record<DuePreset, (now: Date) => number> = {
+  today: () => 0,
+  tomorrow: () => 1,
+  'next-saturday': (now) => daysUntil(now, 6),
+  'next-monday': (now) => daysUntil(now, 1),
+};
+
 export const dueFromPreset = (preset: DuePreset, now: Date): TodoDue => ({
-  date: localDateString(addDays(now, preset === 'today' ? 0 : 1).getTime()),
+  date: localDateString(addDays(now, PRESET_DAYS[preset](now)).getTime()),
 });
 
 /** Due from a native picker value; `time` carries the hours and minutes only when given. */

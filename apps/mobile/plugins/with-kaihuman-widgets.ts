@@ -142,6 +142,13 @@ export const APP_INTENTS_DIR = 'targets/ios-app-intents';
 export const APP_INTENTS_GROUP = 'KaihumanAppIntents';
 
 /**
+ * Siri matches only App Shortcut phrases in the Siri language, so a German Siri ignored the
+ * English-only phrases. The String Catalogs in APP_INTENTS_DIR carry the translations
+ * (`AppShortcuts.xcstrings` for phrases, `Localizable.xcstrings` for titles and dialogs).
+ */
+export const APP_LOCALIZATIONS: readonly string[] = ['en', 'de'];
+
+/**
  * Swift files of `targets/ios-widget` compiled into the widget extension AND the main app: the
  * App Shortcuts read the same snapshot and complete todos through the same store as the widgets.
  * No SwiftUI or WidgetKit views in here.
@@ -204,6 +211,8 @@ export interface AppSourceGroup {
   /** Relative to the mobile app root. */
   dir: string;
   files: string[];
+  /** String Catalogs etc. for the app's Resources phase. */
+  resources?: string[];
 }
 
 export const appSourceGroups = (
@@ -221,6 +230,7 @@ export const appSourceGroups = (
       name: APP_INTENTS_GROUP,
       dir: APP_INTENTS_DIR,
       files: appIntentFiles.filter((f) => f.endsWith('.swift')),
+      resources: appIntentFiles.filter((f) => f.endsWith('.xcstrings')),
     },
   ].filter((group) => group.files.length > 0);
 
@@ -233,6 +243,24 @@ export const withIosAppGroup = (config: ExpoConfigLike): ExpoConfigLike => {
   const groups = Array.isArray(existing) ? (existing as string[]) : [];
   entitlements[APP_GROUP_ENTITLEMENT] = groups.includes(appGroup) ? groups : [...groups, appGroup];
   return { ...config, ios: { ...config.ios, entitlements } };
+};
+
+/** Declares the phrase languages, or iOS resolves the app to English only. */
+export const withIosLocalizations = (config: ExpoConfigLike): ExpoConfigLike => {
+  const current = config.ios?.infoPlist?.CFBundleLocalizations;
+  const existing = Array.isArray(current) ? (current as string[]) : [];
+  const merged = [...existing, ...APP_LOCALIZATIONS.filter((l) => !existing.includes(l))];
+  return {
+    ...config,
+    ios: {
+      ...config.ios,
+      infoPlist: {
+        CFBundleDevelopmentRegion: 'en',
+        ...config.ios?.infoPlist,
+        CFBundleLocalizations: merged,
+      },
+    },
+  };
 };
 
 /** The app (not the extension) must declare Live Activity support or `Activity.request` throws. */
@@ -528,7 +556,8 @@ interface PbxObjects {
   PBXNativeTarget: Record<string, PbxNativeTarget | string>;
   XCConfigurationList: Record<string, { buildConfigurations: Array<{ value: string }> } | string>;
   XCBuildConfiguration: Record<string, { buildSettings: Record<string, unknown> } | string>;
-  PBXFileReference: Record<string, { path?: string } | string>;
+  PBXFileReference: Record<string, { path?: string; lastKnownFileType?: string } | string>;
+  PBXProject: Record<string, { knownRegions?: string[] } | string>;
   PBXBuildFile: Record<string, unknown>;
   PBXTargetDependency?: Record<string, unknown>;
   PBXContainerItemProxy?: Record<string, unknown>;
@@ -552,6 +581,9 @@ interface PbxProject {
   addPbxGroup(files: string[], name: string, path: string): { uuid: string };
   addToPbxGroup(groupUuid: string, parentGroupUuid: string): void;
   pbxSourcesBuildPhaseObj(
+    target: string,
+  ): { files: Array<{ value: string; comment?: string }> } | null;
+  pbxResourcesBuildPhaseObj(
     target: string,
   ): { files: Array<{ value: string; comment?: string }> } | null;
   generateUuid(): string;
@@ -640,8 +672,10 @@ export const xcodeProjectEditor: XcodeEditor = {
   addAppSources(project, groups) {
     const pbx = project as PbxProject;
     const objects = pbx.hash.project.objects;
-    const sources = pbx.pbxSourcesBuildPhaseObj(pbx.getFirstTarget().uuid);
+    const appUuid = pbx.getFirstTarget().uuid;
+    const sources = pbx.pbxSourcesBuildPhaseObj(appUuid);
     if (!sources) throw new Error('with-kaihuman-widgets: the app target has no Sources phase');
+    const resources = pbx.pbxResourcesBuildPhaseObj(appUuid);
 
     const fileRefOf = (name: string): string | undefined =>
       Object.entries(objects.PBXFileReference).find(
@@ -651,21 +685,45 @@ export const xcodeProjectEditor: XcodeEditor = {
           (ref.path === name || ref.path === `"${name}"`),
       )?.[0];
 
+    const addToPhase = (
+      phase: { files: Array<{ value: string; comment?: string }> },
+      file: string,
+      phaseName: string,
+    ) => {
+      const fileRef = fileRefOf(file);
+      const comment = `${file} in ${phaseName}`;
+      if (!fileRef || phase.files.some((f) => f.comment === comment)) return;
+      const uuid = pbx.generateUuid();
+      objects.PBXBuildFile[uuid] = { isa: 'PBXBuildFile', fileRef, fileRef_comment: file };
+      objects.PBXBuildFile[`${uuid}_comment`] = comment;
+      phase.files.push({ value: uuid, comment });
+    };
+
     for (const group of groups) {
-      const missing = group.files.filter((file) => !fileRefOf(file));
+      const groupResources = group.resources ?? [];
+      const missing = [...group.files, ...groupResources].filter((file) => !fileRefOf(file));
       if (missing.length > 0) {
         const created = pbx.addPbxGroup(missing, group.name, `"${fromIosProject(group.dir)}"`);
         pbx.addToPbxGroup(created.uuid, pbx.getFirstProject().firstProject.mainGroup);
       }
-      for (const file of group.files) {
-        const fileRef = fileRefOf(file);
-        const comment = `${file} in Sources`;
-        if (!fileRef || sources.files.some((f) => f.comment === comment)) continue;
-        const uuid = pbx.generateUuid();
-        objects.PBXBuildFile[uuid] = { isa: 'PBXBuildFile', fileRef, fileRef_comment: file };
-        objects.PBXBuildFile[`${uuid}_comment`] = comment;
-        sources.files.push({ value: uuid, comment });
+      for (const file of group.files) addToPhase(sources, file, 'Sources');
+      if (groupResources.length === 0) continue;
+      if (!resources) {
+        throw new Error('with-kaihuman-widgets: the app target has no Resources phase');
       }
+      for (const file of groupResources) {
+        // node-xcode does not know String Catalogs; Xcode compiles them only with this type.
+        const ref = objects.PBXFileReference[fileRefOf(file) ?? ''];
+        if (ref && typeof ref !== 'string') ref.lastKnownFileType = 'text.json.xcstrings';
+        addToPhase(resources, file, 'Resources');
+      }
+    }
+
+    // Xcode builds only the languages the project lists.
+    for (const [key, project] of Object.entries(objects.PBXProject)) {
+      if (key.endsWith('_comment') || typeof project === 'string') continue;
+      const regions = project.knownRegions ?? [];
+      project.knownRegions = [...regions, ...APP_LOCALIZATIONS.filter((l) => !regions.includes(l))];
     }
   },
 };
@@ -742,11 +800,34 @@ export interface PluginOptions {
   kotlinVersion?: string;
 }
 
+/** iOS floor for the app: AppShortcuts.xcstrings (German Siri phrases) needs iOS 17. */
+export const APP_DEPLOYMENT_TARGET = '17.0';
+
+/** Raises every build configuration below the floor (app target and project level) to it. */
+export const raiseDeploymentTarget = (
+  project: unknown,
+  floor: string = APP_DEPLOYMENT_TARGET,
+): void => {
+  const configs = (project as Partial<PbxProject>).hash?.project.objects.XCBuildConfiguration;
+  for (const [key, config] of Object.entries(configs ?? {})) {
+    if (key.endsWith('_comment') || typeof config === 'string') continue;
+    const current = Number.parseFloat(
+      String(config.buildSettings.IPHONEOS_DEPLOYMENT_TARGET ?? '0'),
+    );
+    const isApp = config.buildSettings.PRODUCT_BUNDLE_IDENTIFIER !== undefined;
+    if (current < Number.parseFloat(floor) && (current > 0 || isApp)) {
+      config.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = floor;
+    }
+  }
+};
+
 const withKaihumanWidgets = (
   config: ExpoConfigLike,
   options: PluginOptions = {},
 ): ExpoConfigLike => {
-  let next = withIosQuickActions(withLiveActivities(withUrlScheme(withIosAppGroup(config))));
+  let next = withIosLocalizations(
+    withIosQuickActions(withLiveActivities(withUrlScheme(withIosAppGroup(config)))),
+  );
 
   next = composeMod<AndroidManifest>(next, 'android', 'manifest', (cfg) => ({
     ...cfg,
@@ -812,8 +893,14 @@ const withKaihumanWidgets = (
       },
       appIntentFiles,
     );
+    raiseDeploymentTarget(cfg.modResults);
     return cfg;
   });
+
+  next = composeMod<Record<string, string>>(next, 'ios', 'podfileProperties', (cfg) => ({
+    ...cfg,
+    modResults: { ...cfg.modResults, 'ios.deploymentTarget': APP_DEPLOYMENT_TARGET },
+  }));
 
   return next;
 };

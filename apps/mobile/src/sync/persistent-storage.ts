@@ -133,12 +133,14 @@ export interface SecureStoreApi {
 
 /**
  * Keychain/Keystore KV for secrets. A read can throw while the device is locked (background
- * task before first unlock); then nothing is deleted this session, because an unreadable token
- * looks exactly like a missing one and core would otherwise "clean it up".
+ * launch); such a key is not deleted this session, because an unreadable token looks exactly
+ * like a missing one and core would otherwise "clean it up". Failures are not cached, so the
+ * key is read again once the device unlocks (see `AuthStore.restore`).
  */
 export function createSecureKeyValueDriver(api: SecureStoreApi): KeyValueDriver {
   const cache = new Map<string, string | null>();
-  let readFailed = false;
+  // Per key: one readable item (e.g. AFTER_FIRST_UNLOCK) must not unlock deletes of another.
+  const unreadable = new Set<string>();
   // SecureStore keys allow only [A-Za-z0-9._-]; core uses `record:auth:token`.
   const native = (key: string) => key.replace(/[^\w.-]/g, '_');
   return {
@@ -147,9 +149,10 @@ export function createSecureKeyValueDriver(api: SecureStoreApi): KeyValueDriver 
       try {
         const value = api.getItem(native(key));
         cache.set(key, value);
+        unreadable.delete(key);
         return value;
       } catch {
-        readFailed = true;
+        unreadable.add(key);
         return null;
       }
     },
@@ -157,13 +160,19 @@ export function createSecureKeyValueDriver(api: SecureStoreApi): KeyValueDriver 
       cache.set(key, value);
       try {
         api.setItem(native(key), value);
+        unreadable.delete(key);
       } catch {
         // The cached copy still serves this session.
       }
     },
     remove(key) {
+      if (unreadable.has(key)) {
+        // Never confirmed empty: forget nothing, so a later read still finds the stored value.
+        cache.delete(key);
+        return;
+      }
       cache.set(key, null);
-      if (!readFailed) void api.deleteItemAsync(native(key)).catch(() => undefined);
+      void api.deleteItemAsync(native(key)).catch(() => undefined);
     },
   };
 }

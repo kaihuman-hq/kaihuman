@@ -14,9 +14,9 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
 import { Button, haptics, SegmentedControl, Text, TextField } from '../../ui/index.js';
-import type { Ctx } from './bodies.js';
+import type { AddFormProps, Ctx } from './bodies.js';
 import { GroupedBars, LineChart, Swatch } from './chart-parts.js';
-import { EmptyLine, ItemRow, Rows, Stat, StatRow, useDisclosure } from './parts.js';
+import { EmptyLine, FormButtons, ItemRow, Rows, Stat, StatRow } from './parts.js';
 
 const num = (n: number, digits = 2) => n.toFixed(digits);
 const signed = (n: number, digits = 2) => `${n > 0 ? '+' : ''}${n.toFixed(digits)}`;
@@ -171,25 +171,18 @@ function Charts({
   );
 }
 
-function AddStockForm({ ctx }: { ctx: Ctx }) {
-  const form = useDisclosure();
+export function StockAddForm({ ctx, onDone }: AddFormProps) {
   const [value, setValue] = useState('');
   const [invest, setInvest] = useState('');
   const [date, setDate] = useState('');
   const save = () => {
     if (ctx.apply(addStockValue(ctx.content, value, invest, date, ctx.now))) {
       haptics.success();
-      setValue('');
-      setInvest('');
-      setDate('');
-      form.hide();
+      onDone();
     } else haptics.error();
   };
-  if (!form.open) {
-    return <Button variant="tinted" icon="add" label="Add value" onPress={form.show} fullWidth />;
-  }
   return (
-    <View style={{ gap: 8 }}>
+    <>
       <TextField
         label="Current value"
         value={value}
@@ -211,13 +204,8 @@ function AddStockForm({ ctx }: { ctx: Ctx }) {
         placeholder="Today"
         autoCapitalize="none"
       />
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button variant="plain" label="Cancel" onPress={form.hide} />
-        <View style={{ flex: 1 }}>
-          <Button label="Save value" onPress={save} fullWidth />
-        </View>
-      </View>
-    </View>
+      <FormButtons saveLabel="Save value" onSave={save} onCancel={onDone} />
+    </>
   );
 }
 
@@ -226,12 +214,7 @@ export function Stocks({ view, ctx }: { view: StocksView | null; ctx: Ctx }) {
   const [chart, setChart] = useState<StockChart>('bars');
   const [all, setAll] = useState(false);
   if (!view) {
-    return (
-      <>
-        <EmptyLine>No stock data.</EmptyLine>
-        <AddStockForm ctx={ctx} />
-      </>
-    );
+    return <EmptyLine>No stock data.</EmptyLine>;
   }
   const up = view.profit >= 0;
   const points = view.periods[period];
@@ -336,7 +319,6 @@ export function Stocks({ view, ctx }: { view: StocksView | null; ctx: Ctx }) {
           ) : null}
         </>
       ) : null}
-      <AddStockForm ctx={ctx} />
     </>
   );
 }

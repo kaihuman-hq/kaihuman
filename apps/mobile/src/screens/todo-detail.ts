@@ -73,6 +73,7 @@ export class TodoDetailController {
   private allTags: string[] = [];
   private milestones: Milestone[] = [];
   private queue: Promise<unknown> = Promise.resolve();
+  private readonly listeners = new Set<() => void>();
 
   constructor(
     id: string,
@@ -141,11 +142,14 @@ export class TodoDetailController {
   remove(): Promise<DetailResult> {
     return this.serial(async () => {
       const { path, data, index, item } = await this.locate();
-      await this.files.write(
-        path,
-        serializeTodos({ ...data, items: data.items.filter((_, i) => i !== index) }),
+      await this.optimistic(
+        () => this.setState({ kind: 'deleted', path, index, item }),
+        () =>
+          this.files.write(
+            path,
+            serializeTodos({ ...data, items: data.items.filter((_, i) => i !== index) }),
+          ),
       );
-      this.setState({ kind: 'deleted', path, index, item });
     });
   }
 
@@ -164,6 +168,33 @@ export class TodoDetailController {
       this.fingerprint = fingerprintOf(deleted.item);
       this.adopt(restored);
     });
+  }
+
+  /** Called after every state change, optimistic ones included; returns unsubscribe. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private async optimistic(apply: () => void, write: () => Promise<void>): Promise<void> {
+    const before = { state: this.state, ref: this.ref, fingerprint: this.fingerprint };
+    apply();
+    this.changed();
+    try {
+      await write();
+    } catch (err) {
+      this.state = before.state;
+      this.ref = before.ref;
+      this.fingerprint = before.fingerprint;
+      this.changed();
+      throw err;
+    }
+  }
+
+  private changed(): void {
+    for (const l of this.listeners) l();
   }
 
   private setState(state: DetailState): DetailState {
@@ -215,9 +246,12 @@ export class TodoDetailController {
       const next = change(data, index, item);
       if (next === data) return;
       const content = serializeTodos(next);
-      await this.files.write(path, content);
-      // Adopt the file as it reads back, so `#tag` typed into the title shows up as a tag.
-      this.adopt(parseTodos(content), index);
+      // Optimistic: adopt the file as it will read back (so `#tag` typed into the title shows up
+      // as a tag) before the save settles; a failed save puts the previous state back.
+      await this.optimistic(
+        () => this.adopt(parseTodos(content), index),
+        () => this.files.write(path, content),
+      );
     });
   }
 

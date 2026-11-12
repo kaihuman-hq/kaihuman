@@ -22,6 +22,7 @@ let widgets: SyncWidgets | null = null;
 let online = true;
 let tokenReady: Promise<unknown> = Promise.resolve();
 let authRecovery: (() => Promise<AuthRecovery>) | null = null;
+let ensureFreshToken: () => Promise<unknown> = () => Promise.resolve();
 let runtime: { scheduler: SyncScheduler; engine: SyncEngine } | null = null;
 
 function ensure() {
@@ -43,6 +44,8 @@ function ensure() {
     // A run needs the Keychain token, which hydrates asynchronously after a cold start.
     run: async (trigger) => {
       await tokenReady.catch(() => undefined);
+      // Renew an (almost) expired token before the run's first request instead of after its 401.
+      await ensureFreshToken().catch(() => undefined);
       return engine.run(trigger);
     },
     now: () => Date.now(),
@@ -111,10 +114,13 @@ export function startSync(opts: {
   tokenReady?: Promise<unknown>;
   /** Checks, replaces or ends the session after a 401 (see auth-recovery.ts). */
   recoverAuth?: () => Promise<AuthRecovery>;
+  /** Refreshes an expiring token that is close to expiry (see token-refresh.ts). */
+  ensureFreshToken?: () => Promise<unknown>;
 }): () => void {
   widgets = opts.bridge;
   if (opts.tokenReady) tokenReady = opts.tokenReady;
   authRecovery = opts.recoverAuth ?? null;
+  if (opts.ensureFreshToken) ensureFreshToken = opts.ensureFreshToken;
   const { scheduler } = ensure();
   let stopped = false;
 
@@ -128,6 +134,8 @@ export function startSync(opts: {
   });
 
   const appSub = AppState.addEventListener('change', (state) => {
+    // Screens load from GitHub on resume without waiting for a sync run.
+    if (state === 'active') void ensureFreshToken().catch(() => undefined);
     scheduler.setActive(state === 'active');
   });
   const netSub = optional(() =>
@@ -155,6 +163,7 @@ export function startSync(opts: {
     stopSession();
     stopNotice();
     authRecovery = null;
+    ensureFreshToken = () => Promise.resolve();
     appSub.remove();
     netSub.remove();
     powerSub.remove();

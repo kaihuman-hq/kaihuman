@@ -71,6 +71,15 @@ describe('Visual Intelligence intents', () => {
       expect(visual).toContain(s);
     for (const k of KINDS) expect(visual).toContain(`"${k}"`);
   });
+
+  // Regression: EAS's newer SDK types pixelBuffer as CVReadOnlyPixelBuffer, CI's 26.5 SDK as CVPixelBuffer.
+  it('converts both pixel buffer types from the descriptor', () => {
+    expect(visual).toContain('private static func cgImage(_ buffer: CVPixelBuffer) -> CGImage?');
+    expect(visual).toContain(
+      'private static func cgImage(_ buffer: CVReadOnlyPixelBuffer) -> CGImage?',
+    );
+    expect(visual).toContain('buffer.withUnsafeBuffer { cgImage($0) }');
+  });
 });
 
 describe('smart capture', () => {
