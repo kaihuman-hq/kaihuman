@@ -105,7 +105,7 @@ export function SearchView({
   const trimmed = query.trim();
 
   return (
-    <Screen keyboard syncStatus={false}>
+    <Screen keyboard syncStatus={false} title="Search" scrollToTopKey={trimmed}>
       {showField ? (
         <TextField
           label="Search"

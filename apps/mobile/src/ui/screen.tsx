@@ -1,6 +1,13 @@
-import { HeaderShownContext } from 'expo-router/react-navigation';
-import { createContext, type ReactNode, useContext } from 'react';
-import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { HeaderHeightContext, HeaderShownContext } from 'expo-router/react-navigation';
+import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
+import {
+  Platform,
+  RefreshControl,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
@@ -44,6 +51,11 @@ export interface ScreenProps {
   keyboard?: boolean;
   /** Show the sync status line; login and capture screens turn it off. */
   syncStatus?: boolean;
+  /**
+   * Scroll back to the top whenever this changes (e.g. a new search query), so the first row sits
+   * fully below the header instead of under it.
+   */
+  scrollToTopKey?: string;
 }
 
 export function Screen({
@@ -56,10 +68,23 @@ export function Screen({
   footer,
   keyboard,
   syncStatus = true,
+  scrollToTopKey,
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useInsets();
   const keyboardUp = useKeyboardVisible();
+  const headerHeight = useContext(HeaderHeightContext);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key is the trigger, not a value read
+  useEffect(() => {
+    if (scrollToTopKey === undefined) return;
+    // With automatic inset adjustment the resting offset is negative (-header height); a bare
+    // `y: 0` would hide the first row behind the bar, so ask the native view to re-apply the inset.
+    scrollRef.current?.scrollTo({
+      y: Platform.OS === 'ios' ? -(headerHeight ?? 0) : 0,
+      animated: false,
+    });
+  }, [scrollToTopKey]);
   const { spacing, colors } = theme;
   const margin = inset === 'grouped' ? theme.metrics.screenMargin : 0;
   // Native headers already show the title. The web preview hides tab-root headers, so only
@@ -72,6 +97,7 @@ export function Screen({
   const lifted = keyboard === true && (Platform.OS !== 'ios' || !scroll || footer !== undefined);
   const content = scroll ? (
     <ScrollView
+      ref={scrollRef}
       style={styles.flex}
       contentInsetAdjustmentBehavior="automatic"
       {...keyboardScrollProps(lifted)}

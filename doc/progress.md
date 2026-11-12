@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-12 — Mobile: Search results start at the top, large "Search" title
+
+- Typing in Search left the list scrolled down, so the first results hid behind the iOS header. `Screen` has a new `scrollToTopKey`; when it changes the scroll view resets to its resting offset (minus the header height on iOS, so the automatic inset is respected). `SearchView` passes the trimmed query.
+- The Search screen sets `title: 'Search'` and `headerLargeTitle` explicitly on iOS so the large title survives the native search bar; the web preview draws it inline via `Screen title`.
+- Test: `search-view.test.tsx` (scroll reset fires when the query changes, not on an identical rerender).
+
 ## 2026-11-12 — Console: quick link from the dashboard todo tile to `/tasks`
 
 - The dashboard todo tile header has a small muted "↗" icon button (`aria-label="Open Tasks board"`) next to the "N ACTIVE" count; it routes to the Tasks board. Hidden unless `onOpenBoard` is passed (wired from `MainApp`'s existing `onTasksClick`), so the widget stays standalone-safe. No new dashboard chrome; works at mobile width (12px icon in the existing header row; the collapsed mobile tile is unchanged).
