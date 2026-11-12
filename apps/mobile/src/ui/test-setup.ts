@@ -130,9 +130,17 @@ vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
   };
 });
 
+/** Callbacks of the last `usePanGesture`; tests call them as the native recognizer would. */
+export const lastPan: { config: Record<string, any> } = { config: {} };
+
 vi.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children, style }: Record<string, any>) =>
     createElement('div', { style }, children),
+  GestureDetector: ({ children }: Record<string, any>) => children,
+  usePanGesture: (config: Record<string, any>) => {
+    lastPan.config = config;
+    return config;
+  },
 }));
 
 // react-native-svg ships untranspiled native code that jsdom cannot load.
