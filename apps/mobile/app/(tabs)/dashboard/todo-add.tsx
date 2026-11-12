@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
-import { Screen } from '../../../src/ui/index.js';
+import { ErrorBoundary, Screen } from '../../../src/ui/index.js';
 import { TodoAddSheet } from '../../../src/views/todo-add-sheet.js';
 
 export default function TodoAdd() {
@@ -9,6 +9,14 @@ export default function TodoAdd() {
   const router = useRouter();
   const [content, setContent] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  // Add closes the sheet before its write settles; the screen is gone by then.
+  const mounted = useRef(true);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!path) return;
@@ -20,6 +28,7 @@ export default function TodoAdd() {
 
   const write = useCallback(async (file: string, next: string) => {
     await githubContentFiles.write(file, next);
+    if (!mounted.current) return;
     setContent(next);
     setNow(new Date());
   }, []);
@@ -27,13 +36,15 @@ export default function TodoAdd() {
   return (
     <Screen keyboard scroll={false}>
       {path && content !== null ? (
-        <TodoAddSheet
-          path={path}
-          content={content}
-          now={now}
-          onWrite={write}
-          onClose={() => router.back()}
-        />
+        <ErrorBoundary what="this form" resetKey={content}>
+          <TodoAddSheet
+            path={path}
+            content={content}
+            now={now}
+            onWrite={write}
+            onClose={() => router.back()}
+          />
+        </ErrorBoundary>
       ) : null}
     </Screen>
   );

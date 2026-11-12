@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Alert, Modal, Pressable, ScrollView } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
-import { KeyboardLift, Text } from '../../ui/index.js';
+import { ErrorBoundary, KeyboardLift, Text } from '../../ui/index.js';
 
 /**
  * A bottom sheet for editing one thing a tile shows: scrolls its content, dismisses on a tap
@@ -49,7 +49,8 @@ export function TileSheet({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}
             >
-              {children}
+              {/* Inside the Modal, so a failing form shows its error here and the sheet still closes. */}
+              <ErrorBoundary what="this form">{children}</ErrorBoundary>
             </ScrollView>
             {footer}
           </Pressable>

@@ -56,8 +56,8 @@ export function TodoAddSheet({ path, content, now, onWrite, onClose }: TodoAddSh
   const toggleDue = (preset: DuePreset) => setDue(due === preset ? null : preset);
   const file = path.slice(path.lastIndexOf('/') + 1);
 
-  /** Adds the typed todo; false (with an error haptic) when it is rejected. */
-  const add = (): boolean => {
+  /** The file with the typed todo added; null (with an error haptic) when it is rejected. */
+  const build = (): string | null => {
     // A repeat counts from a due date, so it implies today when none was chosen.
     const preset = due ?? (repeat === 'none' ? null : 'today');
     const result = addTodoTask(latest.current, text, now, [...tags], {
@@ -66,7 +66,7 @@ export function TodoAddSheet({ path, content, now, onWrite, onClose }: TodoAddSh
     });
     if (!result.ok) {
       haptics.error();
-      return false;
+      return null;
     }
     let next = result.content;
     if (priority) {
@@ -75,15 +75,26 @@ export function TodoAddSheet({ path, content, now, onWrite, onClose }: TodoAddSh
       if (last) next = serializeTodos(setTodoPriority(data, last.id, priority));
     }
     latest.current = next;
-    void onWrite(path, next);
+    return next;
+  };
+  // A failed save must not become an unhandled rejection; the outbox keeps retrying the copy.
+  const save = (next: string) => {
     haptics.success();
-    return true;
+    Promise.resolve(onWrite(path, next)).catch(() => haptics.error());
   };
   const addAndKeepOpen = () => {
-    if (add()) setText('');
+    const next = build();
+    if (next === null) return;
+    save(next);
+    setText('');
   };
+  // Close before the write: the write fans out (store signals, sync, the dashboard below) and
+  // must not land on a sheet that is already being torn down.
   const addAndClose = () => {
-    if (add()) onClose();
+    const next = build();
+    if (next === null) return;
+    onClose();
+    save(next);
   };
 
   return (

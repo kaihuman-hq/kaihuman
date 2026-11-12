@@ -10,6 +10,7 @@ export {
   errorMessage,
   InlineError,
   type InlineErrorProps,
+  RouteErrorBoundary,
 } from './error-boundary.js';
 export { Fab, type FabProps } from './fab.js';
 export { GithubMark, type GithubMarkProps } from './github-mark.js';

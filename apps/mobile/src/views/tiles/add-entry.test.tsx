@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { presentTile, type TileKind } from '../../components/widgets/tile-controllers.js';
 import { Tile } from '../tile-view.js';
-import { ADD_ENTRIES, addEntryFor } from './add-entry.js';
+import { ADD_ENTRIES, AddEntrySheet, addEntryFor } from './add-entry.js';
 
 afterEach(cleanup);
 
@@ -96,5 +96,30 @@ describe('Tile ＋', () => {
   it('has no inline add form at the bottom of the body', () => {
     renderTile();
     expect(screen.queryByLabelText('What did you do?')).toBeNull();
+  });
+});
+
+describe('AddEntrySheet', () => {
+  // Regression: a form that threw inside the sheet's Modal took the whole tile (or, outside a
+  // tile boundary, the app) down. The sheet now keeps its own boundary for all kinds.
+  it('shows a failing form as an error card inside the sheet, which still closes', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onClose = vi.fn();
+    const Broken = () => {
+      throw new Error('form broke');
+    };
+    render(
+      <AddEntrySheet
+        entry={{ label: 'Add', title: 'New thing', Form: Broken }}
+        ctx={{ content: '', now: NOW, apply: () => true, error: null, path: LOG }}
+        onClose={onClose}
+      />,
+    );
+    const sheet = within(screen.getByTestId('add-entry-sheet'));
+    expect(sheet.getByText("Couldn't show this form")).toBeTruthy();
+    expect(sheet.getByTestId('inline-error').textContent).toBe('form broke');
+    fireEvent.click(screen.getByLabelText('Close'));
+    expect(onClose).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

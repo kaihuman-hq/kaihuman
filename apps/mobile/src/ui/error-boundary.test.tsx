@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ErrorBoundary } from './error-boundary.js';
+import { ErrorBoundary, RouteErrorBoundary } from './error-boundary.js';
 import { Text } from './text.js';
 
 afterEach(() => {
@@ -52,5 +52,15 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     );
     expect(screen.getByText('fixed')).toBeTruthy();
+  });
+});
+
+describe('RouteErrorBoundary', () => {
+  it('shows the error with a retry instead of closing the app', () => {
+    const retry = vi.fn(async () => {});
+    render(<RouteErrorBoundary error={new Error('boom')} retry={retry} />);
+    expect(screen.getByText("Couldn't show this screen")).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retry).toHaveBeenCalled();
   });
 });

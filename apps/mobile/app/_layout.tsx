@@ -20,6 +20,7 @@ import {
 import { tokenHydrated } from '../src/runtime/token-sync.js';
 import { useTheme } from '../src/theme/theme.js';
 import { GestureRoot } from '../src/ui/gesture-root.js';
+import { RouteErrorBoundary } from '../src/ui/index.js';
 import { useSignalValue } from '../src/views/use-signal.js';
 
 const QUICK_ROUTES = [
@@ -32,6 +33,9 @@ const QUICK_ROUTES = [
   // The ＋ menu's one-field Track entry (`?path=`); not a deep link.
   'quick-entry',
 ];
+
+// Last line of defence: a render error no screen caught shows a retry card, not a closed app.
+export { RouteErrorBoundary as ErrorBoundary };
 
 export default function RootLayout() {
   const router = useRouter();

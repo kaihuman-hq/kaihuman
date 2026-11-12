@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-12 — Mobile: adding a todo from a dashboard tile closed the app
+
+- Report: on iOS (TestFlight), adding a todo from the dashboard todo tile's ＋ closed the app. It did not reproduce in jsdom: every add path (`todo-add` sheet, tile detail, tile-card ＋ sheet, dashboard and detail re-render) adds with no errors, and there is no device crash log yet. So the native cause is not confirmed.
+- Most likely cause: `TodoAddSheet` "Add" wrote first and closed the `formSheet` in the same tick. The write's fan-out (store signals, sync, dashboard reload, keyboard hide) then landed on a sheet that was being torn down. The route also called `setContent` after it unmounted, and a failed save became an unhandled rejection (`void onWrite`). Also, `todo-add`, the todos tile detail and the tile ＋ sheet bodies had no error boundary, so a render error in them closed the app.
+- Fix: `TodoAddSheet` builds the next text, closes, then saves. A failed save gives error haptics. The `todo-add` route skips state updates after unmount and wraps the sheet in `ErrorBoundary`. The tile detail wraps `TodosDetailView`. `TileSheet` (the ＋ sheet for all 14 add kinds, plus the other tile sheets) and the todos tile's `Sheet` have a boundary inside the `Modal`, so a failing form shows an error card and the sheet still closes. The root layout exports `RouteErrorBoundary` as expo-router's `ErrorBoundary`, so no uncaught render error closes the app.
+- Other 13 add forms: they share `AddEntrySheet` → `TileSheet`, so the boundary covers them. They write through `optimisticWrite`, which already handles errors.
+- Tests: `views/todo-add-sheet.test.tsx` (close before write; a failed save does not reject unhandled), `tiles/add-entry.test.tsx` (a failing form stays inside the sheet), `ui/error-boundary.test.tsx` (route fallback). All three fail without the fix.
+
 ## 2026-11-11 — Mobile: login survives a background launch on a locked phone
 
 - iOS still asked for a new sign-in now and then, the PWA never. Cause: background sync (expo-background-task) launches the app while the phone is locked; Keychain items that are not readable then (legacy `WHEN_UNLOCKED` items, or any item before the first unlock after a reboot) failed to read, core started with no token and no refresh token, `startTokenSync` marked the session hydrated, and the user who opened the app later found the login screen. The secure driver also cached a `null` for the core's "clean-up" delete, so nothing read the Keychain again. The PWA's localStorage/IndexedDB has no lock state, so it never sees an empty session.

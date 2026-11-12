@@ -27,6 +27,7 @@ import {
   Badge,
   Button,
   Chip,
+  ErrorBoundary,
   haptics,
   Icon,
   KeyboardLift,
@@ -74,7 +75,7 @@ function Sheet({
               <Text variant="headline" numberOfLines={2} accessibilityRole="header">
                 {title}
               </Text>
-              {children}
+              <ErrorBoundary what="this sheet">{children}</ErrorBoundary>
               <Button label="Close" variant="plain" fullWidth onPress={onClose} />
             </ScrollView>
           </Pressable>

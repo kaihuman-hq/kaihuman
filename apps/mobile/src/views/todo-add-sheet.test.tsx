@@ -1,6 +1,7 @@
 import { parseTodos } from '@kaihuman/formats';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { haptics } from '../ui/index.js';
 import { TodoAddSheet } from './todo-add-sheet.js';
 
 afterEach(cleanup);
@@ -105,5 +106,38 @@ describe('TodoAddSheet', () => {
     submit();
     expect(items().at(-1)?.dueDate).toBe('2026-11-10');
     expect(items().at(-1)?.repeat?.unit).toBe('week');
+  });
+
+  // Regression: Add wrote first and closed in the same tick, so the write's fan-out (store
+  // signals, sync, dashboard reload) landed on a sheet being torn down, and a failed save
+  // was an unhandled rejection. Both crashed the iOS app.
+  it('Add closes the sheet before it writes', () => {
+    const order: string[] = [];
+    const onWrite = vi.fn(() => {
+      order.push('write');
+    });
+    const onClose = vi.fn(() => {
+      order.push('close');
+    });
+    render(
+      <TodoAddSheet path={PATH} content={FILE} now={NOW} onWrite={onWrite} onClose={onClose} />,
+    );
+    fireEvent.change(screen.getByLabelText('Todo'), { target: { value: 'ship' } });
+    chip('Add');
+    expect(order).toEqual(['close', 'write']);
+  });
+
+  it('a failed save gives error feedback instead of an unhandled rejection', async () => {
+    const error = vi.spyOn(haptics, 'error');
+    const onWrite = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    render(
+      <TodoAddSheet path={PATH} content={FILE} now={NOW} onWrite={onWrite} onClose={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByLabelText('Todo'), { target: { value: 'ship' } });
+    chip('Add');
+    await vi.waitFor(() => expect(error).toHaveBeenCalled());
+    error.mockRestore();
   });
 });

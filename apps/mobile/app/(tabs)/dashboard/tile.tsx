@@ -6,7 +6,14 @@ import { presentTile } from '../../../src/components/widgets/tile-controllers.js
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { saveToReadLater } from '../../../src/screens/save-read-later.js';
 import { optimisticWrite } from '../../../src/sync/optimistic.js';
-import { EmptyState, errorMessage, Icon, InlineError, Screen } from '../../../src/ui/index.js';
+import {
+  EmptyState,
+  ErrorBoundary,
+  errorMessage,
+  Icon,
+  InlineError,
+  Screen,
+} from '../../../src/ui/index.js';
 import { TILE_META, Tile } from '../../../src/views/tile-view.js';
 import { addEntryFor } from '../../../src/views/tiles/add-entry.js';
 import { TodosDetailView } from '../../../src/views/todos-detail-view.js';
@@ -96,7 +103,9 @@ export default function TileDetail() {
           tile instanceof Error ? (
             <InlineError what="this tile" message={tile.message} />
           ) : tile.kind === 'todos' ? (
-            <TodosDetailView path={path} content={content} now={now} onWrite={write} />
+            <ErrorBoundary what="this tile" resetKey={content}>
+              <TodosDetailView path={path} content={content} now={now} onWrite={write} />
+            </ErrorBoundary>
           ) : (
             <Tile
               path={path}
