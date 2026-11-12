@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-12 — CI: Cloudflare deploy commits all generated version files again
+
+- The console deploy failed at "Commit Generated File": since ce5dcab the template passed `"$GENERATED_FILE_PATH"` quoted, so `apps/console/src/version.ts apps/console/version.json` reached `git add` as one path. The list is now split into words with `read -ra` and passed as `"${paths[@]}"`, so the value is still never evaluated as shell code.
+
 ## 2026-11-12 — Mobile: dashboard pager updates live and swipes endlessly
 
 - The dashboard name and page dots now follow the live scroll offset (`onScroll`, throttled 16 ms) and change as soon as the next page is half visible, instead of after the swipe settles.
