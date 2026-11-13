@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-13 — CI: console deploys when its workspace packages change
+
+- `[PROD] Deploy Life OS` ran only for `apps/console/**`. A change to `packages/ui`, `core`, `formats` or `config`, which the console bundles, never reached the live site; the stream tile order fix (in `packages/ui`) would not have deployed. Those packages, the lockfile and both deploy workflow files now trigger it too.
+
 ## 2026-11-12 — CI: only check what a pull request touches
 
 - `ci.yml`: a new `changes` job diffs the pull request. Build, lint, type-check and test run through `turbo --affected`, so only changed packages and their dependents run (the stream-order change no longer builds the Rust CLI, docspack or the landing pages). Root config (`package.json`, lockfile, workspace, `turbo.json`, `biome.json`, `packages/config/`, `ci.yml`) still runs everything, because turbo does not see those as package inputs. The Rust system libraries and cargo cache are set up only when `apps/cli` changes. The KoSIT e-invoice job runs only when `packages/formats` changes.
