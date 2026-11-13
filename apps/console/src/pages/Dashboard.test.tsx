@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
     renameFolder: vi.fn(),
     updateFileContent: vi.fn(),
     saveFile: vi.fn(),
+    migrateAppFolder: vi.fn(async () => {}),
+    loadTree: vi.fn(async () => {}),
   },
 }));
 
@@ -47,8 +49,7 @@ vi.mock('@kaihuman/core', async () => {
       ]),
       openFiles: signal({}),
       appFolder: signal('.kaihuman'),
-      migrateAppFolder: async () => {},
-      loadTree: async () => {},
+      error: signal(null),
     }),
   };
 });
@@ -70,7 +71,11 @@ vi.mock('../components/ErrorBoundary', () => ({
 }));
 vi.mock('./ShortcutsPage', () => ({ QUICK_ROUTES: [] }));
 
-const { Dashboard } = await import('./Dashboard');
+const { Dashboard, normalizeConfig } = await import('./Dashboard');
+const core = (await import('@kaihuman/core')) as unknown as {
+  githubFileStore: { tree: { value: unknown[] }; error: { value: string | null } };
+  layoutStore: { remoteConfig: { value: unknown } };
+};
 
 const MESSAGE =
   'Issued documents never change. To correct an invoice, issue a credit note from the client page.';
@@ -157,5 +162,58 @@ describe('Dashboard refuses to change issued documents', () => {
     expect(h.store.renameFile).toHaveBeenCalledTimes(2);
     expect(h.store.renameFolder).toHaveBeenCalledWith('notes', 'memo');
     expect(h.store.deleteFile).toHaveBeenCalledWith('notes/a.md');
+  });
+});
+
+describe('Dashboard never stays on the config spinner', () => {
+  const rerender = async () => {
+    act(() => render(null, host));
+    core.layoutStore.remoteConfig.value = null;
+    await act(async () => {
+      render(<Dashboard />, host);
+    });
+    await act(async () => {});
+  };
+
+  it('a failing load shows the default layout with an error and Retry', async () => {
+    h.store.migrateAppFolder.mockRejectedValueOnce(new Error('Update is not a fast forward'));
+    await rerender();
+    expect(host.textContent).not.toContain('Loading Dashboard Configuration');
+    expect(core.layoutStore.remoteConfig.value).toMatchObject({ entries: [] });
+    const alert = host.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Update is not a fast forward');
+
+    const calls = h.store.migrateAppFolder.mock.calls.length;
+    await act(async () => {
+      (alert?.querySelector('button') as HTMLButtonElement).click();
+    });
+    await act(async () => {});
+    expect(h.store.migrateAppFolder.mock.calls.length).toBe(calls + 1);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('shows a tree load error with Retry instead of the spinner', async () => {
+    const tree = core.githubFileStore.tree.value;
+    core.githubFileStore.tree.value = [];
+    core.githubFileStore.error.value = 'Bad credentials';
+    try {
+      await rerender();
+      const alert = host.querySelector('[role="alert"]');
+      expect(alert?.textContent).toContain('Bad credentials');
+      (alert?.querySelector('button') as HTMLButtonElement).click();
+      expect(h.store.loadTree).toHaveBeenCalled();
+    } finally {
+      core.githubFileStore.tree.value = tree;
+      core.githubFileStore.error.value = null;
+    }
+  });
+
+  it('normalizeConfig tolerates a config without entries or dashboards', () => {
+    const c = normalizeConfig({ version: 1, files: { recentlyOpened: [] } });
+    expect(c.entries).toEqual([]);
+    expect(c.dashboards).toEqual([{ id: 'default', name: 'Main' }]);
+    expect(
+      normalizeConfig({ entries: [{ path: 'a', dashboard: 'd' }] as never }).entries,
+    ).toHaveLength(1);
   });
 });

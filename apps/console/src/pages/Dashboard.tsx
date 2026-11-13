@@ -28,12 +28,35 @@ import { BUSINESS_PROFILE_PATH, businessClientSlugs } from '../lib/business/load
 import { VERSION } from '../version';
 import { QUICK_ROUTES } from './ShortcutsPage';
 
+type DashboardConfig = import('@kaihuman/core').DashboardConfig;
+
+const defaultDashboardConfig = (): DashboardConfig => ({
+  version: 1,
+  dashboards: [{ id: 'default', name: 'Main' }],
+  entries: [],
+  files: { recentlyOpened: [] },
+});
+
+/** A hand-edited or partial config file may lack `entries` or `dashboards`; the rest assumes both. */
+export const normalizeConfig = (raw: Partial<DashboardConfig>): DashboardConfig => ({
+  ...defaultDashboardConfig(),
+  ...raw,
+  dashboards:
+    Array.isArray(raw.dashboards) && raw.dashboards.length > 0
+      ? raw.dashboards
+      : defaultDashboardConfig().dashboards,
+  entries: Array.isArray(raw.entries) ? raw.entries : [],
+});
+
 export const Dashboard = () => {
   const [showKBCommands, setShowKBCommands] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configAttempt, setConfigAttempt] = useState(0);
 
   /* original repo/repos declarations removed for mock */
   const tree = githubFileStore.tree.value;
+  const treeError = githubFileStore.error.value;
   const openFiles = githubFileStore.openFiles.value;
 
   // Palette capture needs business set up; clients come from folder names, so no file is loaded.
@@ -127,8 +150,8 @@ export const Dashboard = () => {
     // Only run if we have a tree and no config (or repo changed)
     if (!tree || tree.length === 0) return;
 
-    const loadConfig = async () => {
-      // Migrate .lifeos → .kh if needed (idempotent, no-op if already migrated)
+    const buildConfig = async (): Promise<import('@kaihuman/core').DashboardConfig> => {
+      // Migrate .lifeos → .kh if needed (idempotent, no-op if already migrated; never throws)
       await githubFileStore.migrateAppFolder();
 
       // Show spinner while reloading
@@ -151,7 +174,7 @@ export const Dashboard = () => {
           }
 
           if (content) {
-            config = JSON.parse(content);
+            config = normalizeConfig(JSON.parse(content));
             logger.info('Config loaded successfully');
           }
         } catch (e) {
@@ -160,14 +183,8 @@ export const Dashboard = () => {
       }
 
       if (!config) {
-        // Fallback: Default Config
         logger.info('No config found, using default.');
-        config = {
-          version: 1,
-          dashboards: [{ id: 'default', name: 'Main' }],
-          entries: [],
-          files: { recentlyOpened: [] },
-        };
+        config = defaultDashboardConfig();
       }
 
       // Rewrite any residual .lifeos/ paths → .kh/ in the config
@@ -244,11 +261,23 @@ export const Dashboard = () => {
         }
       }
 
-      layoutStore.remoteConfig.value = config;
+      return config;
+    };
+
+    // Any failure still ends the spinner: the default layout plus an error with Retry.
+    const loadConfig = async () => {
+      setConfigError(null);
+      try {
+        layoutStore.remoteConfig.value = await buildConfig();
+      } catch (e) {
+        logger.error('Failed to load dashboard configuration', e);
+        setConfigError(e instanceof Error ? e.message : String(e));
+        layoutStore.remoteConfig.value = defaultDashboardConfig();
+      }
     };
 
     loadConfig();
-  }, [tree.length, repo?.full_name]); // Re-run when tree loads or repo changes
+  }, [tree.length, repo?.full_name, configAttempt]); // Re-run when tree loads, repo changes or on Retry
 
   // Helper to update recent files
   const addToRecentFiles = useCallback((path: string) => {
@@ -326,7 +355,20 @@ export const Dashboard = () => {
     );
   }
 
-  // Blocking Load: Wait for Config
+  // Blocking Load: Wait for Config. A tree that failed to load (and has no cache) never yields one.
+  if (!remoteConfig && treeError && tree.length === 0) {
+    return (
+      <div
+        role="alert"
+        className="h-screen flex items-center justify-center text-nexus-muted flex-col gap-4"
+      >
+        <div>Could not load the repository: {treeError}</div>
+        <button type="button" class="underline" onClick={() => githubFileStore.loadTree()}>
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!remoteConfig) {
     return (
       <div className="h-screen flex items-center justify-center text-nexus-muted flex-col gap-4">
@@ -604,6 +646,21 @@ export const Dashboard = () => {
           version={VERSION}
         />
       </ErrorBoundary>
+      {configError && (
+        <div
+          role="alert"
+          class="fixed top-2 left-1/2 -translate-x-1/2 z-[300] max-w-[90vw] px-3 py-2 text-xs font-mono border bg-[var(--los-bg)] border-[var(--los-warning)] text-[var(--los-warning)]"
+        >
+          Dashboard configuration failed to load ({configError}); showing the default layout.
+          <button
+            type="button"
+            class="ml-3 underline"
+            onClick={() => setConfigAttempt((n) => n + 1)}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {captureStatus && (
         <div
           role={captureStatus.ok ? 'status' : 'alert'}

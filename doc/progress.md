@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-11-13 — Dashboard no longer hangs after a CLI todo import
+
+- `kaihuman todo import` in a repo without `.kh/` wrote `.lifeos/`, so the console ran its `.lifeos` → `.kh` migration. `renameFolder` read the branch head through GitHub's 60 s HTTP cache; right after the CLI commit that head was stale, the ref update was a non-fast-forward, and the rejected migration left `/` on "Loading Dashboard Configuration..." for good.
+- `renameFolder` reads the head uncached. `migrateAppFolder` never throws: on failure the app keeps reading `.lifeos` and retries on the next load.
+- The dashboard always leaves the spinner: a failed load shows the default layout with an error and Retry; a config without `entries`/`dashboards` is normalized; a failed tree load shows its error with Retry.
+- CLI: a repo with neither `.kh/` nor `.lifeos/` gets `.kh/`.
+- The user's network log showed every GitHub call answered, then no file was ever fetched (not on `/`, not on `/tasks`). Every file open first awaits its IndexedDB cache record; an IndexedDB call that never answers (e.g. a transaction held by another tab) blocked them all silently. The file store's cache calls now time out after 5 s and fail open (read = miss, write skipped, logged as a warning).
+- `loadTree`'s GitHub calls give up after 30 s (`fetch` has no timeout) with an error the dashboard shows with Retry. A successful load logs its entry count.
+- Tasks board already lists every `*.todos.md` in any folder (regression test added); undated imported tasks are not in the default "Today" view, only in their list and Inbox.
+- Root cause of the silent hang: `WebStorageAdapter` opened `life-os-db` with no `blocked`/`blocking`/`terminated` handlers and no timeout, so a stuck open (older connection in another tab, wedged backend) left every storage call waiting forever: the tree load spun, sign-in state never loaded, `/tasks` stayed empty. `blocking` now closes the connection so a newer tab can upgrade, and the open is raced against `IDB_OPEN_TIMEOUT_MS` (3 s). On timeout or error the adapter warns once and uses its in-memory store for the rest of the session. Tests in `web-adapter.test.ts`.
+
 ## 2026-11-13 — CLI: import tests no longer share a temp file
 
 - The TickTick import tests ran in parallel and shared `kh-import-<pid>.csv`, so one could delete it while another read it (CI failure). Each call now writes its own file.

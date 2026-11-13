@@ -248,7 +248,7 @@ pub struct UpdateArgs {
 pub struct Snapshot {
     pub branch: String,
     pub commit: String,
-    /// `.kh`, or `.lifeos` when the repo has no `.kh/`.
+    /// See [`app_folder_for`].
     pub app_folder: String,
     /// (path, content) of every `*.todos.md`, sorted by path.
     pub files: Vec<(String, String)>,
@@ -336,11 +336,7 @@ impl Remote for GithubRemote {
         let (owner, repo) = (&self.owner, &self.repo);
         let (branch, commit) = self.client.head(owner, repo).await?;
         let tree = self.client.tree(owner, repo, &commit).await?;
-        let app_folder = if tree.iter().any(|(p, _)| p.starts_with(".kh/")) {
-            ".kh"
-        } else {
-            ".lifeos"
-        };
+        let app_folder = app_folder_for(tree.iter().map(|(p, _)| p.as_str()));
         let todo_files: Vec<_> = tree.iter().filter(|(p, _)| p.ends_with(SUFFIX)).collect();
         let contents = try_join_all(
             todo_files
@@ -389,6 +385,19 @@ impl Remote for GithubRemote {
             .commit_files(&self.owner, &self.repo, branch, parent, files, message)
             .await
     }
+}
+
+/// `.kh`; the legacy `.lifeos` only while a repo still has it and no `.kh/`. A new repo gets
+/// `.kh`: writing `.lifeos` there made the console run its `.lifeos` → `.kh` migration.
+pub(crate) fn app_folder_for<'a>(mut paths: impl Iterator<Item = &'a str>) -> &'static str {
+    let mut lifeos = false;
+    for p in paths.by_ref() {
+        if p.starts_with(".kh/") {
+            return ".kh";
+        }
+        lifeos |= p.starts_with(".lifeos/");
+    }
+    if lifeos { ".lifeos" } else { ".kh" }
 }
 
 fn conflict(what: &str) -> anyhow::Error {
@@ -1345,11 +1354,7 @@ mod tests {
             Ok(Snapshot {
                 branch: "main".into(),
                 commit: format!("c{}", self.version.borrow()),
-                app_folder: if files.keys().any(|p| p.starts_with(".kh/")) {
-                    ".kh".into()
-                } else {
-                    ".lifeos".into()
-                },
+                app_folder: app_folder_for(files.keys().map(String::as_str)).into(),
                 files: todo_files,
             })
         }
@@ -1737,6 +1742,20 @@ mod tests {
         assert_eq!(
             code(exec(&fake, &["show", "99999999"]).await),
             Code::NotFound
+        );
+    }
+
+    #[test]
+    fn app_folder_defaults_to_kh_in_a_new_repo() {
+        assert_eq!(app_folder_for(["README.md"].into_iter()), ".kh");
+        assert_eq!(app_folder_for(std::iter::empty()), ".kh");
+        assert_eq!(
+            app_folder_for([".lifeos/a.todos.md"].into_iter()),
+            ".lifeos"
+        );
+        assert_eq!(
+            app_folder_for([".lifeos/a.todos.md", ".kh/b.md"].into_iter()),
+            ".kh"
         );
     }
 

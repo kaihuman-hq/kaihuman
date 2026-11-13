@@ -14,19 +14,57 @@ const logger = new Logger('GithubFileStore');
 // reads (get/getKey) return undefined. This keeps demo edits temporary and
 // in-memory without branching at every cache call site.
 const storage = () => getCoreStorage();
+/**
+ * A tree load that waits longer than this on GitHub gives up with an error. `fetch` has no
+ * timeout of its own, so a request that never answered left the dashboard spinning silently.
+ */
+export const LOAD_TREE_TIMEOUT_MS = 30_000;
+
+/**
+ * The IndexedDB cache is an optimisation, so a call that has not answered after this long is
+ * treated as a miss (reads) or skipped (writes). A transaction that never completes (e.g. held by
+ * another tab) otherwise blocked every file open before its network fetch, leaving the dashboard
+ * and the Tasks board empty without an error.
+ */
+export const CACHE_TIMEOUT_MS = 5_000;
+
+class TimeoutError extends Error {}
+
+const withTimeout = <T>(work: Promise<T>, what: string, ms: number): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new TimeoutError(`${what} timed out after ${ms / 1000} s`)),
+      ms,
+    );
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+};
+
+/** Fail-open cache access: `fallback` when IndexedDB does not answer in time. */
+const cached = <T>(work: Promise<T>, what: string, fallback: T): Promise<T> =>
+  withTimeout(work, what, CACHE_TIMEOUT_MS).catch((e: unknown) => {
+    if (!(e instanceof TimeoutError)) throw e;
+    logger.warn(`${e.message}; continuing without the local cache`);
+    return fallback;
+  });
+
 const dbPromise = Promise.resolve({
   get: async (store: 'trees' | 'files', key: string): Promise<any> =>
-    demoMode.value ? undefined : storage().getRecord(store, key),
+    demoMode.value
+      ? undefined
+      : cached(storage().getRecord(store, key), `Cache read ${key}`, undefined),
   getAll: async (store: 'files'): Promise<any[]> =>
-    demoMode.value ? [] : storage().listRecords(store),
+    demoMode.value ? [] : cached(storage().listRecords(store), `Cache scan ${store}`, []),
   // `files` records carry their own key (`path`), mirroring the old keyPath store.
   put: async (store: 'trees' | 'files', value: any, key?: string): Promise<void> => {
     if (demoMode.value) return;
-    await storage().putRecord(store, store === 'files' ? value.path : (key as string), value);
+    const k = store === 'files' ? value.path : (key as string);
+    await cached(storage().putRecord(store, k, value), `Cache write ${k}`, undefined);
   },
   delete: async (store: 'trees' | 'files', key: string): Promise<void> => {
     if (demoMode.value) return;
-    await storage().deleteRecord(store, key);
+    await cached(storage().deleteRecord(store, key), `Cache delete ${key}`, undefined);
   },
 });
 
@@ -717,15 +755,21 @@ export class GithubFileStore {
 
       // 2. Fetch fresh from network. Reading the head first and listing that exact commit avoids
       // a lagging listing, and records the head so syncNow can tell when nothing changed.
-      const head = await githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch);
-      const fetchedTree = (await githubService.fetchRepoTree(
-        repo.owner.login,
-        repo.name,
-        repo.default_branch,
-        { commitSha: head },
+      const head = await withTimeout(
+        githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch),
+        'Reading the branch from GitHub',
+        LOAD_TREE_TIMEOUT_MS,
+      );
+      const fetchedTree = (await withTimeout(
+        githubService.fetchRepoTree(repo.owner.login, repo.name, repo.default_branch, {
+          commitSha: head,
+        }),
+        'Loading the file list from GitHub',
+        LOAD_TREE_TIMEOUT_MS,
       )) as TreeItem[];
       await this.mergeRemoteTree(repo, fetchedTree, cachedTree, db);
       this.lastHead = { repo: repo.full_name, sha: head };
+      logger.info(`Tree loaded: ${fetchedTree.length} entries`);
     } catch (err: any) {
       logger.error('Failed to load tree', err);
       // Fallback to cache if request fails
@@ -1158,7 +1202,19 @@ export class GithubFileStore {
     }
   }
 
-  async migrateAppFolder() {
+  /**
+   * Never throws: a failed migration must not block the app, which keeps reading `.lifeos` (see
+   * `appFolder`). The done flag is set only on success, so the next load retries.
+   */
+  async migrateAppFolder(): Promise<void> {
+    try {
+      await this.runAppFolderMigration();
+    } catch (e) {
+      logger.warn('[Migration] .lifeos → .kh migration failed; keeping .lifeos for now', e);
+    }
+  }
+
+  private async runAppFolderMigration() {
     const repo = githubProfileStore.currentRepo.peek();
     if (!repo) return;
 

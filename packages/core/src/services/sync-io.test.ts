@@ -55,6 +55,21 @@ describe('GithubService cache bypass', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.cache).toBe('no-store');
   });
 
+  it('reads the branch head in renameFolder with cache: no-store', async () => {
+    // A cached head (e.g. from before a CLI commit) made the migration commit a non-fast-forward.
+    fetchMock
+      .mockResolvedValueOnce(json({ object: { sha: 'head1' } }))
+      .mockResolvedValueOnce(json({ sha: 'head1', tree: { sha: 't1' } }))
+      .mockResolvedValueOnce(json({ sha: 't2' }))
+      .mockResolvedValueOnce(json({ sha: 'c2' }))
+      .mockResolvedValueOnce(json({ object: { sha: 'c2' } }));
+    await new GithubService().renameFolder('o', 'r', 'main', '.lifeos', '.kh', [
+      { path: '.lifeos/a.todos.md', mode: '100644', type: 'blob', sha: 'b1' },
+    ]);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('git/ref');
+    expect(fetchMock.mock.calls[0]?.[1]?.cache).toBe('no-store');
+  });
+
   it('revalidates the branch head with If-None-Match and serves the cached sha on 304', async () => {
     const svc = new GithubService();
     fetchMock.mockResolvedValueOnce(
