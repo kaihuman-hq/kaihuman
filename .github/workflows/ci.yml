@@ -29,6 +29,7 @@ jobs:
       full: ${{ steps.diff.outputs.full }}
       cli: ${{ steps.diff.outputs.cli }}
       einvoice: ${{ steps.diff.outputs.einvoice }}
+      console: ${{ steps.diff.outputs.console }}
     steps:
       # The pull_request checkout is a merge commit; its first parent is the base branch tip, so
       # two commits of history are enough to diff the whole pull request.
@@ -48,6 +49,8 @@ jobs:
             echo "full=$full"
             echo "cli=$([ "$full" = true ] && echo true || has '^apps/cli/')"
             echo "einvoice=$([ "$full" = true ] && echo true || has '^packages/formats/')"
+            # What the console deploy bundles (deploy-magic-life-os.yaml), without the lockfile.
+            echo "console=$(has '^(apps/console/|packages/(config|core|formats|ui)/)')"
           } >> "$GITHUB_OUTPUT"
 
   check:
@@ -93,6 +96,24 @@ jobs:
 
       - name: Test
         run: pnpm turbo run test $AFFECTED
+
+  # The console deploy cannot push to main, so a pull request that changes the console bumps its
+  # version itself (`pnpm --filter @kaihuman/app-console version:bump`).
+  console-version:
+    needs: changes
+    if: needs.changes.outputs.console == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check version bump
+        run: node apps/console/scripts/check-version-bump.js HEAD^1
 
   # Phase 6: every golden e-invoice must pass the KoSIT validator with the XRechnung configuration.
   # The goldens are what the serialisers produce (a Vitest test keeps them in sync), so this checks

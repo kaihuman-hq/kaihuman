@@ -18,13 +18,6 @@ on:
       buildTarget:
         required: true
         type: string
-      commitGeneratedFile:
-        required: false
-        type: boolean
-        default: false
-      generatedFilePath:
-        required: false
-        type: string
     secrets:
       cf_account_id:
         required: true
@@ -63,19 +56,6 @@ jobs:
         run: pnpm run "$BUILD_TARGET"
         env:
           BUILD_TARGET: ${{ inputs.buildTarget }}
-
-      - name: Commit Generated File
-        if: ${{ inputs.commitGeneratedFile }}
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          # Space-separated list: split into words, without glob expansion.
-          read -ra paths <<< "$GENERATED_FILE_PATH"
-          git add -f -- "${paths[@]}"
-          git commit -m "chore: update generated version [skip ci]" || echo "No changes to commit"
-          git push
-        env:
-          GENERATED_FILE_PATH: ${{ inputs.generatedFilePath }}
 
       - name: Publish
         id: publish
