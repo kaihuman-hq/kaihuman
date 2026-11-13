@@ -5,7 +5,7 @@ The terminal CLI is a Rust program in `apps/cli` whose binary is called `kaihuma
 ## Building and running the CLI
 <!-- docspack: tags=install,cargo,compile,release binary -->
 
-Prerequisites are Rust and Cargo, `git` on `$PATH` for repo sync, and optionally `claude`, `copilot` or `gemini` on `$PATH` for AI features. The toolchain is pinned to `1.94.1` with `rustfmt` and `clippy` in `apps/cli/rust-toolchain.toml`; rustup fetches it automatically.
+To install a prebuilt binary instead, run `curl -fsSL https://kaihuman.com/install.sh | sh` (see the [CLI quickstart](/docs/cli-quickstart/)). To build from source, the prerequisites are Rust and Cargo, `git` on `$PATH` for repo sync, and optionally `claude`, `copilot` or `gemini` on `$PATH` for AI features. The toolchain is pinned to `1.94.1` with `rustfmt` and `clippy` in `apps/cli/rust-toolchain.toml`; rustup fetches it automatically.
 
 ```sh
 cd apps/cli

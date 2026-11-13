@@ -2,15 +2,18 @@
 
 Welcome to the kaihuman CLI! This is a terminal-based user interface (TUI) application designed to let you interact with your kaihuman console directly from your terminal.
 
-## Download
-
-Prebuilt binaries for Linux (x86_64) and macOS (Apple silicon) are on the
-[releases page](https://github.com/kaihuman-hq/kaihuman/releases) (tags `cli-v…`). Unpack the tarball and put `kaihuman` on your `PATH`:
+## Install
 
 ```bash
-tar -xzf kaihuman-<version>-linux-x86_64.tar.gz
-install -Dm755 kaihuman-<version>-linux-x86_64/kaihuman ~/.local/bin/kaihuman
+curl -fsSL https://kaihuman.com/install.sh | sh
 ```
+
+Installs the prebuilt binary (macOS arm64/x86_64, Linux x86_64/arm64) from the latest `cli-v…`
+[release](https://github.com/kaihuman-hq/kaihuman/releases) to `~/.local/bin`, after checking its
+SHA-256. `KAIHUMAN_VERSION` pins a version, `KAIHUMAN_INSTALL_DIR` changes the target. The script is
+`apps/landing-page-nextgen/public/install.sh`; `scripts/test-install.sh` tests it against a fake release.
+With Rust: `cargo install --git https://github.com/kaihuman-hq/kaihuman cli --locked`. You can also
+unpack a release tarball by hand and put `kaihuman` on your `PATH`.
 
 To build it yourself instead, read on.
 
@@ -110,5 +113,5 @@ When you press `l` to log in:
 2. `pnpm run package` builds and writes `release/kaihuman-<version>-<os>-<arch>.tar.gz` for this
    machine.
 3. Push a tag `cli-v<version>`. The **Release CLI and Desktop Palette** workflow tests and builds
-   Linux x86_64 and macOS arm64 tarballs and attaches them to a GitHub release. It fails if the
+   Linux x86_64/arm64 and macOS arm64/x86_64 tarballs and attaches them, with a `SHA256SUMS` file, to a GitHub release. It fails if the
    tag does not match `Cargo.toml`.

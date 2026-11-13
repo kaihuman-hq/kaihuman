@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-13 — CLI one-line install and docs
+
+- `curl -fsSL https://kaihuman.com/install.sh | sh` (`apps/landing-page-nextgen/public/install.sh`): picks the release tarball for macOS arm64/x86_64 or Linux x86_64/arm64, verifies `SHA256SUMS`, installs to `~/.local/bin`. `scripts/test-install.sh` tests it against a fake release (part of `pnpm -r test` for the CLI).
+- Release workflow now also builds Linux arm64 and macOS x86_64 (cross-compiled) and attaches `SHA256SUMS`; `package.sh` takes `TARGET`. Needs a new `cli-v…` tag to take effect.
+- Website: new docs page `/docs/cli-quickstart/` (install, login, todo examples, agent skills, TickTick), linked from the nav pill and footer.
+
 ## 2026-11-12 — `kaihuman todo import ticktick`
 
 - `kaihuman todo import ticktick <csv> [--apply] [--include-done]`: parses a TickTick backup CSV (preamble lines, multi-line fields, `Is All Day`/`Timezone` aware dates) in `todos_ticktick.rs` and plans it per target file; `--apply` reuses `add_todos` (one commit per file). Ids hash the TickTick task id, so reruns add nothing. Unsupported repeat rules get `#repeat-unmapped` and a note. Adds the `csv` and `chrono-tz` crates. kh-todos skill, CLI docs and `cmdspec.yaml` updated.
