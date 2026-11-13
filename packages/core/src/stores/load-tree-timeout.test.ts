@@ -2,10 +2,14 @@ import '../db.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCoreStorage } from '../storage/adapter.js';
 
-const remote = vi.hoisted(() => ({ fetchRepoTree: vi.fn(), getHeadSha: vi.fn() }));
+const remote = vi.hoisted(() => ({
+  fetchRepoTree: vi.fn(),
+  getHeadSha: vi.fn(),
+  getFileContent: vi.fn(),
+}));
 vi.mock('../services/github.service.js', () => ({ githubService: remote }));
 
-import { GithubFileStore, LOAD_TREE_TIMEOUT_MS } from './github-file.store.js';
+import { CACHE_TIMEOUT_MS, GithubFileStore, LOAD_TREE_TIMEOUT_MS } from './github-file.store.js';
 import { githubProfileStore } from './github-profile.store.js';
 
 const realSetTimeout = globalThis.setTimeout;
@@ -56,5 +60,27 @@ describe('githubFileStore.loadTree never hangs silently', () => {
     spy.mockRestore();
     expect(store.tree.value.map((t) => t.path)).toEqual(['a.md']);
     expect(store.error.value).toBeNull();
+  });
+
+  it('a stuck IndexedDB (e.g. a transaction held by another tab) does not block opening a file', async () => {
+    remote.fetchRepoTree.mockResolvedValue([
+      { path: '.kh/inbox.todos.md', mode: '100644', type: 'blob', sha: 's', url: '' },
+    ]);
+    remote.getFileContent.mockResolvedValue({ content: '- [ ] a\n', sha: 's' });
+    const storage = getCoreStorage();
+    const spies = [
+      vi.spyOn(storage, 'getRecord').mockImplementation(never),
+      vi.spyOn(storage, 'putRecord').mockImplementation(never),
+    ];
+    try {
+      await settle(store.loadTree());
+      await settle(store.openFile('.kh/inbox.todos.md'));
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
+    expect(store.tree.value.map((t) => t.path)).toEqual(['.kh/inbox.todos.md']);
+    expect(remote.getFileContent).toHaveBeenCalled();
+    expect(store.openFiles.value['.kh/inbox.todos.md']?.content).toBe('- [ ] a\n');
+    expect(CACHE_TIMEOUT_MS).toBeLessThan(LOAD_TREE_TIMEOUT_MS);
   });
 });
