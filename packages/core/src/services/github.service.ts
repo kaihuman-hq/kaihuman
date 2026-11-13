@@ -282,11 +282,12 @@ export class GithubService {
   ) {
     const client = this.getClient();
 
-    // 1. Get current HEAD commit SHA
+    // 1. Get current HEAD commit SHA (uncached: a stale head makes the ref update a non-fast-forward)
     const { data: refData } = await client.git.getRef({
       owner,
       repo,
       ref: `heads/${branch}`,
+      ...noStore,
     });
     const headSha = refData.object.sha;
 

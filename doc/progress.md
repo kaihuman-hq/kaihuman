@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-13 — Dashboard no longer hangs after a CLI todo import
+
+- `kaihuman todo import` in a repo without `.kh/` wrote `.lifeos/`, so the console ran its `.lifeos` → `.kh` migration. `renameFolder` read the branch head through GitHub's 60 s HTTP cache; right after the CLI commit that head was stale, the ref update was a non-fast-forward, and the rejected migration left `/` on "Loading Dashboard Configuration..." for good.
+- `renameFolder` reads the head uncached. `migrateAppFolder` never throws: on failure the app keeps reading `.lifeos` and retries on the next load.
+- The dashboard always leaves the spinner: a failed load shows the default layout with an error and Retry; a config without `entries`/`dashboards` is normalized; a failed tree load shows its error with Retry.
+- CLI: a repo with neither `.kh/` nor `.lifeos/` gets `.kh/`.
+- Tasks board already lists every `*.todos.md` in any folder (regression test added); undated imported tasks are not in the default "Today" view, only in their list and Inbox.
+
 ## 2026-11-13 — CLI: import tests no longer share a temp file
 
 - The TickTick import tests ran in parallel and shared `kh-import-<pid>.csv`, so one could delete it while another read it (CI failure). Each call now writes its own file.

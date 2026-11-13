@@ -33,6 +33,12 @@ vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div /> }));
 vi.mock('preact-router', () => ({ route: vi.fn() }));
 
 const { TasksBoardPage } = await import('./TasksBoardPage');
+const core = (await import('@kaihuman/core')) as unknown as {
+  githubFileStore: {
+    tree: { value: unknown[] };
+    openFiles: { value: Record<string, { content: string }> };
+  };
+};
 
 let host: HTMLDivElement;
 const button = (label: string) =>
@@ -111,5 +117,23 @@ describe('TasksBoardPage', () => {
     expect(host.querySelectorAll('nav').length).toBe(2);
     act(() => (host.querySelector('[aria-label="Close lists"]') as HTMLButtonElement).click());
     expect(host.querySelectorAll('nav').length).toBe(1);
+  });
+
+  it('lists todos left in the legacy .lifeos folder (e.g. while its migration is pending)', () => {
+    const LEGACY = '.lifeos/ticktick.todos.md';
+    const fs = core.githubFileStore;
+    const [tree, files] = [fs.tree.value, fs.openFiles.value];
+    act(() => {
+      fs.tree.value = [...tree, blob(LEGACY)];
+      fs.openFiles.value = { ...files, [LEGACY]: { content: '- [ ] Imported\n' } };
+    });
+    try {
+      expect(button('ticktick')?.textContent).toBe('ticktick1');
+      act(() => button('ticktick')?.click());
+      expect(host.textContent).toContain('Imported');
+    } finally {
+      fs.tree.value = tree;
+      fs.openFiles.value = files;
+    }
   });
 });

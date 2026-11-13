@@ -1158,7 +1158,19 @@ export class GithubFileStore {
     }
   }
 
-  async migrateAppFolder() {
+  /**
+   * Never throws: a failed migration must not block the app, which keeps reading `.lifeos` (see
+   * `appFolder`). The done flag is set only on success, so the next load retries.
+   */
+  async migrateAppFolder(): Promise<void> {
+    try {
+      await this.runAppFolderMigration();
+    } catch (e) {
+      logger.warn('[Migration] .lifeos → .kh migration failed; keeping .lifeos for now', e);
+    }
+  }
+
+  private async runAppFolderMigration() {
     const repo = githubProfileStore.currentRepo.peek();
     if (!repo) return;
 
