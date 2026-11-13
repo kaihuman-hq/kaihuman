@@ -26,7 +26,6 @@ jobs:
       distDir: ./dist
       cfPagesName: lifosy-landing
       branchName: main
-      commitGeneratedFile: false
     secrets:
       cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
       cf_api_token: ${{ secrets.CF_API_TOKEN }}

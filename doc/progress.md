@@ -9,6 +9,11 @@
 - `curl -fsSL https://kaihuman.com/install.sh | sh` (`apps/landing-page-nextgen/public/install.sh`): picks the release tarball for macOS arm64/x86_64 or Linux x86_64/arm64, verifies `SHA256SUMS`, installs to `~/.local/bin`. `scripts/test-install.sh` tests it against a fake release (part of `pnpm -r test` for the CLI).
 - Release workflow now also builds Linux arm64 and macOS x86_64 (cross-compiled) and attaches `SHA256SUMS`; `package.sh` takes `TARGET`. Needs a new `cli-v…` tag to take effect.
 - Website: new docs page `/docs/cli-quickstart/` (install, login, todo examples, agent skills, TickTick), linked from the nav pill and footer.
+## 2026-11-13 — CI: console version bump moves into the pull request
+
+- `[PROD] Deploy Life OS` failed at "Commit Generated File": `github-actions[bot]` may not push to main (403). The deploy no longer bumps or commits anything; `build:prod` only writes `src/version.ts` (version, build time, commit) for the build. The `commitGeneratedFile` step and inputs are gone from `template-deploy-to-cloudflare.yaml`.
+- Instead, a pull request that changes `apps/console` or `packages/{config,core,formats,ui}` bumps the version itself (`pnpm --filter @kaihuman/app-console version:bump`) and commits `version.json` and `src/version.ts`. The new `console-version` job in `ci.yml` fails if `version.json` is not higher than on the base branch (`scripts/check-version-bump.js`, tested in `check-version-bump.test.ts`).
+- `generate-version.js` writes `src/version.ts` without the stray indentation. Version is now 0.1.104.
 
 ## 2026-11-13 — CI: console deploys when its workspace packages change
 
