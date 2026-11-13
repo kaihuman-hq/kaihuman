@@ -1,0 +1,32 @@
+format = 1
+splice = "0.4.0"
+
+[channel]
+name = "rigging"
+only = []
+exclude = []
+
+[template]
+source = "gh:keelstackhq/hull//rigging"
+version = "0.9.0"
+commit = "889acba094fa1b4a7c43b7ad0bcb9fab8e642c04"
+
+[vars]
+
+[[pieces]]
+id = "meta"
+name = "meta"
+vars = {}
+
+[[pieces]]
+id = "claude"
+name = "claude"
+vars = {}
+
+[files]
+".claude/agents/ci-fixer.md" = { class = "owned", sha256 = "86d67782737a1ef96070c0c968710261a12bd4f1ed3ae5cf948f84d736ec2452" }
+".claude/agents/explore.md" = { class = "owned", sha256 = "b7294f5f7e87b694e28a93036e9c2aac639808f015f5a08b31ef2c7c1289d2dd" }
+".claude/agents/implementer.md" = { class = "owned", sha256 = "d51c6a188235b26a6d336dd4b9939d90fdf0acd090c44011a06e688ae741328d" }
+".claude/agents/reviewer.md" = { class = "owned", sha256 = "b070770e82c304bed709b91fa786e7576fec0df6de0813a569792caee129ff96" }
+
+[sections]

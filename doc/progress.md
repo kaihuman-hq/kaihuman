@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-13 — hull 0.9.0 rigging channel: Claude subagents
+
+- Added the hull `rigging` channel at v0.9.0 (`splice channel add gh:keelstackhq/hull//rigging --piece claude`): `.claude/agents/{explore,implementer,reviewer,ci-fixer}.md` and `.splice/channels/rigging.toml`. Channel pieces only: no template adoption, no app re-render, no existing file changed.
+
 ## 2026-11-13 — CLI: import tests no longer share a temp file
 
 - The TickTick import tests ran in parallel and shared `kh-import-<pid>.csv`, so one could delete it while another read it (CI failure). Each call now writes its own file.
