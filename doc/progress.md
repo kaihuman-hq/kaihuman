@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-13 — CI: console version bump moves into the pull request
+
+- `[PROD] Deploy Life OS` failed at "Commit Generated File": `github-actions[bot]` may not push to main (403). The deploy no longer bumps or commits anything; `build:prod` only writes `src/version.ts` (version, build time, commit) for the build. The `commitGeneratedFile` step and inputs are gone from `template-deploy-to-cloudflare.yaml`.
+- Instead, a pull request that changes `apps/console` or `packages/{config,core,formats,ui}` bumps the version itself (`pnpm --filter @kaihuman/app-console version:bump`) and commits `version.json` and `src/version.ts`. The new `console-version` job in `ci.yml` fails if `version.json` is not higher than on the base branch (`scripts/check-version-bump.js`, tested in `check-version-bump.test.ts`).
+- `generate-version.js` writes `src/version.ts` without the stray indentation. Version is now 0.1.104.
+
 ## 2026-11-13 — CI: console deploys when its workspace packages change
 
 - `[PROD] Deploy Life OS` ran only for `apps/console/**`. A change to `packages/ui`, `core`, `formats` or `config`, which the console bundles, never reached the live site; the stream tile order fix (in `packages/ui`) would not have deployed. Those packages, the lockfile and both deploy workflow files now trigger it too.

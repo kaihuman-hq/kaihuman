@@ -21,8 +21,9 @@ on:
       - ".github/workflows/template-deploy-to-cloudflare.yaml"
   workflow_dispatch:
 
+# The deploy does not push: the version bump is part of each pull request (ci.yml checks it).
 permissions:
-  contents: write
+  contents: read
 
 
 jobs:
@@ -34,8 +35,6 @@ jobs:
       distDir: ./dist
       cfPagesName: lifosy-console
       branchName: main
-      commitGeneratedFile: true
-      generatedFilePath: apps/console/src/version.ts apps/console/version.json
     secrets:
       cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
       cf_api_token: ${{ secrets.CF_API_TOKEN }}

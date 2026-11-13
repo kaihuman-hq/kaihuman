@@ -19,6 +19,7 @@ pnpm + Turborepo monorepo, TypeScript strict, Biome for lint and format.
 - All `devDependencies` go in the root `package.json`; runtime `dependencies` go in the package that uses them. Add a package only when it can't reasonably be written in-repo.
 - Node code is ESM only: `"type": "module"`, `.js` extensions in relative imports, `node:` imports for built-ins.
 - Prefer type-level guarantees (discriminated unions, branded types) over runtime checks. Comments explain why, not what.
+- A pull request that changes `apps/console` or a package it bundles (`config`, `core`, `formats`, `ui`) bumps the console version: `pnpm --filter @kaihuman/app-console version:bump`, then commit `version.json` and `src/version.ts`. CI checks it; the deploy cannot push to main.
 - Use docspack (block below) before broad searches. A `PreToolUse` hook (`scripts/docspack-nudge.mjs`) nudges toward it; follow the nudge.
 
 ## Docs to update
