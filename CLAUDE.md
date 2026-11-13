@@ -58,3 +58,12 @@ Every tool call is a turn, and every turn resends the whole conversation. Use fe
 
 <!-- Written by `npx docspack agent install`. Re-run it to update this block. -->
 <!-- docspack:end -->
+
+<!-- splice:bosun:begin — managed by `splice update --channel bosun`; edit the source -->
+
+## bosun
+
+bosun runs the process in this repo: read @AGENTS.md (its bosun section) before you start, and
+act on the JSON that `bosun` commands print.
+
+<!-- splice:bosun:end -->

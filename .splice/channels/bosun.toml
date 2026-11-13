@@ -1,0 +1,53 @@
+format = 1
+splice = "0.4.0"
+
+[channel]
+name = "bosun"
+only = []
+exclude = [".npmrc", ".claude/settings.json"]
+
+[template]
+source = "gh:keelstackhq/bosun//channel"
+version = "0.13.0"
+commit = "1b1edd94382bc3fc671bebb596c0a6a29e4cfce3"
+
+[vars]
+bosun_version = "0.14.0"
+intake = ""
+own_ci = ""
+owner = ""
+policy = ""
+project = "kaihuman"
+rust_path = "."
+ts_path = "."
+
+[[pieces]]
+id = "core"
+name = "core"
+vars = {}
+
+[[pieces]]
+id = "ts-pnpm"
+name = "ts-pnpm"
+vars = {}
+
+[[pieces]]
+id = "claude-md"
+name = "claude-md"
+vars = {}
+
+[files]
+".bosun/bosun.toml" = { class = "shared", sha256 = "6e7a272d5fb6d602b1a8654a216cf998de6bce2bac909381900f554da207aff5" }
+".bosun/fold-fragments.sh" = { class = "owned", sha256 = "d82f5e75c028d7e38dcf01773cc064206cba7f1fa258332fa9e2fcd4a874bf2e" }
+".bosun/version" = { class = "owned", sha256 = "d84c9e596c7d6a94e5f74579ef8d8912a807b0d28582474900ad35dfb3edfcf4" }
+".github/workflows/bosun.yml" = { class = "owned", sha256 = "3e0568f8fe2491cb0c5fd2c3fb04bec09f27f62f4f7f2440c0412ac26dc3c435" }
+".github/workflows/main-health.yml" = { class = "owned", sha256 = "0efb68171136117bcf1ae66c82c76f745b339bb77d1987bc2d2f49c72c45e2b2" }
+".github/workflows/main-open.yml" = { class = "owned", sha256 = "63bd190f14d6c15a8fe331ac93be24d266b60d91c1a430fc0c44478fbe7996c2" }
+".github/workflows/risk.yml" = { class = "owned", sha256 = "0af7419d58bcdc48f2e27c3d14da1ffb5496285d2cf2e01062228ae59d19a3f7" }
+".github/workflows/verdict.yml" = { class = "owned", sha256 = "961e39b8a72f7841bf23051ddf3b571bd45c5dae30a96f886b97b04e4573c4ab" }
+"docs/setup-script.sh" = { class = "owned", sha256 = "11046f623541a0768abc7341984855411804533e682a483b27c6b79827f62529" }
+
+[sections]
+"AGENTS.md" = { sha256 = "c787af226ede2bc6e259de9cc79a2eee914ace2ab55121660676a2b55b8c67c1", created = true }
+"CLAUDE.md" = { sha256 = "7e6f429b7d43647cf102e6d1ef31dc86d07aade5b9082264e037cfa0d84c52cc", created = false }
+"REVIEW.md" = { sha256 = "6530eb65cec997766d199b33182431e55582fc9dd5ead6f2b67a21942256892a", created = true }

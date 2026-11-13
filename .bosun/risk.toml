@@ -1,0 +1,42 @@
+# Risk rules (spec §8). risk-check reads this file from the PR's base branch, never from the
+# head, so a PR cannot change the rules that judge it. A rule only escalates. Add rules for the
+# paths of this project that need an owner (auth, payments, migrations, ...).
+
+[[rule]]
+id = "R-gov"
+why = "Governance files decide who approves what, and the rules agents and reviewers follow."
+paths = [".bosun/**", "governance/**", ".github/CODEOWNERS", ".claude/**", ".splice/**", "**/hoist.toml", "docs/setup-script.sh",
+  "REVIEW.md", "src/core/session_rules.rs", "src/core/session_rules/**", "src/hooks/session_rules.rs", "src/hooks/session_rules/**", ".claude-plugin/**", "docs/agents/**", "**/agents.md", "**/claude.md", "**/claude.local.md", "**/plans/**"]
+
+[[rule]]
+id = "R-ci"
+why = "CI decides what is verified."
+paths = [".github/workflows/**", ".github/actions/**", "**/action.yml", "**/action.yaml", ".circleci/**", ".gitlab-ci.yml", ".gitlab/ci/**", ".buildkite/**", "**/jenkinsfile", "azure-pipelines.y*ml", "bitbucket-pipelines.yml", ".travis.yml", ".drone.yml", ".npmrc"]
+
+[[rule]]
+id = "R-secrets"
+why = "A secret in the repo is a leak."
+paths = ["**/secrets.toml", "**/access.toml", "**/*.sops.*"]
+content = '(?i)(api[_-]?key|secret|token)\s*=|AGE-SECRET-KEY-1|SOPS_AGE_KEY\s*[:=]'
+
+[[rule]]
+id = "R-deps"
+why = "A new dependency adds code that nobody reviewed."
+# Package-source config redirects where every dependency comes from: Cargo [source] and
+# [registries], npm, pnpm and yarn registry and scope lines, and the hooks and binaries that
+# rewrite or resolve every package (.pnpmfile.cjs, bunfig.toml, .yarn plugins and releases).
+# Any change counts.
+paths = ["**/.cargo/config.toml", "**/.cargo/config", "**/.npmrc", "**/.yarnrc", "**/.yarnrc.yml", "**/.pnpmfile.cjs", "**/bunfig.toml", "**/.yarn/plugins/**", "**/.yarn/releases/**"]
+new_dependency = true
+
+[[rule]]
+id = "R-prod-write"
+why = "A write to production cannot be undone by a revert."
+capability = "prod-write"
+
+[[rule]]
+id = "R-weaken"
+why = "A change that loosens a gate weakens what verifies every later change."
+# risk-check adds the `weaken` capability when a base/head compare finds a loosened gate
+# (spec §8); its findings are the evidence.
+capability = "weaken"

@@ -1,0 +1,4 @@
+# Governance and CI need an owner review (spec §8, R-gov and R-ci). Code outside these paths
+# merges through auto-merge after the gates (spec D13).
+# Add `/.bosun/ @<login>` and the same for /governance/, /.github/, /.claude/, /.splice/,
+# /hoist.toml, /AGENTS.md, /REVIEW.md, /CLAUDE.md and the R-ci files in .bosun/risk.toml.

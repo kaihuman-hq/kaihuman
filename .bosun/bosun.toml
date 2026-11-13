@@ -1,0 +1,16 @@
+# bosun's project config (spec §3). Unknown keys are an error. The bosun channel merges its
+# changes to this file key by key; your own values stay.
+project = "kaihuman"
+
+[[stack]]
+path = "."
+profile = "ts-pnpm"
+
+[review]
+# "subagent" (mode a): a fresh subagent reviews each PR (spec §7).
+mode = "subagent"
+
+[mode]
+# booster (docs/quickstart.md in keelstackhq/bosun): steady plus fast-lane approval, auto spawn,
+# fixer sessions, budget asks and curator proposals. Knobs follow the mode; no overrides.
+name = "booster"

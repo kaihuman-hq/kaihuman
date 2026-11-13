@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-13 — bosun 0.14.0 onboarding, booster mode (draft)
+
+- Added `.bosun/` (pin `0.14.0`, `[mode] name = "booster"`), the bosun workflows, `governance/owners.toml`, `hoist.toml`, the splice channel record, and a bosun block in `AGENTS.md`, `REVIEW.md` and `CLAUDE.md`. `.claude/settings.json` hooks are an owner step. Draft until 0.14.0 is released.
+
 ## 2026-11-13 — CLI: import tests no longer share a temp file
 
 - The TickTick import tests ran in parallel and shared `kh-import-<pid>.csv`, so one could delete it while another read it (CI failure). Each call now writes its own file.
