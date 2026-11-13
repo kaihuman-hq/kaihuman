@@ -1770,7 +1770,10 @@ mod tests {
 
     /// The fixture on disk (the command reads a path) and the plan of importing it.
     async fn import_run(fake: &Fake, extra: &[&str]) -> ImportPlan {
-        let path = std::env::temp_dir().join(format!("kh-import-{}.csv", std::process::id()));
+        // Tests run in parallel in one process, so each call needs its own file.
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("kh-import-{}-{n}.csv", std::process::id()));
         std::fs::write(&path, TICKTICK).unwrap();
         let mut args = vec!["import", "ticktick", path.to_str().unwrap()];
         args.extend(extra);

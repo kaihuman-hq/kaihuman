@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-11-13 — CLI: import tests no longer share a temp file
+
+- The TickTick import tests ran in parallel and shared `kh-import-<pid>.csv`, so one could delete it while another read it (CI failure). Each call now writes its own file.
+
+## 2026-11-13 — Browser extension: StartPage test no longer crashes after teardown
+
+- CI failed at random with `ReferenceError: cancelAnimationFrame is not defined` from preact's `afterNextFrame` 35 ms timer firing after jsdom teardown. `StartPage.test.tsx` now waits 50 ms in `afterAll` so pending frames drain first.
+
+## 2026-11-13 — CLI one-line install and docs
+
+- `curl -fsSL https://kaihuman.com/install.sh | sh` (`apps/landing-page-nextgen/public/install.sh`): picks the release tarball for macOS arm64/x86_64 or Linux x86_64/arm64, verifies `SHA256SUMS`, installs to `~/.local/bin`. `scripts/test-install.sh` tests it against a fake release (part of `pnpm -r test` for the CLI).
+- Release workflow now also builds Linux arm64 and macOS x86_64 (cross-compiled) and attaches `SHA256SUMS`; `package.sh` takes `TARGET`. Needs a new `cli-v…` tag to take effect.
+- Website: new docs page `/docs/cli-quickstart/` (install, login, todo examples, agent skills, TickTick), linked from the nav pill and footer.
 ## 2026-11-13 — CI: console version bump moves into the pull request
 
 - `[PROD] Deploy Life OS` failed at "Commit Generated File": `github-actions[bot]` may not push to main (403). The deploy no longer bumps or commits anything; `build:prod` only writes `src/version.ts` (version, build time, commit) for the build. The `commitGeneratedFile` step and inputs are gone from `template-deploy-to-cloudflare.yaml`.
