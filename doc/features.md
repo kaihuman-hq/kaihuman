@@ -20,6 +20,8 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| System notifications for due todos (toggle on `/tasks`): each due todo notifies once, a click opens `/tasks`; fires only while the app or its service worker runs (no push server) | `/tasks`, `notification-sw.js` | 2026-11-13 |
+| Quick reschedule on every task row: Tomorrow, Day after tomorrow, Next Saturday, Next Monday, or a date picker | `/tasks` | 2026-11-13 |
 | Safe cross-device saves: a save that hits a newer remote version is three-way merged (todos, read-it-later and action logs item by item, other files line by line) or shown in the conflict dialog, never overwritten; unsaved edits survive a reload; the editor autosaves 3 s after the last keystroke and when the app is hidden | all file editing, `doc/sync-analysis.md` | 2026-11-05 |
 | Cross-device freshness: when the app comes back to the foreground, regains focus or goes online, and every 90 s while visible, it checks the branch head and refreshes open files (unsaved ones are merged); unsynced edits are kept on the device and replayed with backoff, shown as **UNSYNCED n** in the status bar; Kanban moves and renames are single atomic commits | all file views, status bar, `doc/sync-analysis.md` | 2026-11-05 |
 | Ideas overview: every `.kh/ideas/` idea as a card coloured by status, with a 12-week activity strip and a hot/warm/cool/dormant level; status chips, text, product and sort filters; inline log, challenge and status edits | `/ideas` (navbar **Ideas**) | 2026-10-13 |
@@ -140,6 +142,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Tasks view grouped by due (overdue, today, tomorrow, later) like the console board, with a due sheet offering Tomorrow, Day after tomorrow, Next Saturday, Next Monday or any date | `/tasks` (More menu) | 2026-11-13 |
 | Mobile business: More → Business dashboard (running timer, hours, needs attention, open invoices, clients by stage), client page (todo/log line, timer, log time, invoices, recent time, client files), log-time and record-payment sheets; offline writes through the outbox with `@kaihuman/formats/business` actions. Drafts, issuing, expenses, contracts, sharing and exports stay in the console | `apps/mobile/src/business/`, `apps/mobile/app/business/`, `apps/mobile/src/views/business-*.tsx` | 2026-11-11 |
 | Choose where new files go: quick capture (todo, note, log, knowledge) shows a "Saves to …" row that opens a folder picker (existing repo folders, type a new subfolder) and a file name (prefilled, slugified, extension enforced, collision check); the add-tile picker uses the same fields for every tile kind (todos, data collection, action log, board overview…). One tap still saves with the defaults; the last folder is remembered per kind | `apps/mobile/src/files/create-target.ts`, `src/views/create-target-row.tsx` | 2026-11-11 |
 | New file from the file browser: **New file** under the folder list opens a sheet with every creatable kind (Markdown note plus all tile kinds, same starters as the add-tile picker); the folder picker starts in the open folder, the name is checked against existing files (never overwrites) and the new file opens at once | `apps/mobile/src/views/new-file-sheet.tsx`, `src/screens/new-file.ts` | 2026-11-11 |

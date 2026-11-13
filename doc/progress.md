@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-13 — Due notifications, quick reschedule, mobile Tasks view
+
+- Console: opt-in system notifications for due todos (`lib/due-notifications.ts`, `DueNotifier.tsx`, `public/notification-sw.js`). Checked on load, on visibility change and on an interval; notified ids are persisted so each todo fires once. Without a push server they only fire while the app or service worker is alive.
+- Console `/tasks`: per-row reschedule menu (Tomorrow, Day after tomorrow, Next Saturday, Next Monday, date picker). "Next" weekday is strictly after today; an existing time of day is kept.
+- Date math and due-bucket grouping moved to `@kaihuman/formats` (`reschedule.ts`, `task-board.ts`) and shared with mobile.
+- Mobile: new Tasks view grouped by due bucket, reachable from More, with the same one-tap due options in the due sheet.
+- Investigated per-route favicons: feasible for the browser tab (swap `link[rel=icon]` on route change); the installed PWA icon is fixed by the manifest. Not implemented.
+
 ## 2026-11-13 — Dashboard no longer hangs after a CLI todo import
 
 - `kaihuman todo import` in a repo without `.kh/` wrote `.lifeos/`, so the console ran its `.lifeos` → `.kh` migration. `renameFolder` read the branch head through GitHub's 60 s HTTP cache; right after the CLI commit that head was stale, the ref update was a non-fast-forward, and the rejected migration left `/` on "Loading Dashboard Configuration..." for good.
