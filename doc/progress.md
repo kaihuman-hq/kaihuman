@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-13 — Browser extension: StartPage test no longer crashes after teardown
+
+- CI failed at random with `ReferenceError: cancelAnimationFrame is not defined` from preact's `afterNextFrame` 35 ms timer firing after jsdom teardown. `StartPage.test.tsx` now waits 50 ms in `afterAll` so pending frames drain first.
+
 ## 2026-11-12 — `kaihuman todo import ticktick`
 
 - `kaihuman todo import ticktick <csv> [--apply] [--include-done]`: parses a TickTick backup CSV (preamble lines, multi-line fields, `Is All Day`/`Timezone` aware dates) in `todos_ticktick.rs` and plans it per target file; `--apply` reuses `add_todos` (one commit per file). Ids hash the TickTick task id, so reruns add nothing. Unsupported repeat rules get `#repeat-unmapped` and a note. Adds the `csv` and `chrono-tz` crates. kh-todos skill, CLI docs and `cmdspec.yaml` updated.

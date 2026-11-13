@@ -1,6 +1,6 @@
 import { PALETTE_HOST_ID } from '@kaihuman/palette';
 import { render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
 import type { ServiceStatus } from '../background/service-status';
 import type { TodaySummary } from '../background/today';
@@ -264,6 +264,10 @@ afterEach(() => {
   render(null, host);
   host.remove();
 });
+
+// preact's afterNextFrame arms a 35 ms timer that calls cancelAnimationFrame; if it fires after
+// vitest tears jsdom down, that global is gone and the run fails with an unhandled error.
+afterAll(() => new Promise((resolve) => setTimeout(resolve, 50)));
 
 describe('StartPage', () => {
   it('asks for a login when there is no token', async () => {
