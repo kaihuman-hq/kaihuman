@@ -17,6 +17,7 @@ export default defineConfig({
       },
       workbox: {
         skipWaiting: true,
+        importScripts: ['notification-sw.js'],
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB

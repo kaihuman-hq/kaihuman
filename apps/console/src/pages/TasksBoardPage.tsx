@@ -38,6 +38,7 @@ import {
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { DueNotifyToggle } from '../components/DueNotifier';
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 
@@ -296,6 +297,7 @@ export const TasksBoardPage = () => {
               <Menu size={18} />
             </button>
             <h1 class="flex-1 truncate text-lg font-semibold">{title}</h1>
+            <DueNotifyToggle />
             <button
               type="button"
               onClick={() => setSort(sort === 'due' ? 'list' : 'due')}
