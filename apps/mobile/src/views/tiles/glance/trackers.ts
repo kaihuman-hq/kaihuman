@@ -1,12 +1,12 @@
 import { localDate, parseHabitData } from '@kaihuman/formats';
 import {
   addBudgetTransaction,
-  addCollectionEntry,
   BUDGET_CATEGORIES,
   type BudgetView,
   type ConsumptionView,
   clockIn,
   clockOut,
+  collectionDetail,
   type DataCollectionView,
   formatElapsed,
   formatReading,
@@ -232,13 +232,14 @@ export function collectionGlance(input: GlanceInput, view: DataCollectionView): 
   // A sum/avg column is the figure the file exists for, so it beats the first typed column.
   const series = view.series.find((s) => s.aggregate) ?? view.series[0];
   const base = { title, icon: 'table' as const, tint: 'olive' as const };
-  if (!series) return { ...base, hero: '--', label: `${view.rowCount} rows` };
-  const typed =
-    view.series.find((s) => !s.aggregate)?.column ??
-    view.columns.find((c) => c.type === 'number')?.name;
+  // The full form (every input column) is the one way in: a one-field sheet could not fill a
+  // multi-column record, and an empty file (no series yet) still needs a way to add its first row.
+  const action = collectionDetail(input.content, input.now, 'ALL').inputColumns.length
+    ? ({ kind: 'open', icon: 'add', label: `Add ${title}`, href: addHref(input.path) } as const)
+    : undefined;
+  if (!series) return { ...base, hero: '--', label: `${view.rowCount} rows`, action };
   const window = series.points.slice(-30).map((p) => p.y);
   const change = (window.at(-1) ?? 0) - (window[0] ?? 0);
-  const dateCol = view.columns.find((c) => c.type === 'date');
   return {
     ...base,
     hero: num(series.latest),
@@ -255,24 +256,7 @@ export function collectionGlance(input: GlanceInput, view: DataCollectionView): 
         : undefined,
     viz:
       window.length > 1 ? { kind: 'spark', values: window, tone: 'accent', fill: true } : undefined,
-    ...(typed && {
-      action: {
-        kind: 'field',
-        icon: 'add',
-        label: `Add ${title}`,
-        placeholder: typed,
-        keyboard: 'decimal-pad',
-        submit: (content, value, now) =>
-          addCollectionEntry(
-            content,
-            {
-              ...(dateCol ? { [dateCol.name]: localDate(now) } : {}),
-              [typed]: value,
-            },
-            now,
-          ),
-      },
-    }),
+    action,
   };
 }
 

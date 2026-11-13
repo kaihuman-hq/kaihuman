@@ -7,6 +7,7 @@
 - Date math and due-bucket grouping moved to `@kaihuman/formats` (`reschedule.ts`, `task-board.ts`) and shared with mobile.
 - Mobile: new Tasks view grouped by due bucket, with the same one-tap due options in the due sheet. Tasks replaces Ideas in the bottom bar (Today · Board · ＋ · Tasks · More); Ideas moved to More and `/ideas` links still resolve.
 - Investigated per-route favicons: feasible for the browser tab (swap `link[rel=icon]` on route change); the installed PWA icon is fixed by the manifest. Not implemented.
+- Mobile: the data-collection tile's ＋ now opens the full add form (`addHref`, all input columns) instead of the one-field quick-entry sheet, and an empty collection gets a ＋ too (it had none, so the first record could not be added).
 
 ## 2026-11-13 — Dashboard no longer hangs after a CLI todo import
 

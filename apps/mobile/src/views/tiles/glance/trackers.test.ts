@@ -8,6 +8,7 @@ import {
   stocksView,
   timerView,
 } from '../../../components/widgets/tile-controllers.js';
+import { addHref } from './lists.js';
 import {
   budgetGlance,
   collectionGlance,
@@ -205,12 +206,8 @@ describe('collectionGlance', () => {
     expect(g.viz).toEqual({ kind: 'spark', values: [80, 79.5, 79.2], tone: 'accent', fill: true });
   });
 
-  it('adds an entry dated today', () => {
-    const f = field(g);
-    expect(f.placeholder).toBe('Weight');
-    const r = f.submit(csv, '78.9', now);
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.content.endsWith('\n2026-11-05;78.9')).toBe(true);
+  it('＋ opens the full add form, not the one-field sheet', () => {
+    expect(open(g).href).toBe(addHref('weight.data-collection.csv'));
   });
 
   it('regression: a sum column is the hero, input stays a typed column', () => {
@@ -222,8 +219,7 @@ describe('collectionGlance', () => {
     const g = collectionGlance(input('s.data-collection.csv', sum), dataCollectionView(sum));
     expect(g).toMatchObject({ hero: '9', label: 'sum · 2 rows' });
     expect(g.viz).toMatchObject({ values: [3, 9] });
-    const f = field(g);
-    expect(f.placeholder).toBe('A');
+    expect(open(g).href).toBe(addHref('s.data-collection.csv'));
   });
 
   it('an avg column wins too; blank cells are skipped, not 0', () => {
@@ -248,6 +244,10 @@ describe('collectionGlance', () => {
       hero: '--',
       label: '0 rows',
     });
+    // Regression: an empty collection still needs a ＋ to add its first record.
+    expect(
+      collectionGlance(input('w.data-collection.csv', e), dataCollectionView(e)).action,
+    ).toMatchObject({ kind: 'open', href: addHref('w.data-collection.csv') });
   });
 });
 
