@@ -69,7 +69,7 @@ describe('expo-router route files', () => {
     // A hidden (tabs)/search would win `/search` and be redirected away (route-resolution.test.ts).
     expect(existsSync(`${appDir}(tabs)/search`)).toBe(false);
     expect(readFileSync(`${appDir}(tabs)/_layout.tsx`, 'utf8')).not.toContain('name="search"');
-    for (const tab of ['dashboard', 'board', 'capture', 'ideas', 'more']) {
+    for (const tab of ['dashboard', 'board', 'capture', 'tasks', 'ideas', 'more']) {
       expect(readFileSync(`${appDir}(tabs)/${tab}/_layout.tsx`, 'utf8')).toContain('<SearchButton');
     }
   });

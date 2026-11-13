@@ -12,6 +12,7 @@ export * from './merge.js';
 export * from './palette-settings.js';
 export * from './prompts.js';
 export * from './read-later.js';
+export * from './reschedule.js';
 export * from './rss.js';
 export * from './streams.js';
 export * from './task-board.js';

@@ -39,7 +39,9 @@ export default function TabsLayout() {
         <Tabs.Screen name="board" options={{ title: 'Board' }} />
         {/* Kept as a route so /capture links still resolve; the ＋ menu replaced its tab. */}
         <Tabs.Screen name="capture" options={{ title: 'Capture', href: null }} />
-        <Tabs.Screen name="ideas" options={{ title: 'Ideas' }} />
+        <Tabs.Screen name="tasks" options={{ title: 'Tasks' }} />
+        {/* Kept as a route so /ideas links still resolve; More lists it since Tasks took its tab. */}
+        <Tabs.Screen name="ideas" options={{ title: 'Ideas', href: null }} />
         <Tabs.Screen name="more" options={{ title: 'More' }} />
       </Tabs>
       <QuickMenu

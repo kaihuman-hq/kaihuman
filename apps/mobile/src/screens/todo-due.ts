@@ -6,6 +6,8 @@ import {
   MAX_REPEAT_INTERVAL,
   nextDue,
   parseDue,
+  RESCHEDULE_OPTIONS,
+  rescheduleDate,
   setTodoDue,
   setTodoRepeat,
   type TodoData,
@@ -24,6 +26,30 @@ export const DUE_PRESETS: readonly { preset: DuePreset; label: string }[] = [
   { preset: 'next-saturday', label: 'Next Saturday' },
   { preset: 'next-monday', label: 'Next Monday' },
 ];
+
+/** A quick-due menu entry; `due` is computed at tap time from the injected clock. */
+export interface DueChoice {
+  id: string;
+  label: string;
+  due: (now: Date) => TodoDue;
+}
+
+export const DUE_CHOICES: readonly DueChoice[] = DUE_PRESETS.map(({ preset, label }) => ({
+  id: preset,
+  label,
+  due: (now) => dueFromPreset(preset, now),
+}));
+
+/**
+ * Tasks-board reschedule menu: Tomorrow, Day after tomorrow, Next Saturday, Next Monday. The date
+ * math is shared with the console; `time` carries the todo's time of day over when it has one.
+ */
+export const rescheduleChoices = (time?: string): readonly DueChoice[] =>
+  RESCHEDULE_OPTIONS.map(({ id, label }) => ({
+    id,
+    label,
+    due: (now) => ({ date: rescheduleDate(id, now.getTime()), ...(time && { time }) }),
+  }));
 
 export interface DueBadge {
   label: string;

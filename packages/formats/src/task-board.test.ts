@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  groupTaskRows,
   sortTaskRows,
   type TaskList,
   type TaskRow,
   taskBoardCounts,
+  taskBucket,
   taskDueLabel,
   taskListName,
   taskRows,
@@ -102,5 +104,23 @@ describe('taskListName / taskDueLabel', () => {
       'Nov 20 09:30',
     );
     expect(taskDueLabel(todo('a'), NOW)).toBeUndefined();
+  });
+});
+
+describe('taskBucket / groupTaskRows', () => {
+  it('buckets by local date, ignoring time of day', () => {
+    expect(taskBucket(todo('a', { dueDate: '2026-11-11' }), NOW)).toBe('overdue');
+    expect(taskBucket(todo('b', { dueDate: '2026-11-12', dueTime: '01:00' }), NOW)).toBe('today');
+    expect(taskBucket(todo('c', { dueDate: '2026-11-13' }), NOW)).toBe('tomorrow');
+    expect(taskBucket(todo('d', { dueDate: '2026-11-14' }), NOW)).toBe('later');
+    expect(taskBucket(todo('e'), NOW)).toBe('none');
+  });
+
+  it('groups in display order, skips empty buckets, keeps row order', () => {
+    const rows = taskRows([inbox], { kind: 'list', path: INBOX }, INBOX, NOW);
+    const groups = groupTaskRows(rows, NOW);
+    expect(groups.map((g) => g.label)).toEqual(['Overdue', 'Today', 'No date']);
+    expect(groups[2]?.rows.map((r) => r.item.id)).toEqual(['undated']);
+    expect(groupTaskRows([], NOW)).toEqual([]);
   });
 });
