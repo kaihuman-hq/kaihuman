@@ -10,6 +10,6 @@
     "lint": "cargo fmt --check && cargo clippy",
     "format": "cargo fmt",
     "fix": "cargo fmt",
-    "test": "cargo test"
+    "test": "cargo test && sh scripts/test-install.sh"
   }
 }

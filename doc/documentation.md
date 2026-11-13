@@ -1,5 +1,7 @@
 # CLI Documentation
 
+Install a prebuilt binary: `curl -fsSL https://kaihuman.com/install.sh | sh` (macOS, Linux; checksum-verified, goes to `~/.local/bin`).
+
 ## Installation
 
 ```sh

@@ -1,6 +1,7 @@
 name: "Release CLI and Desktop Palette"
 
-# A tag `cli-v<version>` builds the `kaihuman` CLI for Linux x86_64 and macOS (Apple silicon); a
+# A tag `cli-v<version>` builds the `kaihuman` CLI for Linux x86_64 and arm64 and macOS (Apple
+# silicon and Intel; the Intel build is cross-compiled on the arm runner); a
 # tag `desktop-v<version>` builds the desktop palette for Linux x86_64. The version must be the one
 # in the app's Cargo.toml. The tarballs are attached to a GitHub release for the tag.
 #
@@ -20,7 +21,11 @@ jobs:
     if: startsWith(github.ref_name, 'cli-v')
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-14]
+        include:
+          - { os: ubuntu-22.04, name: linux-x86_64 }
+          - { os: ubuntu-22.04-arm, name: linux-aarch64 }
+          - { os: macos-14, name: darwin-arm64 }
+          - { os: macos-14, name: darwin-x86_64, target: x86_64-apple-darwin }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -39,19 +44,27 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
+      - name: Add the cross-compile target
+        if: matrix.target
+        run: rustup target add ${{ matrix.target }}
+
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: apps/cli
+          key: ${{ matrix.name }}
 
       - name: Test
+        if: "!matrix.target"
         run: cargo test
 
       - name: Build and package
-        run: cargo build --release && sh scripts/package.sh
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo build --release ${TARGET:+--target "$TARGET"} && sh scripts/package.sh
 
       - uses: actions/upload-artifact@v4
         with:
-          name: cli-${{ matrix.os }}
+          name: cli-${{ matrix.name }}
           path: apps/cli/release/*.tar.gz
           if-no-files-found: error
 
@@ -121,8 +134,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          # install.sh verifies downloads against this file.
+          (cd dist && sha256sum -- *.tar.gz > SHA256SUMS)
           case "$TAG" in
-            cli-v*) title="CLI ${TAG#cli-v}"; notes="The kaihuman terminal app. Unpack, then put kaihuman on your PATH." ;;
+            cli-v*) title="CLI ${TAG#cli-v}"; notes="The kaihuman CLI. Install: curl -fsSL https://kaihuman.com/install.sh | sh" ;;
             desktop-v*) title="Desktop palette ${TAG#desktop-v}"; notes="Linux (Wayland) desktop palette. Unpack and run ./install.sh." ;;
           esac
-          gh release create "$TAG" dist/*.tar.gz --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
+          gh release create "$TAG" dist/*.tar.gz dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
