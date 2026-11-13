@@ -144,3 +144,35 @@ export const taskDueLabel = (item: TodoItem, now = Date.now()): string | undefin
   if (!item.dueTime) return day;
   return day === 'Today' ? item.dueTime : `${day} ${item.dueTime}`;
 };
+
+export type TaskBucket = 'overdue' | 'today' | 'tomorrow' | 'later' | 'none';
+
+export const TASK_BUCKET_LABELS: Record<TaskBucket, string> = {
+  overdue: 'Overdue',
+  today: 'Today',
+  tomorrow: 'Tomorrow',
+  later: 'Later',
+  none: 'No date',
+};
+
+const BUCKET_ORDER: readonly TaskBucket[] = ['overdue', 'today', 'tomorrow', 'later', 'none'];
+
+/** The due bucket of an item: by local calendar date, so a time of day never changes it. */
+export const taskBucket = (item: TodoItem, now = Date.now()): TaskBucket => {
+  if (!item.dueDate) return 'none';
+  const today = localDateString(now);
+  if (item.dueDate < today) return 'overdue';
+  if (item.dueDate === today) return 'today';
+  return item.dueDate === addDays(today, 1) ? 'tomorrow' : 'later';
+};
+
+/** Rows split into due buckets in display order; empty buckets are left out, row order is kept. */
+export const groupTaskRows = (
+  rows: TaskRow[],
+  now = Date.now(),
+): { bucket: TaskBucket; label: string; rows: TaskRow[] }[] =>
+  BUCKET_ORDER.map((bucket) => ({
+    bucket,
+    label: TASK_BUCKET_LABELS[bucket],
+    rows: rows.filter((r) => taskBucket(r.item, now) === bucket),
+  })).filter((g) => g.rows.length > 0);

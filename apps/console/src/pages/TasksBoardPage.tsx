@@ -5,6 +5,8 @@ import {
   dueStatus,
   inboxPathFor,
   parseTodos,
+  RESCHEDULE_OPTIONS,
+  rescheduleDate,
   serializeTodos,
   setStatus,
   setTodoDue,
@@ -20,6 +22,7 @@ import {
   taskDueLabel,
   taskListName,
   taskRows,
+  withDate,
 } from '@kaihuman/formats';
 import { StatusBar } from '@kaihuman/ui';
 import {
@@ -40,7 +43,6 @@ import {
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { RESCHEDULE_OPTIONS, rescheduleDate, withDate } from '../lib/reschedule';
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 

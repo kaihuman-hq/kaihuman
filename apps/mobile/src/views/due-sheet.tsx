@@ -1,7 +1,7 @@
 import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import { useState } from 'react';
 import { Modal, Pressable } from 'react-native';
-import { DUE_PRESETS, dueFromPreset, retargetRepeat } from '../screens/todo-due.js';
+import { DUE_CHOICES, type DueChoice, retargetRepeat } from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, Text } from '../ui/index.js';
 import { DueEditor } from './due-editor.js';
@@ -17,6 +17,7 @@ export function DueSheet({
   onSelect,
   onClose,
   now = new Date(),
+  presets = DUE_CHOICES,
 }: {
   title: string;
   current: TodoDue | undefined;
@@ -28,6 +29,8 @@ export function DueSheet({
   onSelect: (due: TodoDue | undefined, repeat?: TodoRepeat | null) => void;
   onClose: () => void;
   now?: Date;
+  /** Quick choices in menu order; the board's presets by default. */
+  presets?: readonly DueChoice[];
 }) {
   const { colors, spacing, shape } = useTheme();
   const [draft, setDraft] = useState<TodoDue | undefined>(current);
@@ -78,14 +81,14 @@ export function DueSheet({
             </>
           ) : (
             <>
-              {DUE_PRESETS.map(({ preset, label }) => (
+              {presets.map(({ id, label, due }) => (
                 <Button
-                  key={preset}
+                  key={id}
                   label={label}
-                  testID={`due-${preset}`}
+                  testID={`due-${id}`}
                   variant="tinted"
                   fullWidth
-                  onPress={() => onSelect(dueFromPreset(preset, now))}
+                  onPress={() => onSelect(due(now))}
                 />
               ))}
               <Button
