@@ -4,11 +4,12 @@ import { AppTabBar, type AppTabBarProps } from './app-tab-bar.js';
 
 afterEach(cleanup);
 
-const names = ['dashboard', 'board', 'capture', 'ideas', 'more'];
+const names = ['dashboard', 'board', 'capture', 'tasks', 'ideas', 'more'];
 const titles: Record<string, string> = {
   dashboard: 'Today',
   board: 'Board',
   capture: 'Capture',
+  tasks: 'Tasks',
   ideas: 'Ideas',
   more: 'More',
 };
@@ -41,7 +42,7 @@ const longPress = (el: HTMLElement) => {
 };
 
 describe('AppTabBar', () => {
-  it('shows Today · Board · ＋ · Ideas · More and hides the capture route', () => {
+  it('shows Today · Board · ＋ · Tasks · More and hides the capture and ideas routes', () => {
     renderBar();
     const slots = screen
       .getByRole('tablist')
@@ -50,17 +51,18 @@ describe('AppTabBar', () => {
       'tab-dashboard',
       'tab-board',
       'tab-plus',
-      'tab-ideas',
+      'tab-tasks',
       'tab-more',
     ]);
     expect(screen.queryByText('Capture')).toBeNull();
+    expect(screen.queryByText('Ideas')).toBeNull();
   });
 
   it('navigates to a tab and closes an open menu first', () => {
     const p = renderBar({ menuOpen: true });
-    fireEvent.click(screen.getByTestId('tab-ideas'));
+    fireEvent.click(screen.getByTestId('tab-tasks'));
     expect(p.onCloseMenu).toHaveBeenCalledOnce();
-    expect(p.navigateToTab).toHaveBeenCalledWith('ideas-k');
+    expect(p.navigateToTab).toHaveBeenCalledWith('tasks-k');
   });
 
   it('opens the quick menu on tap and reads as a close control while open', () => {

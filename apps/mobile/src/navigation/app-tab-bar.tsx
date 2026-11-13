@@ -4,14 +4,14 @@ import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reani
 import { type DesignPlatform, type Palette, useTheme } from '../theme/theme.js';
 import { haptics, Icon, type IconName, Text } from '../ui/index.js';
 
-/** Tabs left and right of the raised ＋ (docs/redesign decision 6). `capture` stays a hidden route for /capture links. */
+/** Tabs left and right of the raised ＋ (docs/redesign decision 6). `capture` and `ideas` stay hidden routes so their links resolve. */
 const LEFT = ['dashboard', 'board'] as const;
-const RIGHT = ['ideas', 'more'] as const;
+const RIGHT = ['tasks', 'more'] as const;
 
 const ICONS: Record<(typeof LEFT)[number] | (typeof RIGHT)[number], IconName> = {
   dashboard: 'home',
   board: 'board',
-  ideas: 'ideas',
+  tasks: 'checkbox',
   more: 'more',
 };
 
@@ -49,7 +49,7 @@ export interface AppTabBarProps extends BottomTabBarProps {
 }
 
 /**
- * The app's tab bar on every platform: Today · Board · ＋ · Ideas · More, drawn as a UITabBar on iOS
+ * The app's tab bar on every platform: Today · Board · ＋ · Tasks · More, drawn as a UITabBar on iOS
  * and an M3 NavigationBar on Android. `NativeTabs` cannot raise a centre button or report a long-press.
  */
 export function AppTabBar({
