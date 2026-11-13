@@ -51,6 +51,26 @@ export type SyncOutcome = 'skipped' | 'unchanged' | 'synced';
 
 type Db = Awaited<typeof dbPromise>;
 
+/**
+ * A tree load that waits longer than this on GitHub or the local cache gives up with an error.
+ * `fetch` has no timeout of its own, so a request that never answers left the dashboard spinning
+ * without a log line.
+ */
+export const LOAD_TREE_TIMEOUT_MS = 30_000;
+
+class TimeoutError extends Error {}
+
+const withTimeout = <T>(work: Promise<T>, what: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new TimeoutError(`${what} timed out after ${LOAD_TREE_TIMEOUT_MS / 1000} s`)),
+      LOAD_TREE_TIMEOUT_MS,
+    );
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+};
+
 const RETRY_MIN_MS = 2000;
 const RETRY_MAX_MS = 5 * 60_000;
 
@@ -705,8 +725,15 @@ export class GithubFileStore {
       const db = await dbPromise;
       let cachedTree: TreeItem[] = [];
 
-      // 1. Try to load from DB first
-      const dbTree = await db.get('trees', `tree:${repo.full_name} `);
+      // 1. Try to load from DB first. A stuck cache read is skipped: the network copy follows.
+      const dbTree = await withTimeout(
+        db.get('trees', `tree:${repo.full_name} `),
+        'Reading the cached file list',
+      ).catch((e) => {
+        if (!(e instanceof TimeoutError)) throw e;
+        logger.warn(e.message);
+        return undefined;
+      });
       if (dbTree) {
         cachedTree = dbTree;
         // If we have no in-memory tree, use cache immediately
@@ -717,15 +744,19 @@ export class GithubFileStore {
 
       // 2. Fetch fresh from network. Reading the head first and listing that exact commit avoids
       // a lagging listing, and records the head so syncNow can tell when nothing changed.
-      const head = await githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch);
-      const fetchedTree = (await githubService.fetchRepoTree(
-        repo.owner.login,
-        repo.name,
-        repo.default_branch,
-        { commitSha: head },
+      const head = await withTimeout(
+        githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch),
+        'Reading the branch from GitHub',
+      );
+      const fetchedTree = (await withTimeout(
+        githubService.fetchRepoTree(repo.owner.login, repo.name, repo.default_branch, {
+          commitSha: head,
+        }),
+        'Loading the file list from GitHub',
       )) as TreeItem[];
       await this.mergeRemoteTree(repo, fetchedTree, cachedTree, db);
       this.lastHead = { repo: repo.full_name, sha: head };
+      logger.info(`Tree loaded: ${fetchedTree.length} entries`);
     } catch (err: any) {
       logger.error('Failed to load tree', err);
       // Fallback to cache if request fails
