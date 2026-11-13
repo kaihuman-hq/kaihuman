@@ -6,7 +6,10 @@ export default function TasksLayout() {
   const options = useTabRootOptions();
   return (
     <Stack screenOptions={options}>
-      <Stack.Screen name="index" options={{ title: 'Tasks', headerRight: () => <SearchButton /> }} />
+      <Stack.Screen
+        name="index"
+        options={{ title: 'Tasks', headerRight: () => <SearchButton /> }}
+      />
     </Stack>
   );
 }
