@@ -96,6 +96,40 @@ describe('TasksBoardPage', () => {
     expect(store.saveFile).toHaveBeenCalledWith(INBOX);
   });
 
+  it('reschedules a task from the quick menu, keeping its time of day', () => {
+    const open = (label: string) =>
+      act(() => (host.querySelector(`[aria-label="Reschedule ${label}"]`) as HTMLElement).click());
+    open('Standup');
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
+    expect(items).toEqual(['Tomorrow', 'Day after tomorrow', 'Next Saturday', 'Next Monday']);
+    act(() => (host.querySelectorAll('[role="menuitem"]')[2] as HTMLElement).click());
+    expect(store.updateFileContent).toHaveBeenCalledWith(
+      WORK,
+      expect.stringContaining('::due:: 2026-11-14T15:00'),
+    );
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('reschedules to a custom date, date only when no time, and closes on Escape', () => {
+    const btn = host.querySelector('[aria-label^="Reschedule Read"]') as HTMLElement;
+    act(() => btn.click());
+    const date = host.querySelector('input[type="date"]') as HTMLInputElement;
+    act(() => {
+      date.value = '2026-12-25';
+      date.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(store.updateFileContent).toHaveBeenCalledWith(
+      INBOX,
+      expect.stringContaining('::due:: 2026-12-25\n'),
+    );
+    act(() => btn.click());
+    expect(host.querySelector('[role="menu"]')).toBeTruthy();
+    act(() => {
+      btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+  });
+
   it('switches to a list and adds tasks to it', () => {
     act(() => button('work')?.click());
     expect(host.querySelector('h1')?.textContent).toBe('work');

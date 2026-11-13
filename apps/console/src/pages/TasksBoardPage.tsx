@@ -7,6 +7,7 @@ import {
   parseTodos,
   serializeTodos,
   setStatus,
+  setTodoDue,
   sortTaskRows,
   TASK_SMART_LABELS,
   type TaskBoardView,
@@ -24,6 +25,7 @@ import { StatusBar } from '@kaihuman/ui';
 import {
   ArrowLeft,
   ArrowUpDown,
+  CalendarClock,
   CalendarDays,
   CheckSquare,
   Clock,
@@ -39,6 +41,7 @@ import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { DueNotifyToggle } from '../components/DueNotifier';
+import { RESCHEDULE_OPTIONS, rescheduleDate, withDate } from '../lib/reschedule';
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 
@@ -78,6 +81,79 @@ const SMART_ICONS: Record<TaskSmartView, typeof Sun> = {
   week: CalendarDays,
   inbox: Inbox,
   completed: CheckSquare,
+};
+
+const RescheduleMenu = ({
+  title,
+  now,
+  onPick,
+}: {
+  title: string;
+  now: number;
+  onPick: (date: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const pick = (date: string) => {
+    setOpen(false);
+    onPick(date);
+  };
+  const itemClass = 'block w-full text-left px-3 py-1.5 hover:bg-[var(--los-border)]';
+  return (
+    <fieldset
+      class="relative flex m-0 p-0 border-0 min-w-0"
+      onFocusOut={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation();
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        type="button"
+        aria-label={`Reschedule ${title}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        class="flex text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+      >
+        <CalendarClock size={14} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Reschedule"
+          class="absolute right-0 top-6 z-30 min-w-44 py-1 rounded border border-[var(--los-border)] bg-[var(--los-bg)] shadow-lg text-sm text-[var(--los-fg)]"
+        >
+          {RESCHEDULE_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="menuitem"
+              class={itemClass}
+              onClick={() => pick(rescheduleDate(o.id, now))}
+            >
+              {o.label}
+            </button>
+          ))}
+          <label class="flex items-center gap-2 px-3 py-1.5 border-t border-[var(--los-border)]">
+            <span class="text-xs text-[var(--los-muted)]">Pick date</span>
+            <input
+              type="date"
+              aria-label="Custom due date"
+              class="flex-1 min-w-0 bg-transparent text-xs"
+              onChange={(e) => {
+                const v = (e.target as HTMLInputElement).value;
+                if (v) pick(v);
+              }}
+            />
+          </label>
+        </div>
+      )}
+    </fieldset>
+  );
 };
 
 const NavRow = ({
@@ -191,6 +267,13 @@ export const TasksBoardPage = () => {
     if (index < 0) return;
     const next = done ? setStatus(data, index, 'backlog') : completeTodo(data, id);
     write(path, serializeTodos(next));
+  };
+
+  const reschedule = (path: string, id: string, date: string) => {
+    const data = parseTodos(openFiles[path]?.content ?? '');
+    const item = data.items.find((it) => it.id === id);
+    if (!item) return;
+    write(path, serializeTodos(setTodoDue(data, id, withDate(item, date))));
   };
 
   const add = (e: Event) => {
@@ -399,6 +482,13 @@ export const TasksBoardPage = () => {
                         </>
                       )}
                     </span>
+                    {!done && (
+                      <RescheduleMenu
+                        title={item.text}
+                        now={now}
+                        onPick={(date) => reschedule(list.path, item.id, date)}
+                      />
+                    )}
                   </li>
                 );
               })}
