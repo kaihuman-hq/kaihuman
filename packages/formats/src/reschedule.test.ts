@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RESCHEDULE_OPTIONS, rescheduleDate, rescheduleDue, withDate } from './reschedule';
+import { RESCHEDULE_OPTIONS, rescheduleDate, rescheduleDue, withDate } from './reschedule.js';
 
 const at = (s: string) => new Date(`${s}T12:00:00`).getTime();
 

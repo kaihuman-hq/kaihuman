@@ -1,4 +1,4 @@
-import type { TodoDue, TodoItem } from '@kaihuman/formats';
+import type { TodoDue, TodoItem } from './todos.js';
 
 export type RescheduleOption = 'tomorrow' | 'day-after' | 'saturday' | 'monday';
 

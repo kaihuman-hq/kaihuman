@@ -23,12 +23,14 @@ import {
   sortByNewest,
   sortStreams,
   streamItems,
+  type TaskList,
   type TodoColor,
   type TodoData,
   type TodoDue,
   type TodoItem,
   type TodoRepeat,
   type TodoStatus,
+  taskListName,
   updateMilestone,
   updateTodoText,
 } from '@kaihuman/formats';
@@ -170,6 +172,21 @@ export class KanbanBoardController {
 
   get milestones(): Milestone[] {
     return mergeMilestones(this.loaded);
+  }
+
+  /** Loaded files as Tasks-board lists; `items` is the file's own array, so indexes address writes. */
+  taskLists(): TaskList[] {
+    const inbox = `${this.files.appFolder()}/inbox.todos.md`;
+    return this.loaded.map(({ path, data }) => ({
+      path,
+      name: taskListName(path, inbox),
+      ...(data.color && { color: data.color }),
+      items: data.items,
+    }));
+  }
+
+  get inboxPath(): string {
+    return `${this.files.appFolder()}/inbox.todos.md`;
   }
 
   /** Every tag in use, for the filter chips. */

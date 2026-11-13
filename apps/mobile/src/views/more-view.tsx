@@ -15,6 +15,13 @@ interface WorkspaceLink {
 // rows, Files blue as its folders.
 const WORKSPACE: readonly WorkspaceLink[] = [
   {
+    href: '/tasks',
+    title: 'Tasks',
+    subtitle: 'By due date, quick reschedule',
+    icon: 'check',
+    tone: 'accent',
+  },
+  {
     href: '/analytics',
     title: 'Analytics',
     subtitle: 'Todo velocity and totals',

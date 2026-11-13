@@ -83,6 +83,7 @@ describe('expo-router route files', () => {
     const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
     for (const name of [
       'analytics',
+      'tasks',
       'search',
       'wiki/index',
       'wiki/[...page]',
