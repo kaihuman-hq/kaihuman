@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-13 — CLI: import tests no longer share a temp file
+
+- The TickTick import tests ran in parallel and shared `kh-import-<pid>.csv`, so one could delete it while another read it (CI failure). Each call now writes its own file.
+
 ## 2026-11-13 — Browser extension: StartPage test no longer crashes after teardown
 
 - CI failed at random with `ReferenceError: cancelAnimationFrame is not defined` from preact's `afterNextFrame` 35 ms timer firing after jsdom teardown. `StartPage.test.tsx` now waits 50 ms in `afterAll` so pending frames drain first.
