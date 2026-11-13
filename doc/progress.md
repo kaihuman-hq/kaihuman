@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-13 — CI: console deploy can push its version commit again
+
+- `[PROD] Deploy Life OS` failed at "Commit Generated File" with `Permission … denied to github-actions[bot]` (403). Since #161 the shared `template-deploy-to-cloudflare.yaml` job set `permissions: contents: read`, which overrode the caller's `contents: write`. The job-level block is gone, so each caller's permissions apply: write for the console deploy, read for the landing page.
+
 ## 2026-11-13 — CI: console deploys when its workspace packages change
 
 - `[PROD] Deploy Life OS` ran only for `apps/console/**`. A change to `packages/ui`, `core`, `formats` or `config`, which the console bundles, never reached the live site; the stream tile order fix (in `packages/ui`) would not have deployed. Those packages, the lockfile and both deploy workflow files now trigger it too.

@@ -34,8 +34,9 @@ on:
 jobs:
   deploy-to-cloudflare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    # No job-level permissions: the job inherits the caller's. Deploy Life OS grants
+    # contents: write so it can push the generated version commit; Deploy Landing Page
+    # grants read only. A job-level `contents: read` here made that push fail with 403.
 
     steps:
       - name: Checkout
