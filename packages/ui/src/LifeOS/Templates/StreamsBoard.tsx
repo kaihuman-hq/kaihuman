@@ -1,5 +1,6 @@
 import {
   actionsFor,
+  keepOrder,
   type StreamFile,
   type StreamMode,
   type StreamSort,
@@ -9,7 +10,7 @@ import {
   type TodoStatus,
 } from '@kaihuman/formats';
 import { CheckCircle2, Circle, PlayCircle, XCircle } from 'lucide-preact';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
 import { fileLabel } from '../scope-files';
@@ -208,18 +209,33 @@ export const StreamsBoard = ({
   sort = 'count',
   searchQuery,
   ...handlers
-}: StreamsBoardProps) => (
-  <div className="flex-1 overflow-y-auto p-3">
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      {sortStreams(files, sort, mode, searchQuery).map((file) => (
-        <StreamTile
-          key={file.path}
-          file={file}
-          mode={mode}
-          searchQuery={searchQuery}
-          {...handlers}
-        />
-      ))}
+}: StreamsBoardProps) => {
+  // Sort once, then keep that order while the page is open: re-sorting after every
+  // status change would move tiles around while the user is working in them.
+  // Only an explicit change of sort, mode or search sorts again.
+  const key = `${sort}|${mode}|${searchQuery ?? ''}`;
+  const frozen = useRef<{ key: string; order: string[] } | null>(null);
+  if (frozen.current?.key !== key) {
+    frozen.current = {
+      key,
+      order: sortStreams(files, sort, mode, searchQuery).map((f) => f.path),
+    };
+  }
+  return (
+    <div className="flex-1 overflow-y-auto p-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {keepOrder(sortStreams(files, sort, mode, searchQuery), frozen.current.order).map(
+          (file) => (
+            <StreamTile
+              key={file.path}
+              file={file}
+              mode={mode}
+              searchQuery={searchQuery}
+              {...handlers}
+            />
+          ),
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};

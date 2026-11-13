@@ -8,10 +8,14 @@ on:
   workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    # Only changes to the app itself: shared packages and tests do not change how screens look,
+    # and a run takes a macOS runner for up to 90 minutes. Run it by hand to check anything else.
     paths:
       - "apps/mobile/**"
-      - "packages/core/**"
-      - "packages/formats/**"
+      - "!apps/mobile/docs/**"
+      - "!apps/mobile/**/*.test.ts"
+      - "!apps/mobile/**/*.test.tsx"
+      - "!apps/mobile/scripts/release*"
       - ".github/workflows/mobile-screenshots.yml"
       - ".github/scripts/mobile-screenshots-*.sh"
 

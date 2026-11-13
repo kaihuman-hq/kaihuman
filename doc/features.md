@@ -61,7 +61,7 @@
 | Android long-press shortcuts | manifest.webmanifest | 2026-03-28 |
 | Inbox always on board | KanbanBoard | 2026-03-28 |
 | Move todo between files | KanbanBoard card hover | 2026-03-28 |
-| Streams view: one tile per todo file with quick add, one-click status buttons, drag to reorder, active/closed and sort toggles | `/stream`, KanbanBoard STREAMS toggle | 2026-11-04 |
+| Streams view: one tile per todo file with quick add, one-click status buttons, drag to reorder, active/closed and sort toggles; tile order stays fixed while the page is open | `/stream`, KanbanBoard STREAMS toggle | 2026-11-04 |
 | Todo file colours (10 presets, stored as `color:` in frontmatter) and item priority (`^high`/`^super-high`/`^ultra-high`), shown on board and stream views; higher-priority streams first | `/stream`, `/board` | 2026-11-04 |
 | Todo due dates (`::due::`): date + optional time editor on board cards, Overdue / Today / date badge, due filter and sort | `/board` | 2026-11-08 |
 | Recurring todos (`::repeat::`, e.g. `weekly:mon,thu`, `monthly:last`, `every 2 weeks`): set when adding or editing a todo, repeat icon on board cards and todo widget rows, completing moves the due date to the next occurrence and logs it in `::done::` | `/board`, todo widget, `packages/formats/src/todo-repeat.ts` | 2026-11-09 |

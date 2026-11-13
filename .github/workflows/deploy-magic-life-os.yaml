@@ -9,8 +9,16 @@ on:
   push:
     branches:
       - main
+    # The console bundles these workspace packages, so a change to any of them changes the site.
     paths:
       - "apps/console/**"
+      - "packages/config/**"
+      - "packages/core/**"
+      - "packages/formats/**"
+      - "packages/ui/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-magic-life-os.yaml"
+      - ".github/workflows/template-deploy-to-cloudflare.yaml"
   workflow_dispatch:
 
 permissions:
