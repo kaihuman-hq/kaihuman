@@ -209,3 +209,24 @@ describe('structuralMergers: action log', () => {
     }
   });
 });
+
+describe('structuralMergers: todo ids', () => {
+  const t = (text: string, id?: string, n = 1) =>
+    `- [ ] ${text}\n::updated:: ${n} ::created:: 2026-01-0${n}T00:00:00.000Z${id ? ` ::id:: ${id}` : ''}\n`;
+  it('matches a todo by id when its text changed on one side and another was added on the other', () => {
+    const base = t('a', 'aaaaaaaa');
+    const result = mergeFile('.todos.md', base, t('a2', 'aaaaaaaa'), base + t('b', 'bbbbbbbb', 2));
+    expect(result).toEqual({ clean: true, content: t('a2', 'aaaaaaaa') + t('b', 'bbbbbbbb', 2) });
+  });
+  it('treats an id backfilled on one side as the same todo', () => {
+    const base = t('a');
+    const result = mergeFile('.todos.md', base, t('a', 'aaaaaaaa'), base);
+    expect(result).toEqual({ clean: true, content: t('a', 'aaaaaaaa') });
+  });
+  it('conflicts when both sides edit the same id differently', () => {
+    const base = t('a', 'aaaaaaaa');
+    expect(mergeFile('.todos.md', base, t('x', 'aaaaaaaa'), t('y', 'aaaaaaaa'))).toEqual({
+      clean: false,
+    });
+  });
+});

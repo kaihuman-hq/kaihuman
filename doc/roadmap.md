@@ -56,6 +56,11 @@
 - [ ] Publish `@kaihuman/docspack` to npm
 - [ ] Run `docspack doctor --strict` and `docspack eval` in CI
 
+## Agent todo CLI
+
+- [x] `kaihuman todo` (lists, list, show, add, update, done, move, rm, assign-ids), stable `::id::` ids and the `kh-todos` agent skill
+- [x] `kaihuman todo import ticktick` (dry-run plan, `--apply`, idempotent reruns)
+
 ## Mobile (`doc/mobile.md`)
 
 - [x] Phase 1: `@kaihuman/core` storage adapter, widget todo snapshot engine, and `auth-worker` mobile OAuth callback

@@ -239,11 +239,50 @@ commands:
         summary: Park an idea with a reason
       - run: pbpaste | kaihuman ideas import --by claude.ai
         summary: Apply hand-off blocks copied from a chat
+  - name: todo
+    summary: Read and change todos (*.todos.md) by id; --json for agents
+    description: |
+      Subcommands: `lists`, `list`, `show <id>`, `add`, `update <id>`, `done <id>`,
+      `move <id> --to <list>`, `rm <id>`, `assign-ids` and
+      `import ticktick <csv> [--apply] [--include-done]`. Import prints a JSON plan
+      (per target file: counts and todos) and writes only with `--apply`, one commit per
+      file; todos already imported are skipped.
+    arguments:
+      - name: command
+        summary: lists, list, show, add, update, done, move, rm, assign-ids or import, with its arguments
+        variadic: true
+    options:
+      - name: --json
+        summary: Print JSON; errors go to stderr as {"error":{"code","message"}}
+      - name: --apply
+        summary: "import: write the todos instead of printing the plan"
+      - name: --include-done
+        summary: "import: also import completed and won't-do todos"
+      - name: --help
+        aliases: [-h]
+        summary: Print help
+    effects: [read, write, network]
+    exits:
+      "0":
+        meaning: Done
+      "1":
+        meaning: The command failed
+      "2":
+        meaning: Usage error
+      "3":
+        meaning: No todo with that id
+      "4":
+        meaning: The repo changed twice while writing; run the command again
+    examples:
+      - run: kaihuman todo import ticktick backup.csv --json
+        summary: Dry run of a TickTick import
+      - run: kaihuman todo import ticktick backup.csv --apply
+        summary: Import the open TickTick todos
   - name: skills
     summary: Install agent skills
     description: |
-      `kaihuman skills install [--dir D]` writes the kh-ideas skill to
-      `~/.claude/skills/kh-ideas/SKILL.md` and `~/.agents/skills/kh-ideas/SKILL.md`.
+      `kaihuman skills install [--dir D]` writes the kh-ideas and kh-todos skills to
+      `~/.claude/skills/<name>/SKILL.md` and `~/.agents/skills/<name>/SKILL.md`.
     arguments:
       - name: command
         summary: install

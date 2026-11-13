@@ -80,11 +80,21 @@ kaihuman ideas summary palette-sync "Queue writes; no CRDT."
 kaihuman ideas status palette-sync committed --reason "Small enough." --by claude
 kaihuman ideas import --by claude.ai < chat.md # apply kh-idea hand-off blocks
 kaihuman ideas path [palette-sync]            # local clone path
-kaihuman skills install                       # kh-ideas skill → ~/.claude/skills/, ~/.agents/skills/
+kaihuman skills install                       # kh-ideas and kh-todos skills → ~/.claude/skills/, ~/.agents/skills/
 ```
 
 `--by` is the author of the log entry: `human` (the default) or an agent's short name. A new idea
 whose slug is taken fails; pick another one with `--slug`.
+
+## Todos
+
+```sh
+kaihuman todo list --due today               # active todos due today, all lists (--json)
+kaihuman todo add "Renew passport" --list admin --due 2026-12-01
+kaihuman todo done <id>                      # a recurring todo moves to its next due date
+```
+
+Every `kaihuman todo` command is listed in `doc/documentation.md`.
 
 ## Authentication Workflow
 

@@ -18,6 +18,9 @@ mod github;
 mod ideas;
 mod ideas_cli;
 mod server;
+mod todos;
+mod todos_cli;
+mod todos_ticktick;
 mod ui;
 
 use app::App;
@@ -46,6 +49,8 @@ enum Commands {
     Idea(ideas_cli::IdeaArgs),
     /// List, read and update ideas in .kh/ideas/ (overview when no subcommand is given)
     Ideas(ideas_cli::IdeasArgs),
+    /// Read and change todos (*.todos.md) by id; --json for agents
+    Todo(todos_cli::TodoArgs),
     /// Install agent skills
     Skills {
         #[command(subcommand)]
@@ -55,7 +60,14 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        // `todo --json` promises JSON errors, usage errors included.
+        Err(e) if e.use_stderr() && wants_todo_json() => {
+            std::process::exit(todos_cli::report_usage_json(&e.to_string()))
+        }
+        Err(e) => e.exit(),
+    };
 
     match cli.command {
         Some(Commands::Server { port }) => {
@@ -79,6 +91,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         Some(Commands::Idea(args)) => exit_on_error("idea", ideas_cli::run_idea(args).await),
         Some(Commands::Ideas(args)) => exit_on_error("ideas", ideas_cli::run_ideas(args).await),
+        Some(Commands::Todo(args)) => match todos_cli::run(args).await {
+            0 => Ok(()),
+            code => std::process::exit(code),
+        },
         Some(Commands::Skills { command }) => {
             exit_on_error("skills", ideas_cli::run_skills(command))
         }
@@ -87,6 +103,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             setup_and_run_tui().await
         }
     }
+}
+
+fn wants_todo_json() -> bool {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    args.first().is_some_and(|a| a == "todo") && args.iter().any(|a| a == "--json")
 }
 
 /// Prints a subcommand's error and exits 1, like `capture` does.

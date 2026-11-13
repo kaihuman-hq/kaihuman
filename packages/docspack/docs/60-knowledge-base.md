@@ -45,7 +45,7 @@ Open the console at `/knowledge` with a repository selected. When `.kh/.skill-ve
 - `.kh/.skill-version`, `.kh/schema.md`, `.kh/index.kb.md`, `.kh/log.md`
 - `.kh/raw/.gitkeep`, `.kh/journal/.gitkeep`, `.kh/wiki/.gitkeep`, `.kh/ideas/.gitkeep`
 - `.claude/commands/kb-ingest.md`, `kb-index.md`, `kb-lint.md`, `kb-ask.md`, `kb-session.md`, `kb-digest.md`, `kb-agent-capture.md`
-- `.agents/skills/kh-ideas/SKILL.md` and `.claude/skills/kh-ideas/SKILL.md`, the ideas skill (see "Idea file format")
+- `.agents/skills/kh-ideas/SKILL.md` and `.claude/skills/kh-ideas/SKILL.md`, the ideas skill (see "Idea file format"). The todo skill `kh-todos` is installed by `kaihuman skills install`, not by setup
 - a kaihuman section in `CLAUDE.md` and in `AGENTS.md` (for agents that do not read `CLAUDE.md`: Antigravity, Codex, Copilot, Cursor) with the knowledge base and ideas conventions
 
 The kaihuman section sits between `<!-- kaihuman:start … -->` and `<!-- kaihuman:end -->`. `mergeAgentInstructions` in `kb-skills.ts` creates a missing file, appends the section to a file the user wrote, and replaces only the text between the markers when they are there; the user's own text around it stays. A file an older version wrote in full (it starts with `# Knowledge Base` and "This repo is a personal…") is replaced. A file whose text would not change is not written.

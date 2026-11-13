@@ -221,6 +221,7 @@
 | Quick note to active repo | `n` | Initial |
 | Knowledge note to `.kh/raw/` | `k` | 2026-07-18 |
 | Headless knowledge capture (offline-safe spool) | `kaihuman capture` | 2026-07-18 |
+| Agent todo CLI: `kaihuman todo` lists files and todos, shows, adds, updates, completes, moves and removes todos (`--json`, stable `::id::` ids, sha-checked writes); `kh-todos` agent skill via `kaihuman skills install` | `kaihuman todo` | 2026-11-12 |
 | Desktop quick-capture overlay (Hyprland `Super+K`) | `scripts/kh-capture` | 2026-07-18 |
 | Native-sdk capture app (experimental, Zig core, direct GitHub API + auth.json reuse) | `apps/kh-capture-native` | 2026-07-18 |
 | Agent-driven capture command (drives native app via automation server; auto-scaffolded to KB repo) | `/kb-agent-capture` | 2026-07-18 |

@@ -166,10 +166,7 @@ impl GithubClient {
         repo: &str,
         path: &str,
     ) -> Result<Option<(String, String)>> {
-        let url = format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            owner, repo, path
-        );
+        let url = contents_url(owner, repo, path);
         let res = self.client.get(&url).send().await?;
         if res.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
@@ -194,10 +191,7 @@ impl GithubClient {
         message: &str,
         sha: Option<&str>,
     ) -> Result<PutOutcome> {
-        let url = format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            owner, repo, path
-        );
+        let url = contents_url(owner, repo, path);
 
         #[derive(Serialize)]
         struct PutBody<'a> {
@@ -238,76 +232,147 @@ impl GithubClient {
         )
         .await
     }
-
-    pub async fn append_to_inbox(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
-        let path = "inbox.md";
-        let url = format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            owner, repo, path
-        );
-
-        // 1. Try to get existing file
-        let existing = self.get_file_content(owner, repo, path).await;
-
-        let (content, sha) = match existing {
-            Ok((c, s)) => (c, Some(s)),
-            Err(_) => (String::new(), None),
-        };
-
-        // 2. Append new text
-        let new_content = if content.is_empty() {
-            format!("- {}\n", text)
-        } else {
-            format!("{}\n- {}\n", content.trim_end(), text)
-        };
-
-        // 3. Update/Create file
-        let encoded_content = BASE64_STANDARD.encode(new_content);
-
-        #[derive(Serialize)]
-        struct PutBody {
-            message: String,
-            content: String,
-            sha: Option<String>,
-        }
-
-        let body = PutBody {
-            message: "Add note via CLI".to_string(),
-            content: encoded_content,
-            sha,
-        };
-
-        let res = self.client.put(&url).json(&body).send().await?;
-
+    async fn get_json<T: serde::de::DeserializeOwned>(&self, url: &str) -> Result<T> {
+        let res = self.client.get(url).send().await?;
         if !res.status().is_success() {
-            bail!("Failed to save note: {}", res.status());
+            bail!("GET {url} failed: {}", res.status());
         }
-
-        Ok(())
+        Ok(res.json().await?)
     }
 
-    async fn get_file_content(
+    async fn post_json<T: serde::de::DeserializeOwned>(
+        &self,
+        url: &str,
+        body: &serde_json::Value,
+    ) -> Result<T> {
+        let res = self.client.post(url).json(body).send().await?;
+        if !res.status().is_success() {
+            bail!("POST {url} failed: {}", res.status());
+        }
+        Ok(res.json().await?)
+    }
+
+    /// The default branch and the sha of its head commit.
+    pub async fn head(&self, owner: &str, repo: &str) -> Result<(String, String)> {
+        #[derive(Deserialize)]
+        struct Repo {
+            default_branch: String,
+        }
+        #[derive(Deserialize)]
+        struct Ref {
+            object: Sha,
+        }
+        let base = format!("https://api.github.com/repos/{owner}/{repo}");
+        let info: Repo = self.get_json(&base).await?;
+        let branch = info.default_branch;
+        let head: Ref = self
+            .get_json(&format!("{base}/git/ref/heads/{branch}"))
+            .await?;
+        Ok((branch, head.object.sha))
+    }
+
+    /// Every blob in a commit's tree: (path, blob sha).
+    pub async fn tree(
         &self,
         owner: &str,
         repo: &str,
-        path: &str,
-    ) -> Result<(String, String)> {
-        let url = format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            owner, repo, path
-        );
-        let res = self.client.get(&url).send().await?;
-
-        if !res.status().is_success() {
-            bail!("File not found");
+        commit: &str,
+    ) -> Result<Vec<(String, String)>> {
+        #[derive(Deserialize)]
+        struct Entry {
+            path: String,
+            #[serde(rename = "type")]
+            kind: String,
+            sha: String,
         }
-
-        let data: ContentResponse = res.json().await?;
-        // Github API returns content with newlines
-        let cleaned = data.content.replace("\n", "");
-        let decoded = BASE64_STANDARD.decode(cleaned)?;
-        let content = String::from_utf8(decoded)?;
-
-        Ok((content, data.sha))
+        #[derive(Deserialize)]
+        struct Tree {
+            tree: Vec<Entry>,
+            truncated: bool,
+        }
+        let url =
+            format!("https://api.github.com/repos/{owner}/{repo}/git/trees/{commit}?recursive=1");
+        let tree: Tree = self.get_json(&url).await?;
+        if tree.truncated {
+            bail!("{owner}/{repo} has too many files for GitHub's tree listing");
+        }
+        Ok(tree
+            .tree
+            .into_iter()
+            .filter(|e| e.kind == "blob")
+            .map(|e| (e.path, e.sha))
+            .collect())
     }
+
+    pub async fn blob(&self, owner: &str, repo: &str, sha: &str) -> Result<String> {
+        let url = format!("https://api.github.com/repos/{owner}/{repo}/git/blobs/{sha}");
+        let blob: ContentResponse = self.get_json(&url).await?;
+        let decoded = BASE64_STANDARD.decode(blob.content.replace('\n', ""))?;
+        Ok(String::from_utf8(decoded)?)
+    }
+
+    /// Writes several files in one commit on `branch`, whose head must still be `parent`;
+    /// otherwise nothing is written and the outcome is `Conflict`.
+    pub async fn commit_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+        parent: &str,
+        files: &[(String, String)],
+        message: &str,
+    ) -> Result<PutOutcome> {
+        #[derive(Deserialize)]
+        struct Commit {
+            tree: Sha,
+        }
+        let base = format!("https://api.github.com/repos/{owner}/{repo}/git");
+        let parent_commit: Commit = self.get_json(&format!("{base}/commits/{parent}")).await?;
+        let entries: Vec<_> = files
+            .iter()
+            .map(|(path, content)| {
+                serde_json::json!({"path": path, "mode": "100644", "type": "blob", "content": content})
+            })
+            .collect();
+        let tree: Sha = self
+            .post_json(
+                &format!("{base}/trees"),
+                &serde_json::json!({"base_tree": parent_commit.tree.sha, "tree": entries}),
+            )
+            .await?;
+        let commit: Sha = self
+            .post_json(
+                &format!("{base}/commits"),
+                &serde_json::json!({"message": message, "tree": tree.sha, "parents": [parent]}),
+            )
+            .await?;
+        let res = self
+            .client
+            .patch(format!("{base}/refs/heads/{branch}"))
+            .json(&serde_json::json!({"sha": commit.sha, "force": false}))
+            .send()
+            .await?;
+        match res.status() {
+            s if s.is_success() => Ok(PutOutcome::Written),
+            reqwest::StatusCode::CONFLICT | reqwest::StatusCode::UNPROCESSABLE_ENTITY => {
+                Ok(PutOutcome::Conflict)
+            }
+            s => bail!("updating {branch} failed: {s}"),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct Sha {
+    sha: String,
+}
+
+/// A contents-API URL with each path segment percent-encoded (todo list names may have spaces).
+fn contents_url(owner: &str, repo: &str, path: &str) -> String {
+    let mut url = reqwest::Url::parse("https://api.github.com/repos").expect("a valid base");
+    url.path_segments_mut()
+        .expect("an http URL")
+        .extend([owner, repo, "contents"])
+        .extend(path.split('/'));
+    url.to_string()
 }

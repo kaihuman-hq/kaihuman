@@ -32,8 +32,10 @@ describe('addTodoEntry', () => {
       { text: 'Call #admin the bank', tags: ['home'] },
       NOW,
     );
-    expect(next).toBe(
-      `- [x] Done\n- [ ] Call the bank #home #admin\n::updated:: ${NOW.getTime()} ::created:: ${NOW.toISOString()}\n`,
+    expect(next).toMatch(
+      new RegExp(
+        `^- \\[x\\] Done\\n- \\[ \\] Call the bank #home #admin\\n::updated:: ${NOW.getTime()} ::created:: ${NOW.toISOString()} ::id:: [0-9a-z]{8}\\n$`,
+      ),
     );
     expect(parseTodos(next).items[1]).toMatchObject({
       text: 'Call the bank',
