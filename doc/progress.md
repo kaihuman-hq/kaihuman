@@ -10,6 +10,21 @@
 - Release workflow now also builds Linux arm64 and macOS x86_64 (cross-compiled) and attaches `SHA256SUMS`; `package.sh` takes `TARGET`. Needs a new `cli-v…` tag to take effect.
 - Website: new docs page `/docs/cli-quickstart/` (install, login, todo examples, agent skills, TickTick), linked from the nav pill and footer.
 
+## 2026-11-13 — CI: console deploys when its workspace packages change
+
+- `[PROD] Deploy Life OS` ran only for `apps/console/**`. A change to `packages/ui`, `core`, `formats` or `config`, which the console bundles, never reached the live site; the stream tile order fix (in `packages/ui`) would not have deployed. Those packages, the lockfile and both deploy workflow files now trigger it too.
+
+## 2026-11-12 — CI: only check what a pull request touches
+
+- `ci.yml`: a new `changes` job diffs the pull request. Build, lint, type-check and test run through `turbo --affected`, so only changed packages and their dependents run (the stream-order change no longer builds the Rust CLI, docspack or the landing pages). Root config (`package.json`, lockfile, workspace, `turbo.json`, `biome.json`, `packages/config/`, `ci.yml`) still runs everything, because turbo does not see those as package inputs. The Rust system libraries and cargo cache are set up only when `apps/cli` changes. The KoSIT e-invoice job runs only when `packages/formats` changes.
+- `turbo.json` has a `test` task (after `^build`), so tests can use `--affected`.
+- `mobile-build.yml`: the Android and iOS Debug builds run only when a native input changes (Expo config, plugins, native modules and targets, assets, `package.json`). They no longer run for `packages/core` or `packages/formats` changes, or for app TypeScript changes. The `check` job ran the app's lint, types and tests a second time, so it is removed: `ci.yml` covers them.
+- `mobile-screenshots.yml`: runs only for changes in `apps/mobile`, without docs, tests and release scripts. It no longer runs for shared package changes. Use **Run workflow** to run it by hand.
+
+## 2026-11-12 — Console: stream tiles keep their order while the page is open
+
+- `/stream` sorted tiles on every render, so marking todos done moved the tiles while you were working in them. `StreamsBoard` now sorts once and keeps that order until the page closes. It sorts again only when you change MOST ITEMS/NEWEST, ACTIVE/CLOSED or the search. New streams go at the end.
+- The new helper `keepOrder(files, order)` lives in `@kaihuman/formats` (`todo-board.ts`). Tests are in `todo-board.test.ts` and `StreamsBoard.order.test.tsx`.
 ## 2026-11-12 — `kaihuman todo import ticktick`
 
 - `kaihuman todo import ticktick <csv> [--apply] [--include-done]`: parses a TickTick backup CSV (preamble lines, multi-line fields, `Is All Day`/`Timezone` aware dates) in `todos_ticktick.rs` and plans it per target file; `--apply` reuses `add_todos` (one commit per file). Ids hash the TickTick task id, so reruns add nothing. Unsupported repeat rules get `#repeat-unmapped` and a note. Adds the `csv` and `chrono-tz` crates. kh-todos skill, CLI docs and `cmdspec.yaml` updated.

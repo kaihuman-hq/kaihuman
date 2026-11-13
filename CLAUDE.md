@@ -9,7 +9,7 @@ pnpm + Turborepo monorepo, TypeScript strict, Biome for lint and format.
 
 ## Commands
 
-- Build: `pnpm run build` · Lint + type-check: `pnpm run check` · Test: `pnpm -r test` (CI `.github/workflows/ci.yml` runs exactly these after `pnpm install --frozen-lockfile`).
+- Build: `pnpm run build` · Lint + type-check: `pnpm run check` · Test: `pnpm -r test` (CI `.github/workflows/ci.yml` runs the same tasks through `turbo --affected`, only for the packages a pull request touches and their dependents; root config changes run everything).
 - Fix formatting: `pnpm run fix` (Biome; `cargo fmt` for `apps/cli`).
 
 ## Rules

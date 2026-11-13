@@ -1,8 +1,13 @@
 name: "CI"
 
-# Builds, lints, type-checks and tests the whole monorepo on every pull request that is not a draft, so a broken
+# Builds, lints, type-checks and tests every pull request that is not a draft, so a broken
 # lockfile, build or test shows up before the deploy workflows run on main. Main itself is
 # skipped: the deploy workflows build it.
+#
+# Only the packages a pull request touches, and the packages that depend on them, are checked
+# (`turbo --affected`). Changes to shared root config run everything, because turbo cannot see
+# that dependency (`changes` below lists those files). Jobs that only some packages need are skipped
+# as a whole, which still counts as a pass for required checks.
 
 on:
   pull_request:
@@ -16,16 +21,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  changes:
     # Draft PRs don't run CI; marking the PR ready for review triggers it.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.diff.outputs.full }}
+      cli: ${{ steps.diff.outputs.cli }}
+      einvoice: ${{ steps.diff.outputs.einvoice }}
+    steps:
+      # The pull_request checkout is a merge commit; its first parent is the base branch tip, so
+      # two commits of history are enough to diff the whole pull request.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: diff
+        run: |
+          files=$(git diff --name-only HEAD^1 HEAD)
+          printf '%s\n' "$files"
+          has() { grep -Eq "$1" <<<"$files" && echo true || echo false; }
+          # Root files every package reads (devDependencies, Biome, turbo, workspace) and the shared
+          # config that apps extend by relative path.
+          full=$(has '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|biome\.json|packages/config/|\.github/workflows/ci\.yml$)')
+          {
+            echo "full=$full"
+            echo "cli=$([ "$full" = true ] && echo true || has '^apps/cli/')"
+            echo "einvoice=$([ "$full" = true ] && echo true || has '^packages/formats/')"
+          } >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: changes
+    runs-on: ubuntu-latest
+    env:
+      # Empty on a full run; otherwise only affected packages, compared with the base branch tip.
+      AFFECTED: ${{ needs.changes.outputs.full != 'true' && '--affected' || '' }}
+      TURBO_SCM_BASE: HEAD^1
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       # The CLI (apps/cli) builds with cargo; these are the libraries its clipboard and TLS crates
       # link against.
       - name: Install system libraries
+        if: needs.changes.outputs.cli == 'true'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -38,6 +78,7 @@ jobs:
           cache: "pnpm"
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        if: needs.changes.outputs.cli == 'true'
         with:
           workspaces: apps/cli
 
@@ -45,20 +86,20 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm run build
+        run: pnpm turbo run build $AFFECTED
 
       - name: Lint and type-check
-        run: pnpm run check
+        run: pnpm turbo run lint check-types $AFFECTED
 
       - name: Test
-        run: pnpm -r test
+        run: pnpm turbo run test $AFFECTED
 
   # Phase 6: every golden e-invoice must pass the KoSIT validator with the XRechnung configuration.
   # The goldens are what the serialisers produce (a Vitest test keeps them in sync), so this checks
   # the serialisers against the official Schematron and schemas.
   einvoice:
-    # Draft PRs don't run CI; marking the PR ready for review triggers it.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: changes
+    if: needs.changes.outputs.einvoice == 'true'
     runs-on: ubuntu-latest
     env:
       KOSIT_VALIDATOR: 1.6.3

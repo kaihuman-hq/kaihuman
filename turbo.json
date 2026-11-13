@@ -38,6 +38,12 @@
         "^lint"
       ]
     },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
     "format": {
       "cache": false
     },
