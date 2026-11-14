@@ -1,7 +1,7 @@
 import type { NativeStackNavigationOptions } from 'expo-router/native-stack';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/theme.js';
-import { SearchButton } from './search-button.js';
+import { searchHeaderRight } from './search-button.js';
 
 /**
  * Header chrome shared by every stack: themed colours, no shadow, left-aligned on Android, and a
@@ -16,7 +16,9 @@ export function useStackScreenOptions(): NativeStackNavigationOptions {
     headerTintColor: colors.accent,
     headerTitleStyle: { color: colors.label, fontFamily: fontFamily.system },
     headerShadowVisible: false,
-    headerRight: SearchButton,
+    // The navigator calls headerRight as a plain function inside its own header render, so it
+    // must return an element, not run hooks: a screen swapping it would change the hook count.
+    headerRight: searchHeaderRight(),
     headerTitleAlign: platform === 'android' ? 'left' : undefined,
     headerBackButtonDisplayMode: 'minimal',
     // iOS already pushes with the native slide; Android's default fade felt abrupt next to it.
