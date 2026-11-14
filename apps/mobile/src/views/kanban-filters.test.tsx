@@ -152,6 +152,19 @@ describe('KanbanView search, filters and streams', () => {
     );
   });
 
+  it('jumps to a list, focuses its add field and adds an item', async () => {
+    const f = files();
+    render(<KanbanView controller={new KanbanBoardController(f)} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
+    const jump = await screen.findByTestId('stream-jump');
+    fireEvent.change(jump, { target: { value: 'sid' } });
+    fireEvent.keyDown(jump, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('stream-add-side')));
+    fireEvent.change(jump, { target: { value: 'zzz' } });
+    expect(screen.getByText('No matching list')).toBeTruthy();
+  });
+
   it('shows closed items when the stream mode is switched in the sheet', async () => {
     render(<KanbanView controller={new KanbanBoardController(files())} />);
     await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
