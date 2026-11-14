@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import type { Stream } from '../screens/kanban-board.js';
+import { jumpStreams, loadLastStream, saveLastStream } from '../screens/stream-jump.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -78,18 +79,43 @@ export function StreamsList({
   const [colorFor, setColorFor] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ path: string; pos: number } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState('');
+  const [lastPath, setLastPath] = useState(loadLastStream);
+  // Set by submitting the jump field: the list whose add field takes focus.
+  const [focusPath, setFocusPath] = useState<string | null>(null);
   if (streams.length === 0) {
     return <EmptyState icon="empty" title="No streams" message="Todo files appear here." />;
   }
+  const shown = jumpStreams(streams, query, streamName, lastPath);
   return (
     <View style={{ gap: spacing.lg }}>
-      {streams.map(({ path, rows, data }) => {
+      {mode === 'active' && streams.length > 1 ? (
+        <TextField
+          label="Jump to list"
+          testID="stream-jump"
+          placeholder="Jump to list…"
+          autoCapitalize="none"
+          returnKeyType="go"
+          value={query}
+          onChangeText={(text) => {
+            setQuery(text);
+            setFocusPath(null);
+          }}
+          onSubmitEditing={() => setFocusPath(shown[0]?.path ?? null)}
+        />
+      ) : null}
+      {shown.length === 0 ? (
+        <EmptyState icon="empty" title="No matching list" message={`Nothing named "${query}".`} />
+      ) : null}
+      {shown.map(({ path, rows, data }) => {
         const name = streamName(path);
         const keyFor = contentKeys();
         const submit = () => {
           const text = drafts[path]?.trim();
           if (!text) return;
           onAdd(path, text);
+          saveLastStream(path);
+          setLastPath(path);
           setDrafts((d) => ({ ...d, [path]: '' }));
         };
         return (
@@ -114,11 +140,14 @@ export function StreamsList({
             {mode === 'active' ? (
               <View style={{ paddingHorizontal: spacing.md }}>
                 <TextField
+                  // autoFocus only applies on mount, so remount when the jump field targets this list.
+                  key={focusPath === path ? 'focus' : 'idle'}
                   label={`Add to ${name}`}
                   testID={`stream-add-${name}`}
                   placeholder="Add item…"
                   autoCapitalize="sentences"
                   returnKeyType="done"
+                  autoFocus={focusPath === path}
                   value={drafts[path] ?? ''}
                   onChangeText={(text) => setDrafts((d) => ({ ...d, [path]: text }))}
                   onSubmitEditing={submit}

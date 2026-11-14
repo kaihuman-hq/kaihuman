@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-14 — Mobile board: jump to a list and add
+
+- Mobile Board → Streams: a "Jump to list…" field narrows the long list view by name; Enter focuses the first match's add field, so jump → type → Enter adds an item. The last list you added to is remembered and leads the view. Pure logic in `src/screens/stream-jump.ts` with tests.
+
 ## 2026-11-13 — Due notifications, quick reschedule, mobile Tasks view
 
 - Console: opt-in system notifications for due todos (`lib/due-notifications.ts`, `DueNotifier.tsx`, `public/notification-sw.js`). Checked on load, on visibility change and on an interval; notified ids are persisted so each todo fires once. Without a push server they only fire while the app or service worker is alive.
