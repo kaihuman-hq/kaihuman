@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-14 — Mobile: search from every screen, board jump-to-list add
+
+- The shared stack header (`useStackScreenOptions`) now carries the search button, so every pushed screen (Business, Analytics, Wiki, Knowledge, Repos, Files, tile and todo/idea details, More sub-pages…) has it. Screens with their own right-hand controls (file mode toggle, tile open/add, iOS board ＋) use `searchHeaderRight` to keep both. Sheets and the search screen itself stay without it.
+- Search is pushed, never replaced, so back (or back after opening a result) returns to the origin screen. Tests cover the push, the shared option and a no-`replace` guard on the search flow.
+- Fix: the stack default `headerRight` was the `SearchButton` component itself. The navigator calls `headerRight` as a plain function inside its header render, so the button's hooks ran there; a screen that set its own `headerRight` (every dashboard tile) then crashed with "Rendered fewer hooks than expected". The default now returns an element (`searchHeaderRight()`); regression test calls it the way the navigator does.
+- Mobile Board → Streams: a "Jump to list…" field narrows the long list view by name; Enter focuses the first match's add field, so jump → type → Enter adds an item. The last list you added to is remembered and leads the view. Pure logic in `src/screens/stream-jump.ts` with tests.
+
 ## 2026-11-13 — Due notifications, quick reschedule, mobile Tasks view
 
 - Console: opt-in system notifications for due todos (`lib/due-notifications.ts`, `DueNotifier.tsx`, `public/notification-sw.js`). Checked on load, on visibility change and on an interval; notified ids are persisted so each todo fires once. Without a push server they only fire while the app or service worker is alive.

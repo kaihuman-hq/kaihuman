@@ -74,6 +74,16 @@ describe('expo-router route files', () => {
     }
   });
 
+  it('leaves search by back: search is pushed and nothing in its flow replaces the origin route', () => {
+    const src = (f: string) => readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8');
+    for (const f of ['../screens/search-screen.tsx', '../search/open.ts', './search-button.tsx']) {
+      expect(src(f), f).not.toMatch(/\.replace\(/);
+    }
+    expect(src('./search-button.tsx')).toContain("router.push('/search')");
+    // Already on search, so the stack's default header button is hidden there.
+    expect(src('../screens/search-screen.tsx')).toContain('headerRight: undefined');
+  });
+
   it('has a todo detail route registered in the board stack', () => {
     expect(existsSync(`${appDir}(tabs)/board/todo.tsx`)).toBe(true);
     expect(readFileSync(`${appDir}(tabs)/board/_layout.tsx`, 'utf8')).toContain('name="todo"');

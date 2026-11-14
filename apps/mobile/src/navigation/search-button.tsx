@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Pressable } from 'react-native';
+import type { ReactNode } from 'react';
+import { Pressable, View } from 'react-native';
 import { useTheme } from '../theme/theme.js';
 import { Icon } from '../ui/index.js';
 
@@ -17,4 +18,19 @@ export function SearchButton() {
       <Icon name="search" size={22} />
     </Pressable>
   );
+}
+
+/**
+ * A header's right side that keeps search one tap away next to a screen's own controls.
+ * Search is pushed (never replaced), so back returns to the screen the user came from.
+ */
+export function searchHeaderRight(extra?: () => ReactNode) {
+  return function HeaderRight() {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+        {extra?.()}
+        <SearchButton />
+      </View>
+    );
+  };
 }

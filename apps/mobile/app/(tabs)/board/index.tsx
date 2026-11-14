@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable } from 'react-native';
 import { KaihumanShared } from '../../../modules/kaihuman-shared/index.js';
+import { searchHeaderRight } from '../../../src/navigation/search-button.js';
 import { FocusSessionController } from '../../../src/screens/focus-session.js';
 import { KanbanBoardController } from '../../../src/screens/kanban-board.js';
 import { todoDetailHref } from '../../../src/screens/todo-detail.js';
@@ -32,7 +33,7 @@ export default function Board() {
         options={{
           title: 'Board',
           // iOS puts the create action in the navigation bar; Android gets the FAB inside the view.
-          headerRight:
+          headerRight: searchHeaderRight(
             platform === 'ios'
               ? () => (
                   <Pressable
@@ -45,6 +46,7 @@ export default function Board() {
                   </Pressable>
                 )
               : undefined,
+          ),
         }}
       />
       <KanbanView
