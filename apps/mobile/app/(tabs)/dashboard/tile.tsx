@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { presentTile } from '../../../src/components/widgets/tile-controllers.js';
+import { searchHeaderRight } from '../../../src/navigation/search-button.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { saveToReadLater } from '../../../src/screens/save-read-later.js';
 import { optimisticWrite } from '../../../src/sync/optimistic.js';
@@ -72,30 +73,32 @@ export default function TileDetail() {
         options={{
           title: shownTile ? TILE_META[shownTile.kind].title : 'Tile',
           // Every tile is a view of one file, so the file itself is always one tap away.
-          headerRight: path
-            ? () => (
-                <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Open file"
-                    testID="tile-open-file"
-                    onPress={() => router.push(`/files/${path}` as never)}
-                  >
-                    <Icon name="document" size={22} />
-                  </Pressable>
-                  {onAdd ? (
+          headerRight: searchHeaderRight(
+            path
+              ? () => (
+                  <View style={{ flexDirection: 'row', gap: 16 }}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={entry?.label ?? 'New todo'}
-                      testID="tile-add"
-                      onPress={onAdd}
+                      accessibilityLabel="Open file"
+                      testID="tile-open-file"
+                      onPress={() => router.push(`/files/${path}` as never)}
                     >
-                      <Icon name="add" size={22} />
+                      <Icon name="document" size={22} />
                     </Pressable>
-                  ) : null}
-                </View>
-              )
-            : undefined,
+                    {onAdd ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={entry?.label ?? 'New todo'}
+                        testID="tile-add"
+                        onPress={onAdd}
+                      >
+                        <Icon name="add" size={22} />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                )
+              : undefined,
+          ),
         }}
       />
       <Screen keyboard>

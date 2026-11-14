@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-14 — Mobile: search one tap from every screen
+
+- The shared stack header (`useStackScreenOptions`) now carries the search button, so every pushed screen (Business, Analytics, Wiki, Knowledge, Repos, Files, tile and todo/idea details, More sub-pages…) has it. Screens with their own right-hand controls (file mode toggle, tile open/add, iOS board ＋) use `searchHeaderRight` to keep both. Sheets and the search screen itself stay without it.
+- Search is pushed, never replaced, so back (or back after opening a result) returns to the origin screen. Tests cover the push, the shared option and a no-`replace` guard on the search flow.
+
 ## 2026-11-13 — Due notifications, quick reschedule, mobile Tasks view
 
 - Console: opt-in system notifications for due todos (`lib/due-notifications.ts`, `DueNotifier.tsx`, `public/notification-sw.js`). Checked on load, on visibility change and on an interval; notified ids are persisted so each todo fires once. Without a push server they only fire while the app or service worker is alive.

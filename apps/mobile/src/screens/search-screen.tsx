@@ -63,6 +63,8 @@ export function SearchScreen() {
         options={{
           // Explicit so the iOS large "Search" title survives the native search bar.
           title: 'Search',
+          // Already here; the stack's default search button would be a dead end.
+          headerRight: undefined,
           headerLargeTitle: Platform.OS === 'ios',
           headerSearchBarOptions: web
             ? undefined
