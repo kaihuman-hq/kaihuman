@@ -9,7 +9,7 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "com.kaihuman.app",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
