@@ -206,6 +206,7 @@ export const TasksBoardPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [draftDue, setDraftDue] = useState('');
 
   useEffect(() => {
     if (githubFileStore.tree.peek().length === 0) githubFileStore.loadTree();
@@ -285,9 +286,15 @@ export const TasksBoardPage = () => {
     const tags = view.kind === 'tag' ? [view.tag] : [];
     write(
       targetPath,
-      addTodoEntry(openFiles[targetPath]?.content ?? '', { text, tags, position: 'top' }),
+      addTodoEntry(openFiles[targetPath]?.content ?? '', {
+        text,
+        tags,
+        position: 'top',
+        ...(draftDue && { due: { date: draftDue } }),
+      }),
     );
     setDraft('');
+    setDraftDue('');
   };
 
   const loading = paths.some((p) => openFiles[p]?.content === undefined);
@@ -433,14 +440,21 @@ export const TasksBoardPage = () => {
           </header>
           <div class="flex-1 overflow-y-auto px-3 md:px-5">
             {view.kind !== 'smart' || view.id !== 'completed' ? (
-              <form onSubmit={add} class="py-3">
+              <form onSubmit={add} class="py-3 flex gap-2">
                 <input
                   type="text"
                   value={draft}
                   onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
                   placeholder={`Add task to "${targetName}"`}
                   aria-label={`Add task to ${targetName}`}
-                  class="w-full rounded bg-[var(--los-border)]/40 px-3 py-2 text-sm placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
+                  class="flex-1 min-w-0 rounded bg-[var(--los-border)]/40 px-3 py-2 text-sm placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
+                />
+                <input
+                  type="date"
+                  value={draftDue}
+                  onInput={(e) => setDraftDue((e.target as HTMLInputElement).value)}
+                  aria-label="New task due date"
+                  class="shrink-0 rounded bg-[var(--los-border)]/40 px-2 py-2 text-xs"
                 />
               </form>
             ) : null}

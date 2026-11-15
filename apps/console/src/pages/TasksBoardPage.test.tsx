@@ -113,7 +113,7 @@ describe('TasksBoardPage', () => {
   it('reschedules to a custom date, date only when no time, and closes on Escape', () => {
     const btn = host.querySelector('[aria-label^="Reschedule Read"]') as HTMLElement;
     act(() => btn.click());
-    const date = host.querySelector('input[type="date"]') as HTMLInputElement;
+    const date = host.querySelector('input[aria-label="Custom due date"]') as HTMLInputElement;
     act(() => {
       date.value = '2026-12-25';
       date.dispatchEvent(new Event('change', { bubbles: true }));
@@ -143,6 +143,26 @@ describe('TasksBoardPage', () => {
       input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(store.updateFileContent).toHaveBeenCalledWith(WORK, expect.stringContaining('New one'));
+  });
+
+  it('sets a due date when creating a task', () => {
+    act(() => button('work')?.click());
+    const input = host.querySelector('input[type="text"]') as HTMLInputElement;
+    const due = host.querySelector('input[aria-label="New task due date"]') as HTMLInputElement;
+    act(() => {
+      input.value = 'Dated one';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      due.value = '2026-12-01';
+      due.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(store.updateFileContent).toHaveBeenCalledWith(
+      WORK,
+      expect.stringMatching(/Dated one[\s\S]*::due:: 2026-12-01/),
+    );
+    expect(due.value).toBe('');
   });
 
   it('opens the sidebar behind the header icon at mobile width', () => {
