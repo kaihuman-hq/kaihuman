@@ -170,4 +170,19 @@ describe('TasksBoardPage', () => {
       fs.openFiles.value = files;
     }
   });
+
+  it('searches all lists regardless of view, and empty term restores the view', () => {
+    const input = host.querySelector('input[type="search"]') as HTMLInputElement;
+    const type = (v: string) =>
+      act(() => {
+        input.value = v;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    type('LATER');
+    expect([...host.querySelectorAll('li')].map((r) => r.textContent)).toEqual(['LaterworkDec 20']);
+    type('#nope');
+    expect(host.querySelectorAll('li')).toHaveLength(0);
+    type('');
+    expect(host.querySelectorAll('li')).toHaveLength(2);
+  });
 });

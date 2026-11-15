@@ -44,6 +44,7 @@ import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { DueNotifyToggle } from '../components/DueNotifier';
+import { searchTaskRows } from './taskSearch';
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 
@@ -206,6 +207,7 @@ export const TasksBoardPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (githubFileStore.tree.peek().length === 0) githubFileStore.loadTree();
@@ -238,7 +240,11 @@ export const TasksBoardPage = () => {
 
   const now = Date.now();
   const counts = taskBoardCounts(lists, inboxPath, now);
-  const rows = sortTaskRows(taskRows(lists, view, inboxPath, now), sort);
+  const searching = query.trim() !== '';
+  const rows = sortTaskRows(
+    searching ? searchTaskRows(lists, query) : taskRows(lists, view, inboxPath, now),
+    sort,
+  );
 
   const title =
     view.kind === 'smart'
@@ -382,6 +388,14 @@ export const TasksBoardPage = () => {
               <Menu size={18} />
             </button>
             <h1 class="flex-1 truncate text-lg font-semibold">{title}</h1>
+            <input
+              type="search"
+              value={query}
+              onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+              placeholder="Search all tasks"
+              aria-label="Search all tasks"
+              class="w-28 md:w-48 rounded bg-[var(--los-border)]/40 px-2 py-1 text-xs placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
+            />
             <DueNotifyToggle />
             <button
               type="button"
