@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-15 — Tasks: due date on create, search all tasks
+
+- Console `/tasks`: the quick-add form has a date input; the new todo gets that due date (via `addTodoEntry`'s `due` option). Tests cover add with and without a date.
+- Console `/tasks`: a "Search all tasks" field filters every task across all lists, case-insensitive; an empty term shows the normal view. Pure logic in `pages/taskSearch.ts` with tests.
+
 ## 2026-11-14 — Mobile: search from every screen, board jump-to-list add
 
 - The shared stack header (`useStackScreenOptions`) now carries the search button, so every pushed screen (Business, Analytics, Wiki, Knowledge, Repos, Files, tile and todo/idea details, More sub-pages…) has it. Screens with their own right-hand controls (file mode toggle, tile open/add, iOS board ＋) use `searchHeaderRight` to keep both. Sheets and the search screen itself stay without it.

@@ -44,6 +44,7 @@ import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { DueNotifyToggle } from '../components/DueNotifier';
+import { searchTaskRows } from './taskSearch';
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 
@@ -206,6 +207,8 @@ export const TasksBoardPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [draftDue, setDraftDue] = useState('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (githubFileStore.tree.peek().length === 0) githubFileStore.loadTree();
@@ -238,7 +241,11 @@ export const TasksBoardPage = () => {
 
   const now = Date.now();
   const counts = taskBoardCounts(lists, inboxPath, now);
-  const rows = sortTaskRows(taskRows(lists, view, inboxPath, now), sort);
+  const searching = query.trim() !== '';
+  const rows = sortTaskRows(
+    searching ? searchTaskRows(lists, query) : taskRows(lists, view, inboxPath, now),
+    sort,
+  );
 
   const title =
     view.kind === 'smart'
@@ -285,9 +292,15 @@ export const TasksBoardPage = () => {
     const tags = view.kind === 'tag' ? [view.tag] : [];
     write(
       targetPath,
-      addTodoEntry(openFiles[targetPath]?.content ?? '', { text, tags, position: 'top' }),
+      addTodoEntry(openFiles[targetPath]?.content ?? '', {
+        text,
+        tags,
+        position: 'top',
+        ...(draftDue && { due: { date: draftDue } }),
+      }),
     );
     setDraft('');
+    setDraftDue('');
   };
 
   const loading = paths.some((p) => openFiles[p]?.content === undefined);
@@ -382,6 +395,14 @@ export const TasksBoardPage = () => {
               <Menu size={18} />
             </button>
             <h1 class="flex-1 truncate text-lg font-semibold">{title}</h1>
+            <input
+              type="search"
+              value={query}
+              onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+              placeholder="Search all tasks"
+              aria-label="Search all tasks"
+              class="w-28 md:w-48 rounded bg-[var(--los-border)]/40 px-2 py-1 text-xs placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
+            />
             <DueNotifyToggle />
             <button
               type="button"
@@ -433,14 +454,21 @@ export const TasksBoardPage = () => {
           </header>
           <div class="flex-1 overflow-y-auto px-3 md:px-5">
             {view.kind !== 'smart' || view.id !== 'completed' ? (
-              <form onSubmit={add} class="py-3">
+              <form onSubmit={add} class="py-3 flex gap-2">
                 <input
                   type="text"
                   value={draft}
                   onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
                   placeholder={`Add task to "${targetName}"`}
                   aria-label={`Add task to ${targetName}`}
-                  class="w-full rounded bg-[var(--los-border)]/40 px-3 py-2 text-sm placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
+                  class="flex-1 min-w-0 rounded bg-[var(--los-border)]/40 px-3 py-2 text-sm placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
+                />
+                <input
+                  type="date"
+                  value={draftDue}
+                  onInput={(e) => setDraftDue((e.target as HTMLInputElement).value)}
+                  aria-label="New task due date"
+                  class="shrink-0 rounded bg-[var(--los-border)]/40 px-2 py-2 text-xs"
                 />
               </form>
             ) : null}

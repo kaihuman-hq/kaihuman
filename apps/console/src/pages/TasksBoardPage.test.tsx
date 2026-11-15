@@ -113,7 +113,7 @@ describe('TasksBoardPage', () => {
   it('reschedules to a custom date, date only when no time, and closes on Escape', () => {
     const btn = host.querySelector('[aria-label^="Reschedule Read"]') as HTMLElement;
     act(() => btn.click());
-    const date = host.querySelector('input[type="date"]') as HTMLInputElement;
+    const date = host.querySelector('input[aria-label="Custom due date"]') as HTMLInputElement;
     act(() => {
       date.value = '2026-12-25';
       date.dispatchEvent(new Event('change', { bubbles: true }));
@@ -145,6 +145,26 @@ describe('TasksBoardPage', () => {
     expect(store.updateFileContent).toHaveBeenCalledWith(WORK, expect.stringContaining('New one'));
   });
 
+  it('sets a due date when creating a task', () => {
+    act(() => button('work')?.click());
+    const input = host.querySelector('input[type="text"]') as HTMLInputElement;
+    const due = host.querySelector('input[aria-label="New task due date"]') as HTMLInputElement;
+    act(() => {
+      input.value = 'Dated one';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      due.value = '2026-12-01';
+      due.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => {
+      input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(store.updateFileContent).toHaveBeenCalledWith(
+      WORK,
+      expect.stringMatching(/Dated one[\s\S]*::due:: 2026-12-01/),
+    );
+    expect(due.value).toBe('');
+  });
+
   it('opens the sidebar behind the header icon at mobile width', () => {
     expect(host.querySelectorAll('nav').length).toBe(1);
     act(() => (host.querySelector('[aria-label="Show lists"]') as HTMLButtonElement).click());
@@ -169,5 +189,20 @@ describe('TasksBoardPage', () => {
       fs.tree.value = tree;
       fs.openFiles.value = files;
     }
+  });
+
+  it('searches all lists regardless of view, and empty term restores the view', () => {
+    const input = host.querySelector('input[type="search"]') as HTMLInputElement;
+    const type = (v: string) =>
+      act(() => {
+        input.value = v;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    type('LATER');
+    expect([...host.querySelectorAll('li')].map((r) => r.textContent)).toEqual(['LaterworkDec 20']);
+    type('#nope');
+    expect(host.querySelectorAll('li')).toHaveLength(0);
+    type('');
+    expect(host.querySelectorAll('li')).toHaveLength(2);
   });
 });
