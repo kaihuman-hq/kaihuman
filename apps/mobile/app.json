@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.kaihuman.app",
       "buildNumber": "13",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "kaihuman uses the camera to scan receipts, tickets and documents into entries."
       }
     },
     "android": {
