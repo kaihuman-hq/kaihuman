@@ -18,16 +18,16 @@ private final class IntelligenceException: Exception {
 
 /// Keeps the document camera delegate alive until the sheet is dismissed (the controller holds it weakly).
 private final class DocumentScanDelegate: NSObject, VNDocumentCameraViewControllerDelegate {
-    private var continuation: CheckedContinuation<[CGImage]?, Never>?
+    private var continuation: CheckedContinuation<[CGImage]?, Error>?
     static var current: DocumentScanDelegate?
 
-    init(_ continuation: CheckedContinuation<[CGImage]?, Never>) {
+    init(_ continuation: CheckedContinuation<[CGImage]?, Error>) {
         self.continuation = continuation
     }
 
-    private func finish(_ images: [CGImage]?, _ controller: VNDocumentCameraViewController) {
+    private func finish(_ result: Result<[CGImage]?, Error>, _ controller: VNDocumentCameraViewController) {
         controller.dismiss(animated: true)
-        continuation?.resume(returning: images)
+        continuation?.resume(with: result)
         continuation = nil
         DocumentScanDelegate.current = nil
     }
@@ -36,17 +36,17 @@ private final class DocumentScanDelegate: NSObject, VNDocumentCameraViewControll
         _ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan
     ) {
         let images = (0..<scan.pageCount).compactMap { scan.imageOfPage(at: $0).cgImage }
-        finish(images, controller)
+        finish(.success(images), controller)
     }
 
     func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-        finish(nil, controller)
+        finish(.success(nil), controller)
     }
 
     func documentCameraViewController(
         _ controller: VNDocumentCameraViewController, didFailWithError error: Error
     ) {
-        finish(nil, controller)
+        finish(.failure(error), controller)
     }
 }
 
@@ -91,7 +91,7 @@ public class KaihumanIntelligenceModule: Module {
                 }
                 return try await Self.recognize(image)
             }
-            guard let pages = await Self.scanPages() else { return nil }
+            guard let pages = try await Self.scanPages() else { return nil }
             var texts: [String] = []
             for page in pages {
                 texts.append(try await Self.recognize(page))
@@ -200,11 +200,14 @@ public class KaihumanIntelligenceModule: Module {
     }
 
     @MainActor
-    static func scanPages() async -> [CGImage]? {
-        guard VNDocumentCameraViewController.isSupported, let top = topViewController() else {
-            return nil
+    static func scanPages() async throws -> [CGImage]? {
+        guard VNDocumentCameraViewController.isSupported else {
+            throw IntelligenceException("The document camera is not available on this device.")
         }
-        return await withCheckedContinuation { continuation in
+        guard let top = topViewController() else {
+            throw IntelligenceException("Could not open the document camera.")
+        }
+        return try await withCheckedThrowingContinuation { continuation in
             let controller = VNDocumentCameraViewController()
             let delegate = DocumentScanDelegate(continuation)
             DocumentScanDelegate.current = delegate

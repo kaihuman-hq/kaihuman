@@ -55,6 +55,17 @@ describe('kaihuman-intelligence native module', () => {
     ])
       expect(swift).toContain(s);
   });
+
+  // Regression: without a camera usage string iOS kills the app when the document camera opens.
+  it('declares the camera usage string the document camera needs', () => {
+    const plist = JSON.parse(read('app.json')).expo.ios.infoPlist;
+    expect(plist.NSCameraUsageDescription).toMatch(/\w/);
+  });
+
+  it('rejects instead of hanging or crashing when the document camera fails', () => {
+    expect(swift).toContain('withCheckedThrowingContinuation');
+    expect(swift).toMatch(/didFailWithError[\s\S]*?\.failure\(error\)/);
+  });
 });
 
 describe('Visual Intelligence intents', () => {
