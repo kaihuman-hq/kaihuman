@@ -1,5 +1,5 @@
 import { buildDemoSeed, configureCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as controllers from '../components/widgets/tile-controllers.js';
 import { type DashboardPage, loadDashboards } from '../screens/dashboards.js';
@@ -229,5 +229,23 @@ describe('DashboardPager RSS tile', () => {
     expect(within(tile).getByText('unread')).toBeTruthy();
     // The glance is a count and a few figures; item titles live in the detail view.
     expect(within(tile).queryByText('Item a')).toBeNull();
+  });
+});
+
+describe('DashboardPager clock', () => {
+  it('re-presents tiles as the minute rolls over without a reload', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      vi.setSystemTime(NOW);
+      const present = vi.spyOn(controllers, 'presentTile');
+      const pages = await demoPages();
+      render(<DashboardPager pages={pages} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
+      const latest = () => present.mock.calls.at(-1)?.[2] as Date;
+      expect(latest().getTime()).toBe(NOW.getTime());
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(latest().getTime()).toBe(NOW.getTime() + 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

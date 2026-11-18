@@ -41,6 +41,7 @@ import { jumpSlot, pageAtOffset, pageOfSlot, slotOf } from './pager-loop.js';
 import { type Glance, glanceOf } from './tiles/glance/index.js';
 import { SquareTile, TILE_GAP, tileSide } from './tiles/square/square-tile.js';
 import { tileRoute, UnsupportedTile } from './tiles/summary-tile.js';
+import { useLiveNow } from './tiles/use-live-now.js';
 
 export { DASHBOARD_LINKS } from './dashboard-view.js';
 
@@ -405,7 +406,7 @@ export interface DashboardPagerProps {
 export function DashboardPager({
   pages,
   defaulted = false,
-  now,
+  now: loadedAt,
   loading = false,
   refreshing = false,
   error,
@@ -414,6 +415,8 @@ export function DashboardPager({
   onNavigate,
   editor,
 }: DashboardPagerProps) {
+  // `now` only seeds: the load time alone left clock tiles and the date line frozen between loads.
+  const now = useLiveNow(loadedAt);
   const { colors, spacing, metrics } = useTheme();
   const insets = useInsets();
   const { width } = useWindowDimensions();
