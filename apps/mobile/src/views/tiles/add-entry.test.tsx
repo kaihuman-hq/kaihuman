@@ -35,6 +35,7 @@ describe('add entry registry', () => {
         'timezones',
         'todos',
         'travel',
+        'vacation',
       ].sort(),
     );
     for (const kind of ['habit', 'timetracking', 'boardoverview', 'palettesettings'] as TileKind[])

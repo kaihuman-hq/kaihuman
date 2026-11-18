@@ -6,6 +6,7 @@ describe('fileKindForPath', () => {
     ['.kh/news.rss.json', { type: 'tile', tile: 'rss' }],
     ['.kh/health.habit.csv', { type: 'tile', tile: 'habit' }],
     ['.kh/trips.travel.json', { type: 'tile', tile: 'travel' }],
+    ['.kh/summer.vacation.json', { type: 'tile', tile: 'vacation' }],
     ['.kh/board.board-overview.json', { type: 'tile', tile: 'boardoverview' }],
     ['.kh/command-palette.settings.json', { type: 'tile', tile: 'palettesettings' }],
     ['notes/welcome.md', { type: 'markdown' }],

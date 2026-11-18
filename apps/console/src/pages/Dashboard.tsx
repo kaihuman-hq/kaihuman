@@ -465,6 +465,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.board-overview.json') ||
               lowerPath.endsWith('.bookmarks.json') ||
               lowerPath.endsWith('.travel.json') ||
+              lowerPath.endsWith('.vacation.json') ||
               lowerPath.endsWith('command-palette.settings.json') ||
               lowerPath.endsWith('.enc');
 

@@ -158,6 +158,7 @@ export class LayoutStore {
       const isBoardOverview = item.path.toLowerCase().endsWith('.board-overview.json');
       const isBookmarks = item.path.toLowerCase().endsWith('.bookmarks.json');
       const isTravel = item.path.toLowerCase().endsWith('.travel.json');
+      const isVacation = item.path.toLowerCase().endsWith('.vacation.json');
 
       // Use compound extension for known widget types; fall back to last segment
       let extension: string | undefined;
@@ -178,6 +179,7 @@ export class LayoutStore {
       else if (isBoardOverview) extension = '.board-overview.json';
       else if (isBookmarks) extension = '.bookmarks.json';
       else if (isTravel) extension = '.travel.json';
+      else if (isVacation) extension = '.vacation.json';
       else extension = item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined;
 
       const tile: TileDef = {
@@ -207,7 +209,8 @@ export class LayoutStore {
         isConsumption ||
         isBoardOverview ||
         isBookmarks ||
-        isTravel;
+        isTravel ||
+        isVacation;
 
       if (isWidget && openFiles && openFiles[item.path]) {
         tile.rawContent = openFiles[item.path]?.content;

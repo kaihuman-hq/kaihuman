@@ -24,6 +24,7 @@ The console picks a widget by suffix (`MainApp.tsx` in `packages/ui`). New File 
 | `.budget.csv` | Budget | `packages/ui/.../BudgetLogic.ts` |
 | `.stocks.csv` | Stocks / portfolio | `packages/ui/.../StocksLogic.ts` |
 | `.rss.json` | RSS reader | `packages/ui/.../RssLogic.ts` |
+| `.vacation.json` | Vacation research | `packages/formats/src/vacation.ts` |
 | `.board-overview.json` | Board overview tile | none (`{}`) |
 | `.settings.json` | Command palette settings | `packages/formats/src/palette-settings.ts` |
 
@@ -351,6 +352,34 @@ The console reads `.kh/.dashboard.config.json` (type `DashboardConfig` in `packa
 - `navbar` orders the desktop bottom navbar. Allowed ids are `dashboard`, `files`, `board`, `shortcuts`, `wiki`, `knowledge`, `actionLog`, `graph` and `commits` (`NAVBAR_ITEMS` in `packages/ui/src/LifeOS/navbar-items.ts`).
 
 Without the file, the console uses one `Main` dashboard. The Rust CLI looks for `.dashboard.config.json`, `.kh/.dashboard.config.json`, `.lifeos/.dashboard.config.json` or `dashboard.config.json`, then scans for any file ending in `dashboard.config.json`.
+
+## Vacation research format (`*.vacation.json`)
+<!-- docspack: tags=vacation,vacation research,destinations,.vacation.json -->
+
+One file is one search (e.g. "Summer 2027"). It is standalone: it does not link to `.travel.json`. Parser: `packages/formats/src/vacation.ts`; `parseVacation` never throws and keeps every valid destination.
+
+```ts
+type VacationDoc = {
+  version: 1;
+  title: string;
+  from?: string;      // ISO YYYY-MM-DD
+  to?: string;        // ISO YYYY-MM-DD
+  budget?: number;
+  currency: string;   // default 'EUR'
+  travelers?: number;
+  notes?: string;
+  custom: CustomField[];
+  destinations: Destination[];
+};
+type DestinationStatus = 'idea' | 'shortlist' | 'booked' | 'dropped'; // default 'idea'
+type Destination = {
+  id: string; name: string; status: DestinationStatus;
+  rating?: number;    // integer 1-5
+  price?: number; duration?: string; // free text, e.g. "5 nights"
+  website?: string; address?: string; mapsUrl?: string; notes?: string;
+  custom: CustomField[];
+};
+```
 
 ## Formats of the other widget files
 <!-- docspack: tags=data collection,consumption,budget,stocks,rss,timezones -->

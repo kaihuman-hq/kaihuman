@@ -50,6 +50,8 @@ import {
   rssView,
   type TravelView,
   travelView,
+  type VacationView,
+  vacationView,
 } from './more-tiles.js';
 import { type StocksView, stocksView } from './stocks-tile.js';
 import { type TodosView, todosView } from './todos-tile.js';
@@ -935,6 +937,7 @@ export type TileView =
   | { kind: 'commands'; view: TemplatesView }
   | { kind: 'rss'; view: RssView }
   | { kind: 'travel'; view: TravelView }
+  | { kind: 'vacation'; view: VacationView }
   | { kind: 'boardoverview'; view: BoardOverviewView }
   | { kind: 'palettesettings'; view: PaletteSettingsView };
 
@@ -957,6 +960,7 @@ const TILE_SUFFIXES: readonly (readonly [string, TileKind])[] = [
   ['.commands.md', 'commands'],
   ['.rss.json', 'rss'],
   ['.travel.json', 'travel'],
+  ['.vacation.json', 'vacation'],
   ['.board-overview.json', 'boardoverview'],
   ['command-palette.settings.json', 'palettesettings'],
 ];
@@ -1002,6 +1006,8 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
       return { kind: 'rss', view: rssView(content, feedStore.snapshot(), now) };
     case 'travel':
       return { kind: 'travel', view: travelView(content, now) };
+    case 'vacation':
+      return { kind: 'vacation', view: vacationView(content) };
     case 'boardoverview':
       return { kind: 'boardoverview', view: boardOverviewView(content, [], now) };
     case 'palettesettings':

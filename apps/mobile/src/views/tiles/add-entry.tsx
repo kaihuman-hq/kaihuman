@@ -15,6 +15,7 @@ import { TileSheet } from './tile-sheet.js';
 import { ZoneAddForm } from './timezones-body.js';
 import { TodoAddForm } from './todos-body.js';
 import { TripAddForm } from './travel-body.js';
+import { DestinationAddForm } from './vacation-body.js';
 
 /** How one tile kind adds an entry: the ＋ button's label, the sheet's title and its form. */
 export interface AddEntry {
@@ -61,6 +62,11 @@ export const ADD_ENTRIES: { readonly [K in TileKind]?: AddEntryFor } = {
   commands: fixed({ label: 'Add command', title: 'New command', Form: CommandForm }),
   rss: fixed({ label: 'Add feed', title: 'New feed', Form: RssAddForm }),
   travel: fixed({ label: 'Add trip', title: 'New trip', Form: TripAddForm }),
+  vacation: fixed({
+    label: 'Add destination',
+    title: 'New destination',
+    Form: DestinationAddForm,
+  }),
 };
 
 export const addEntryFor = (kind: TileKind, content: string, now: Date): AddEntry | null =>

@@ -23,3 +23,4 @@ export * from './todo-repeat.js';
 export * from './todo-views.js';
 export * from './todos.js';
 export * from './travel.js';
+export * from './vacation.js';

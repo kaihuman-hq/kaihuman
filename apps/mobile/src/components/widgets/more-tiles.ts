@@ -145,3 +145,4 @@ export const removeRssFeedById = (content: string, feedId: string): string =>
 export * from './board-overview-tile.js';
 export * from './palette-settings-tile.js';
 export * from './travel-tile.js';
+export * from './vacation-tile.js';
