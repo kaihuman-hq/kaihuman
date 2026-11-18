@@ -1,9 +1,11 @@
 import { encrypt, Logger, passwordStore } from '@kaihuman/core';
 import {
   DEFAULT_PALETTE_SETTINGS,
+  emptyVacation,
   parseTravel,
   serializePaletteSettings,
   serializeTravel,
+  serializeVacation,
 } from '@kaihuman/formats';
 import {
   Activity,
@@ -25,6 +27,7 @@ import {
   Star,
   Terminal,
   TrendingUp,
+  Umbrella,
   X,
   Zap,
 } from 'lucide-preact';
@@ -172,6 +175,15 @@ const TEMPLATES: Template[] = [
     extension: '.travel.json',
     defaultContent: serializeTravel(parseTravel('')),
     suggestedFilename: String(new Date().getFullYear()),
+  },
+  {
+    id: 'vacation',
+    name: 'Vacation research',
+    description: 'Collect and compare candidate destinations with status, rating, price and links.',
+    icon: Umbrella,
+    extension: '.vacation.json',
+    defaultContent: serializeVacation(emptyVacation('Vacation')),
+    suggestedFilename: 'vacation',
   },
   {
     id: 'command-palette-settings',

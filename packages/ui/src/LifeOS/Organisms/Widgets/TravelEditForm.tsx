@@ -184,7 +184,7 @@ export const TravelEditForm = ({ content, tripId, onChange, onDone }: TravelEdit
   );
 };
 
-const LabeledInput = ({
+export const LabeledInput = ({
   label,
   ariaLabel,
   value,
@@ -211,7 +211,7 @@ const LabeledInput = ({
   </label>
 );
 
-const CustomFieldsEditor = ({
+export const CustomFieldsEditor = ({
   prefix,
   fields,
   onFields,

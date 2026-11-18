@@ -142,15 +142,15 @@ const Overview = ({ doc, className }: { doc: TravelDoc; className?: string }) =>
   );
 };
 
-const linkClass =
+export const linkClass =
   'inline-flex items-center gap-1 text-[10px] font-mono text-[var(--los-accent)] hover:underline';
 const fieldLabelClass = 'text-[10px] text-[var(--los-muted)] uppercase';
 
 // User-typed URLs become links; anything but http(s) (e.g. javascript:) is not linked.
-const safeHref = (url?: string): string | undefined =>
+export const safeHref = (url?: string): string | undefined =>
   url && /^https?:\/\//i.test(url.trim()) ? url.trim() : undefined;
 
-const Detail = ({ label, value }: { label: string; value?: string }) =>
+export const Detail = ({ label, value }: { label: string; value?: string }) =>
   value ? (
     <div className="min-w-0">
       <span className={fieldLabelClass}>{label}</span>
@@ -158,7 +158,7 @@ const Detail = ({ label, value }: { label: string; value?: string }) =>
     </div>
   ) : null;
 
-const CustomList = ({ fields }: { fields: CustomField[] }) => (
+export const CustomList = ({ fields }: { fields: CustomField[] }) => (
   <>
     {fields.map((c, i) => (
       // biome-ignore lint/suspicious/noArrayIndexKey: custom fields have no id, order is the identity
