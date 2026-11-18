@@ -52,8 +52,13 @@ const IMG_SRC = /(<img\b[^>]*?\bsrc=")([^"]*)(")/gi;
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// As narro's attributeText: remark writes some characters (`&`) as numeric references.
 const unescapeAttr = (s: string) =>
   s
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number(dec)))
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')

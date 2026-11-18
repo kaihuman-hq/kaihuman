@@ -39,6 +39,8 @@ function DocumentView(props: {
 }) {
   const { target, data, path, text } = props;
   const [view, setView] = useState<View>({ status: 'rendering' });
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   useEffect(() => {
     if (text === undefined || !data.profile) return;
@@ -96,7 +98,15 @@ function DocumentView(props: {
         <button
           type="button"
           class={PRIMARY}
-          onClick={() => loadPrint().then((m) => m.printHtml(html))}
+          disabled={printing}
+          onClick={() => {
+            setPrinting(true);
+            setPrintError(null);
+            loadPrint()
+              .then((m) => m.printHtml(html))
+              .catch((e: unknown) => setPrintError(`Printing failed: ${String(e)}`))
+              .finally(() => setPrinting(false));
+          }}
         >
           Print / Save as PDF
         </button>
@@ -104,6 +114,11 @@ function DocumentView(props: {
           In the print dialog choose “Save as PDF” and turn off the browser's headers and footers.
           Chromium browsers give the exact layout.
         </p>
+        {printError && (
+          <p role="alert" class="text-xs text-[var(--los-warning)]">
+            {printError}
+          </p>
+        )}
       </div>
       <iframe
         title={`Preview: ${view.title}`}

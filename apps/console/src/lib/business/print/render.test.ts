@@ -91,11 +91,11 @@ describe('renderBusinessDocument', () => {
     };
     const text = offerText.replace(
       '<!-- items -->',
-      '![D](../assets/diagram.svg)\n\n<!-- items -->',
+      '![D](../assets/diagram.svg) ![E](a&b.svg)\n\n<!-- items -->',
     );
     const r = await renderBusinessDocument(
       text,
-      { ...profile, print: { logo: 'assets/logo.svg' } },
+      { ...profile, print: { logo: './assets/logo.svg' } },
       clients,
       read,
       noFonts,
@@ -104,8 +104,9 @@ describe('renderBusinessDocument', () => {
     expect(seen.sort()).toEqual([
       '.kh/business/assets/diagram.svg',
       '.kh/business/assets/logo.svg',
+      '.kh/business/documents/a&b.svg',
     ]);
-    if (r.ok) expect(r.value.html.match(/src="data:image\/svg\+xml;base64,/g)).toHaveLength(2);
+    if (r.ok) expect(r.value.html.match(/src="data:image\/svg\+xml;base64,/g)).toHaveLength(3);
   });
 });
 

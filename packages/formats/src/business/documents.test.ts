@@ -168,6 +168,10 @@ describe('images and paths', () => {
     expect(resolveRepoPath('../assets/diagram.svg')).toBe(`${BUSINESS_ROOT}/assets/diagram.svg`);
     expect(resolveRepoPath('img/a%20b.png')).toBe(`${BUSINESS_ROOT}/documents/img/a b.png`);
     expect(resolveRepoPath('../../../../x.png')).toBeNull();
+    expect(resolveRepoPath('100%.svg')).toBe(`${BUSINESS_ROOT}/documents/100%.svg`);
+    expect(resolveRepoPath('./assets/logo.svg', BUSINESS_ROOT)).toBe(
+      `${BUSINESS_ROOT}/assets/logo.svg`,
+    );
   });
 
   it('classifies documents and assets, and the repo lists documents', () => {

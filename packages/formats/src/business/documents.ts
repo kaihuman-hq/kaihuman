@@ -162,7 +162,13 @@ export const resolveDocument = (
  */
 export const resolveRepoPath = (ref: string, fromDir: string = DOCUMENTS_DIR): string | null => {
   const out = ref.startsWith('/') ? [] : fromDir.split('/').filter(Boolean);
-  for (const part of decodeURI(ref).split('/')) {
+  let decoded = ref;
+  try {
+    decoded = decodeURI(ref);
+  } catch {
+    // A literal `%` (e.g. `100%.svg`) is a file name, not an escape.
+  }
+  for (const part of decoded.split('/')) {
     if (part === '..') {
       if (out.length === 0) return null;
       out.pop();

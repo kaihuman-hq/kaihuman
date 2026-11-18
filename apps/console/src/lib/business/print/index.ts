@@ -7,6 +7,7 @@ import {
   type Issue,
   parseDocumentFile,
   resolveDocument,
+  resolveRepoPath,
 } from '@kaihuman/formats/business';
 import { browserFontCss } from './fonts';
 import { type ReadBytes, type Rendered, renderDocumentHtml } from './render';
@@ -27,11 +28,11 @@ export async function renderBusinessDocument(
   if (!parsed.ok) return parsed;
   const resolved = resolveDocument(parsed.value, profile, clients);
   if (!resolved.ok) return resolved;
-  const logo = profile.print?.logo;
+  const logo = profile.print?.logo ? resolveRepoPath(profile.print.logo, BUSINESS_ROOT) : null;
   return renderDocumentHtml({
     doc: resolved.value,
     readBytes,
-    ...(logo ? { logoPath: `${BUSINESS_ROOT}/${logo}` } : {}),
+    ...(logo ? { logoPath: logo } : {}),
     fontCss,
   });
 }
