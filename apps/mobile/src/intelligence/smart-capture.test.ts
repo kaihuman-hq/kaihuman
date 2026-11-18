@@ -245,6 +245,23 @@ describe('Siri queue', () => {
     expect(parseQueue(null, now)).toEqual([]);
   });
 
+  // Row shape InboxCapture.add (CaptureTodoIntent.swift) writes for "Add a todo" with a due date.
+  it('files a Siri todo with a due date as a dated inbox todo', () => {
+    const json = JSON.stringify([
+      {
+        text: 'pay rent',
+        capturedAt: '2026-11-09T08:00:00.000Z',
+        capture: { kind: 'todo', text: 'pay rent', tags: [], due: '2026-11-20' },
+      },
+    ]);
+    expect(parseQueue(json, now)).toEqual([
+      {
+        text: 'pay rent',
+        capture: { kind: 'todo', text: 'pay rent', tags: [], due: { date: '2026-11-20' } },
+      },
+    ]);
+  });
+
   it('drains, keeping failed entries for the next launch', async () => {
     const s = store(
       JSON.stringify([

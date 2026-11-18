@@ -42,16 +42,27 @@ struct TodoEntityQuery: EntityStringQuery {
     }
 }
 
-/// "Add a todo in kaihuman": opens the capture sheet (text input needs the app).
+/// "Add a todo in kaihuman" / "Neues Todo zu kaihuman": saved to the inbox without opening the app.
+/// Siri asks for the text; the due date is optional (Shortcuts, or Siri when asked to change it).
 struct AddTodoIntent: AppIntent {
     static let title: LocalizedStringResource = "Add a todo"
-    static let description = IntentDescription("Opens kaihuman on a new todo.")
-    static let openAppWhenRun = true
+    static let description = IntentDescription("Adds a todo to your kaihuman inbox.")
+    static let openAppWhenRun = false
 
-    func perform() async throws -> some IntentResult {
-        UserDefaults(suiteName: SharedTodoStore.appGroupId)?
-            .set(QuickCaptureKind.todo.url, forKey: "pending-url")
-        return .result()
+    @Parameter(title: "Todo")
+    var text: String
+
+    @Parameter(title: "Due date")
+    var due: Date?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Add \(\.$text) to inbox") {
+            \.$due
+        }
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: await InboxCapture.add(text, due: due))
     }
 }
 

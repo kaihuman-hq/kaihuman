@@ -320,6 +320,38 @@
           }
         }
       }
+    },
+    "New todo for ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Todo zu ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New todo for ${applicationName}"
+          }
+        }
+      }
+    },
+    "Add a todo to ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo zu ${applicationName} hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a todo to ${applicationName}"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
