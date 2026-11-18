@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-18 — Mobile: pull-down search, braindumps, scan crash, live clock
+
+- Pull-down on any `Screen` with refresh: a short pull (36–80pt) opens search, a longer pull still syncs. Threshold logic in `src/ui/pull-search.ts` with tests.
+- Braindumps: ＋ menu → Braindump creates one; More → Braindumps lists them (`app/braindumps.tsx`, `src/views/braindumps-view.tsx`).
+- Scan document no longer crashes: `app.json` gets `NSCameraUsageDescription`; the native scan call and scan view report errors instead of crashing. Needs a native rebuild.
+- Dashboard clock: `DashboardPager` ticks `now` every minute via `useLiveNow` instead of only on reload. Regression test added.
+
 ## 2026-11-18 — Braindump: save to file (⌃⇧S)
 
 - Desktop palette braindump window: ⌃⇧S (⌘⇧S on macOS) opens a native save dialog and writes the text to a file on disk. The name is suggested from the first line with `.md` as the default; the extension the user types is kept. GitHub autosave is unchanged.
