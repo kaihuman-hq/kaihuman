@@ -9,7 +9,7 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "com.kaihuman.app",
-      "buildNumber": "13",
+      "buildNumber": "14",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "kaihuman uses the camera to scan receipts, tickets and documents into entries."
