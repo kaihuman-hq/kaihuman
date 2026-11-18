@@ -1,6 +1,9 @@
+import { router } from 'expo-router';
 import { HeaderHeightContext, HeaderShownContext } from 'expo-router/react-navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   RefreshControl,
   ScrollView,
@@ -12,6 +15,7 @@ import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
 import { KeyboardLift, keyboardScrollProps } from './keyboard.js';
+import { pullDistance, pullIntent } from './pull-search.js';
 import { Text } from './text.js';
 import { useKeyboardVisible } from './use-keyboard.js';
 
@@ -85,6 +89,15 @@ export function Screen({
       animated: false,
     });
   }, [scrollToTopKey]);
+  // A short pull-down opens search; a long one is left to the refresh control. iOS only: it is
+  // the platform with a rubber-band overscroll and the search-under-header convention.
+  const pullSearch = Platform.OS === 'ios' && scroll && onRefresh !== undefined;
+  const onScrollEndDrag = pullSearch
+    ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const pull = pullDistance(e.nativeEvent.contentOffset.y, -(headerHeight ?? 0));
+        if (pullIntent(pull) === 'search' && !refreshing) router.push('/search');
+      }
+    : undefined;
   const { spacing, colors } = theme;
   const margin = inset === 'grouped' ? theme.metrics.screenMargin : 0;
   // Native headers already show the title. The web preview hides tab-root headers, so only
@@ -102,6 +115,7 @@ export function Screen({
       contentInsetAdjustmentBehavior="automatic"
       {...keyboardScrollProps(lifted)}
       keyboardDismissMode="interactive"
+      onScrollEndDrag={onScrollEndDrag}
       refreshControl={
         onRefresh ? (
           <RefreshControl
