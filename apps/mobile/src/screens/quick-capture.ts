@@ -4,6 +4,8 @@ import {
   addTodoEntry,
   applyIdeaHandoff,
   asIdeaSlug,
+  type BraindumpId,
+  braindumpPath,
   type IdeaHandoff,
   ideaPath,
   localDate,
@@ -262,6 +264,17 @@ export class QuickCaptureController {
     } finally {
       this.busy = false;
     }
+  }
+
+  /** One file per braindump, named by creation time like the desktop braindump window's. */
+  quickBraindump(text: string): Promise<CaptureResult> {
+    const body = text.trim();
+    if (!body) return Promise.resolve({ ok: false, error: 'Nothing to add' });
+    const path = braindumpPath(String(this.clock().getTime()) as BraindumpId);
+    return this.run(path, async () => {
+      await this.files.write(path, `${body}\n`);
+      return 'Braindump saved';
+    });
   }
 
   /** Drops a raw source into `.kh/raw/` for the knowledge-base ingest skill to process. */

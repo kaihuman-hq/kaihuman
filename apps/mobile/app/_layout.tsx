@@ -29,6 +29,7 @@ const QUICK_ROUTES = [
   'quick-log',
   'quick-idea',
   'quick-knowledge',
+  'quick-braindump',
   'quick-inbox',
   // The ＋ menu's one-field Track entry (`?path=`); not a deep link.
   'quick-entry',
@@ -124,6 +125,10 @@ export default function RootLayout() {
         <Stack.Screen
           name="knowledge"
           options={{ title: 'Knowledge', headerLargeTitle: largeTitles, ...webBack('/more') }}
+        />
+        <Stack.Screen
+          name="braindumps"
+          options={{ title: 'Braindumps', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
         <Stack.Screen
           name="repos"

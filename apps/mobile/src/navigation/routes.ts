@@ -4,7 +4,7 @@ import { isScanKind, type ScanKind } from '../intelligence/scan-kinds.js';
 export const APP_SCHEME = 'kaihuman';
 
 /** `inbox` is the one-field sheet behind the widget "+": it adds a plain todo to the inbox. */
-export type QuickKind = 'todo' | 'note' | 'log' | 'idea' | 'knowledge' | 'inbox';
+export type QuickKind = 'todo' | 'note' | 'log' | 'idea' | 'knowledge' | 'braindump' | 'inbox';
 
 export type Route =
   | { name: 'auth-callback'; accessToken: string | null }
@@ -27,7 +27,15 @@ export type Route =
 /** Longest `text` a quick-capture link may prefill. */
 export const MAX_PREFILL = 2000;
 
-const QUICK_KINDS: readonly QuickKind[] = ['todo', 'note', 'log', 'idea', 'knowledge', 'inbox'];
+const QUICK_KINDS: readonly QuickKind[] = [
+  'todo',
+  'note',
+  'log',
+  'idea',
+  'knowledge',
+  'braindump',
+  'inbox',
+];
 
 /**
  * Parses `kaihuman://...` deep links. Returns null for foreign schemes and unknown routes

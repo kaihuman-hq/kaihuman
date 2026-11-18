@@ -164,6 +164,17 @@ describe('QuickCaptureController', () => {
     expect(await c.quickKnowledge(' ')).toMatchObject({ ok: false });
   });
 
+  it('saves a braindump as its own file named by the creation time', async () => {
+    const files = mem();
+    const c = capture(files);
+    expect(await c.quickBraindump('  Trip ideas\nmore  ')).toMatchObject({
+      ok: true,
+      path: `.kh/braindumps/${NOW.getTime()}.md`,
+    });
+    expect(files.store.get(`.kh/braindumps/${NOW.getTime()}.md`)).toBe('Trip ideas\nmore\n');
+    expect(await c.quickBraindump(' ')).toMatchObject({ ok: false });
+  });
+
   it('writes to a picked target instead of the built-in file', async () => {
     const files = mem();
     const c = capture(files);

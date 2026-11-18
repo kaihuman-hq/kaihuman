@@ -22,6 +22,13 @@ const WORKSPACE: readonly WorkspaceLink[] = [
     tone: 'accent',
   },
   {
+    href: '/braindumps',
+    title: 'Braindumps',
+    subtitle: 'Dumped thoughts, newest first',
+    icon: 'note',
+    tone: 'neutral',
+  },
+  {
     href: '/analytics',
     title: 'Analytics',
     subtitle: 'Todo velocity and totals',
