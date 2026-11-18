@@ -97,5 +97,14 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
             shortTitle: "Add to stream",
             systemImageName: "text.badge.plus"
         )
+        AppShortcut(
+            intent: NextBirthdayIntent(),
+            phrases: [
+                "What's the next birthday in \(.applicationName)",
+                "Next birthday in \(.applicationName)",
+            ],
+            shortTitle: "Next birthday",
+            systemImageName: "gift"
+        )
     }
 }

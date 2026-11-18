@@ -573,6 +573,7 @@ const fullSnapshot: Required<
     | 'items'
     | 'ideas'
     | 'cards'
+    | 'birthdays'
     | 'habits'
     // Not read by Android; kept verbatim in its raw copy like the other v2 keys.
     | 'nextDue'

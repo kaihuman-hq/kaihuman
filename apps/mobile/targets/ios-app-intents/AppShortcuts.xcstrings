@@ -384,6 +384,38 @@
           }
         }
       }
+    },
+    "What's the next birthday in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wann ist der nächste Geburtstag in ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the next birthday in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Next birthday in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächster Geburtstag in ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next birthday in ${applicationName}"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
