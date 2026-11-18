@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   companyFromProfile,
-  imageRefs,
   parseDocumentFile,
   partyFromClient,
   resolveDocument,
@@ -165,14 +164,6 @@ describe('resolveDocument', () => {
 });
 
 describe('images and paths', () => {
-  it('finds relative image references only', () => {
-    expect(
-      imageRefs(
-        '![D](../assets/diagram.svg) ![x](https://e.x/a.png) <img src="logo.png"> ![d](data:image/png;base64,AA)',
-      ),
-    ).toEqual(['../assets/diagram.svg', 'logo.png']);
-  });
-
   it('resolves relative to documents/ and refuses to leave the repository', () => {
     expect(resolveRepoPath('../assets/diagram.svg')).toBe(`${BUSINESS_ROOT}/assets/diagram.svg`);
     expect(resolveRepoPath('img/a%20b.png')).toBe(`${BUSINESS_ROOT}/documents/img/a b.png`);

@@ -156,19 +156,6 @@ export const resolveDocument = (
   };
 };
 
-const IMAGE_MD = /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
-const IMAGE_HTML = /<img\b[^>]*?\bsrc=["']([^"']+)["']/gi;
-const EXTERNAL = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i;
-
-/** Relative image references in a body, as written; URLs and data: URIs are left alone. */
-export const imageRefs = (body: string): string[] => {
-  const refs = new Set<string>();
-  for (const re of [IMAGE_MD, IMAGE_HTML]) {
-    for (const m of body.matchAll(re)) if (m[1] && !EXTERNAL.test(m[1])) refs.add(m[1]);
-  }
-  return [...refs];
-};
-
 /**
  * The repo path a reference written in `documents/<slug>.md` points to, or null when it would
  * leave the repository. `fromDir` defaults to the documents folder.

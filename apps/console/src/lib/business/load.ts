@@ -12,8 +12,8 @@ export const parseLoadError = (entry: string): { path: string; message: string }
     : { path: entry.slice(0, at), message: entry.slice(at + 2) };
 };
 
-// Artifacts and receipts are known from the tree alone; meta files carry no data.
-const SKIPPED_KINDS = new Set(['meta', 'artifact', 'receipt']);
+// Artifacts, receipts and images are known from the tree alone; meta files carry no data.
+const SKIPPED_KINDS = new Set(['meta', 'artifact', 'receipt', 'asset']);
 
 /** The blobs to fetch for business pages. */
 export const businessTreeItems = (tree: readonly TreeItem[]): TreeItem[] =>

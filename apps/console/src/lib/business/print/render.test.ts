@@ -1,3 +1,5 @@
+/// <reference types="node" />
+// The parity check runs narro itself in Node, which reads files.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
