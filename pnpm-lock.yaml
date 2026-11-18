@@ -276,6 +276,9 @@ importers:
       '@cascivo/themes':
         specifier: ^1.0.0
         version: 1.0.0
+      '@getnarro/pdf':
+        specifier: 0.0.0
+        version: 0.0.0(playwright-core@1.56.1)(supports-color@8.1.1)
       '@kaihuman/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -2387,6 +2390,23 @@ packages:
   '@expo/xcpretty@4.4.7':
     resolution: {integrity: sha512-EbxYllZ7/ozONVZd425cm4XnolfW+AmSFT5aP7Jdno6oc3WrYQcHz2CO20z/2rwWwYgztmV2PXvYH+BQ8YFjqg==}
     hasBin: true
+
+  '@fontsource/ibm-plex-sans@5.3.0':
+    resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
+
+  '@fontsource/inter@5.3.0':
+    resolution: {integrity: sha512-RofMylZmjlJEfELXeNHFWBRcSs75rGU/6bV2S2jfnvv/3rPXPGe0LgUJTklcHZ9lM4OZmAVFhcJPnACfb91A3g==}
+
+  '@fontsource/source-serif-4@5.3.1':
+    resolution: {integrity: sha512-cWcTCXjYYrgF9A67fThVir1VSc0lPEYmwQ6jA4pPt01s2MSCi/maINUcZoCzaqnU8fyUReDO97eGcBUkHgOeug==}
+
+  '@getnarro/pdf@0.0.0':
+    resolution: {integrity: sha512-bRm6nH1+jwsB6qmlBYvZbig7Fzb8NtQP93xHLesGMFUM/efjmkWlVViQkxe1rfzc/Hlj6A7ZhYp5KAgSN8qrNQ==}
+    peerDependencies:
+      playwright-core: ^1.56.0
+    peerDependenciesMeta:
+      playwright-core:
+        optional: true
 
   '@hono/node-server@2.1.1':
     resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
@@ -10283,6 +10303,31 @@ snapshots:
       '@babel/code-frame': 7.29.0
       chalk: 4.1.2
       js-yaml: 4.1.1
+
+  '@fontsource/ibm-plex-sans@5.3.0': {}
+
+  '@fontsource/inter@5.3.0': {}
+
+  '@fontsource/source-serif-4@5.3.1': {}
+
+  '@getnarro/pdf@0.0.0(playwright-core@1.56.1)(supports-color@8.1.1)':
+    dependencies:
+      '@fontsource/ibm-plex-sans': 5.3.0
+      '@fontsource/inter': 5.3.0
+      '@fontsource/source-serif-4': 5.3.1
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      rehype-stringify: 10.0.1
+      remark-gfm: 4.0.1(supports-color@8.1.1)
+      remark-parse: 11.0.0(supports-color@8.1.1)
+      remark-rehype: 11.1.2
+      unified: 11.0.5
+      yaml: 2.9.1
+      zod: 4.6.5
+    optionalDependencies:
+      playwright-core: 1.56.1
+    transitivePeerDependencies:
+      - supports-color
 
   '@hono/node-server@2.1.1(hono@4.13.8)':
     dependencies:

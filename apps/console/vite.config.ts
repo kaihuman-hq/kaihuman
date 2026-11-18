@@ -3,9 +3,11 @@ import preact from '@preact/preset-vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { narroBrowser } from './narro.vite';
 
 export default defineConfig({
   plugins: [
+    narroBrowser(),
     preact(),
     tailwindcss(),
     VitePWA({

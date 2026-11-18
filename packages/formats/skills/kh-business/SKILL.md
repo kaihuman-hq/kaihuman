@@ -37,6 +37,9 @@ When the `kaihuman-kb` MCP tools (`business_*`) are available, prefer them to ed
   expenses/<year>/<ulid>.yaml    expenses
   expenses/<year>/<ulid>.<ext>   the receipt (optional; `receipt: <ulid>.<ext>`)
   events.jsonl, links.jsonl      document events and share links
+  documents/<slug>.md            letters and offers to print: frontmatter (template, client slug,
+                                 date, items, ...) + Markdown body; the console renders them
+  assets/, documents/**          images (svg, png, jpg, webp) the documents and `print.logo` use
 ```
 
 Never create share links or edit `links.jsonl`: links are made and revoked by the kaihuman console

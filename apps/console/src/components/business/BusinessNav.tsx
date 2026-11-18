@@ -4,6 +4,7 @@ export const BUSINESS_SECTIONS = [
   { href: '/clients', label: 'Clients' },
   { href: '/business/pipeline', label: 'Pipeline' },
   { href: '/business/invoices', label: 'Invoices' },
+  { href: '/business/documents', label: 'Documents' },
   { href: '/business/expenses', label: 'Expenses' },
   { href: '/business/shared', label: 'Shared files' },
 ] as const;

@@ -56,6 +56,8 @@ export type BusinessRepo = {
   links: LinkRecord[];
   expenses: Expense[];
   clientFiles: { client: Slug; kind: 'notes' | 'todos' | 'log'; path: string }[];
+  /** `documents/<slug>.md`, sorted by slug; their content is checked when rendered. */
+  documents: { slug: Slug; path: string }[];
   /** Pdf/xml/sha256 and receipt paths, known from the tree alone. */
   artifacts: ReadonlySet<string>;
   findings: Finding[];
@@ -133,6 +135,7 @@ export const loadBusinessRepoDetailed = (
     links: [],
     expenses: [],
     clientFiles: [],
+    documents: [],
     artifacts: new Set(),
     findings,
   };
@@ -175,6 +178,10 @@ export const loadBusinessRepoDetailed = (
     switch (p.kind) {
       case 'profile':
       case 'meta':
+      case 'asset':
+        break;
+      case 'document':
+        repo.documents.push({ slug: p.slug, path: file });
         break;
       case 'receipt':
       case 'artifact':
