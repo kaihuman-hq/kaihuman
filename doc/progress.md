@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-18 — Mobile: Siri add todo (inbox, stream, due date), next birthday
+
+- Root cause of "Neues Todo zu kaihuman" failing: the only German phrase was "Neues Todo in kaihuman", and the intent only opened the app. New phrases "New todo for / Add a todo to kaihuman" (DE "Neues Todo zu … / Todo zu … hinzufügen"); the todo is saved without opening the app, with an optional due date (dated todos are queued and added on next app open).
+- "Add a todo to <stream> in kaihuman" (DE "Todo zu <stream> in kaihuman hinzufügen"): the stream is picked from the todo files in the widget snapshot; the todo is queued into that file (`StreamIntents.swift`, `save-capture.ts`).
+- "What's the next birthday in kaihuman" (DE "Wann ist der nächste Geburtstag in kaihuman"): answers name, date and days from the birthdays in the widget snapshot (`packages/core/src/widget-birthdays.ts`, `BirthdayIntent.swift`).
+- The three "Add to inbox" shortcuts were merged so the app stays at the iOS limit of 10 App Shortcuts. Swift not compiled here; needs a native rebuild and device check.
+
 ## 2026-11-18 — Mobile: pull-down search, braindumps, scan crash, live clock
 
 - Pull-down on any `Screen` with refresh: a short pull (36–80pt) opens search, a longer pull still syncs. Threshold logic in `src/ui/pull-search.ts` with tests.
