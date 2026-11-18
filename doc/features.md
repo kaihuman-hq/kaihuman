@@ -205,6 +205,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| ⌃⇧S Save braindump to file: native save dialog, name suggested from the first line, `.md` by default, typed extension kept | braindump window | 2026-11-18 |
 | ⌃I Promote to idea: the braindump becomes a `.kh/ideas/` idea and is deleted | braindump window | 2026-10-13 |
 | The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `kaihuman-palette-toggle` bound to a key | 2026-09-23 |
 | Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@kaihuman/palette` | desktop palette | 2026-09-23 |

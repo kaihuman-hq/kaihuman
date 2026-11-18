@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-18 — Braindump: save to file (⌃⇧S)
+
+- Desktop palette braindump window: ⌃⇧S (⌘⇧S on macOS) opens a native save dialog and writes the text to a file on disk. The name is suggested from the first line with `.md` as the default; the extension the user types is kept. GitHub autosave is unchanged.
+
 ## 2026-11-15 — Tasks: due date on create, search all tasks
 
 - Console `/tasks`: the quick-add form has a date input; the new todo gets that due date (via `addTodoEntry`'s `due` option). Tests cover add with and without a date.

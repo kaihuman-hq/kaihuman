@@ -25,6 +25,8 @@ export const BRAINDUMP_RETRY_MS = 60_000;
 export interface BraindumpHost {
   hide: () => void;
   copy: (text: string) => Promise<void>;
+  /** Asks where to write `text` and writes it: the path, or `null` when the person cancels. */
+  saveFile: (text: string) => Promise<string | null>;
 }
 
 export interface BraindumpWindow {
@@ -36,7 +38,7 @@ export interface BraindumpWindow {
   settled: () => Promise<void>;
 }
 
-const HINTS = 'Esc hide · ⌃F find · ⌃N new · ⌃O braindumps · ⌃I idea · ⌃⏎ copy all';
+const HINTS = 'Esc hide · ⌃F find · ⌃N new · ⌃O braindumps · ⌃I idea · ⌃⏎ copy all · ⌃⇧S save file';
 
 /** An idea's title from a braindump: its first line, without a heading's `#`s. */
 export const ideaTitleOf = (text: string) =>
@@ -131,6 +133,22 @@ export const createBraindumpWindow = (
   };
   const showTitle = () => {
     title.textContent = editor.value.trim() ? braindumpTitle(editor.value) : 'New braindump';
+  };
+
+  /** Writes the text to a file the person picks; the braindump itself is neither saved nor synced. */
+  const exportFile = async () => {
+    const text = editor.value;
+    if (!text.trim()) {
+      showState('nothing to save');
+      return;
+    }
+    const before = state.textContent ?? '';
+    try {
+      const path = await host.saveFile(text);
+      showState(path ? `saved to ${path.split(/[\\/]/).pop()}` : before);
+    } catch (error) {
+      showState(`not saved to file — ${message(error)}`);
+    }
   };
 
   const save = (): Promise<void> => {
@@ -397,6 +415,9 @@ export const createBraindumpWindow = (
     if (event.key === 'Escape') {
       event.preventDefault();
       void close();
+    } else if (mod && event.shiftKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      void exportFile();
     } else if (mod && event.key === 'Enter') {
       event.preventDefault();
       void host

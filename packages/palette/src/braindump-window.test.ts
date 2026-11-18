@@ -62,6 +62,7 @@ const port: ActionPort = {
 let root: HTMLElement;
 let hide: ReturnType<typeof vi.fn<() => void>>;
 let copy: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
+let saveFile: ReturnType<typeof vi.fn<(text: string) => Promise<string | null>>>;
 let win: BraindumpWindow;
 
 const text = () => root.querySelector('textarea') as HTMLTextAreaElement;
@@ -96,7 +97,8 @@ beforeEach(async () => {
   document.body.replaceChildren(root);
   hide = vi.fn<() => void>();
   copy = vi.fn(async (_text: string) => {});
-  win = createBraindumpWindow(root, port, { hide, copy }, () => Date.now());
+  saveFile = vi.fn(async (_text: string) => '/home/me/notes/dump.md' as string | null);
+  win = createBraindumpWindow(root, port, { hide, copy, saveFile }, () => Date.now());
   await tick();
 });
 
@@ -166,6 +168,75 @@ describe('braindump window', () => {
     await tick();
     expect(copy).toHaveBeenCalledWith('copy me');
     expect(hide).toHaveBeenCalledOnce();
+  });
+
+  describe('save to file', () => {
+    const exportKey = (init: KeyboardEventInit) =>
+      text().dispatchEvent(new KeyboardEvent('keydown', { key: 'S', bubbles: true, ...init }));
+
+    it('writes the text on ⌃⇧S and ⌘⇧S and says where', async () => {
+      type('keep this');
+      for (const init of [
+        { ctrlKey: true, shiftKey: true },
+        { metaKey: true, shiftKey: true },
+      ]) {
+        saveFile.mockClear();
+        exportKey(init);
+        await tick();
+        expect(saveFile).toHaveBeenCalledExactlyOnceWith('keep this');
+        expect(state()).toBe('saved to dump.md');
+      }
+    });
+
+    it('names the file whatever the path separator', async () => {
+      type('x');
+      saveFile.mockResolvedValueOnce('C:\\Users\\me\\a.txt');
+      exportKey({ ctrlKey: true, shiftKey: true });
+      await tick();
+      expect(state()).toBe('saved to a.txt');
+    });
+
+    it('leaves plain ⌃S alone', async () => {
+      type('x');
+      key(text(), 's', true);
+      await tick();
+      expect(saveFile).not.toHaveBeenCalled();
+    });
+
+    it('shows no error when the dialog is cancelled, and restores the earlier state', async () => {
+      type('x');
+      await tick(BRAINDUMP_SAVE_DELAY_MS);
+      const before = state();
+      saveFile.mockResolvedValueOnce(null);
+      exportKey({ ctrlKey: true, shiftKey: true });
+      await tick();
+      expect(state()).toBe(before);
+    });
+
+    it('shows the error when writing fails', async () => {
+      type('x');
+      saveFile.mockRejectedValueOnce(new Error('disk full'));
+      exportKey({ ctrlKey: true, shiftKey: true });
+      await tick();
+      expect(state()).toBe('not saved to file — disk full');
+    });
+
+    it('does not ask for a file when there is nothing to save', async () => {
+      exportKey({ ctrlKey: true, shiftKey: true });
+      await tick();
+      expect(saveFile).not.toHaveBeenCalled();
+      expect(state()).toBe('nothing to save');
+    });
+
+    it('does not save or sync the braindump itself', async () => {
+      await tick();
+      type('x');
+      await tick(BRAINDUMP_SAVE_DELAY_MS);
+      const before = sent.length;
+      exportKey({ ctrlKey: true, shiftKey: true });
+      await tick();
+      expect(sent).toHaveLength(before);
+    });
   });
 
   it('keeps an empty new braindump when asked for another, and starts over once typed in', async () => {

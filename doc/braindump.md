@@ -123,6 +123,7 @@ You suggested Chrome opening the console's editor. Here are the options side by 
   | ⌃O | The window's own list of braindumps, to switch |
   | ⌃⏎ | Copy all and hide, as in the dump editor now |
   | ⌃F | Find in the text: matches highlighted, ⏎ / ⇧⏎ next / previous, Esc back to the text |
+  | ⌃⇧S | Save the text to a file on disk via a native save dialog; GitHub autosave is unchanged |
 
   Clearing the text deletes the braindump, as clearing a dump did. A status line at the bottom
   shows the braindump's title and its state (`saved here`, `synced 12:04`, or why a sync failed).
