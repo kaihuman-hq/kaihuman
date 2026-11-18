@@ -452,6 +452,39 @@ async fn pull(store: &Store, remote: &impl Remote) -> Result<(), String> {
     Ok(())
 }
 
+/// The file name offered when saving a braindump: a slug of its first line, so the file says what
+/// it holds. Capped so it stays short on a char boundary.
+pub fn suggested_filename(text: &str) -> String {
+    const MAX: usize = 40;
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    let line = line.trim_start_matches(['#', ' ']);
+    let mut slug = String::new();
+    for c in line.chars().flat_map(char::to_lowercase) {
+        if c.is_alphanumeric() {
+            slug.push(c);
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    let mut slug = slug.trim_matches('-').to_string();
+    if slug.len() > MAX {
+        let mut end = MAX;
+        while !slug.is_char_boundary(end) {
+            end -= 1;
+        }
+        slug.truncate(end);
+        slug = slug.trim_end_matches('-').to_string();
+    }
+    if slug.is_empty() {
+        slug = "braindump".to_string();
+    }
+    format!("{slug}.md")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -820,5 +853,27 @@ mod tests {
         );
         assert!(is_braindump_id("1790000000000"));
         assert!(!is_braindump_id("123456789012345678901"));
+    }
+
+    #[test]
+    fn suggests_a_file_name() {
+        assert_eq!(
+            suggested_filename("# Release Plan\nbody"),
+            "release-plan.md"
+        );
+        assert_eq!(
+            suggested_filename("\n  \n## Hello, World!  \nx"),
+            "hello-world.md"
+        );
+        assert_eq!(suggested_filename("   \n"), "braindump.md");
+        assert_eq!(suggested_filename("?!# --"), "braindump.md");
+        let long = suggested_filename(&format!("{} tail", "word ".repeat(20)));
+        assert!(
+            long.len() <= 43 && long.ends_with(".md") && !long.contains("-."),
+            "{long}"
+        );
+        let multi = suggested_filename(&"ä".repeat(100));
+        assert!(multi.ends_with(".md") && multi.len() <= 43, "{multi}");
+        assert!(multi.starts_with("äää"));
     }
 }

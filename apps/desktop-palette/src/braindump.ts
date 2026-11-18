@@ -22,6 +22,10 @@ const braindumps = createBraindumpWindow(document.body, port, {
       throw new Error(String(error));
     });
   },
+  saveFile: (text) =>
+    invoke('save_braindump_file', { text }).catch((error: unknown) => {
+      throw new Error(String(error));
+    }) as Promise<string | null>,
 });
 
 await listen<{ id: Braindump['id'] | null }>('braindump:open', (event) => {

@@ -30,6 +30,7 @@ mod wifi;
 
 use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::os::unix::net::UnixListener;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use desktop_palette::{Command, Delivery, now_ms, parse_request, send, socket_path};
@@ -380,6 +381,36 @@ fn hide_braindump(app: AppHandle) {
     }
 }
 
+/// Keeps an extension the user typed; a bare name gets `.md`.
+fn ensure_md(path: PathBuf) -> PathBuf {
+    if path.extension().is_some() {
+        path
+    } else {
+        path.with_extension("md")
+    }
+}
+
+/// Asks where to save a braindump as a markdown file and writes it there. `None` when cancelled.
+#[tauri::command]
+async fn save_braindump_file(app: AppHandle, text: String) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_file_name(braindumps::suggested_filename(&text))
+        .add_filter("Markdown", &["md"]);
+    if let Some(window) = app.get_webview_window(BRAINDUMP) {
+        dialog = dialog.set_parent(&window);
+    }
+    let Some(chosen) = dialog.blocking_save_file() else {
+        return Ok(None);
+    };
+    let path = ensure_md(chosen.into_path().map_err(|error| error.to_string())?);
+    std::fs::write(&path, text)
+        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    Ok(Some(path.display().to_string()))
+}
+
 fn build_palette(app: &AppHandle) -> Result<WebviewWindow, Box<dyn std::error::Error>> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("kaihuman-palette")
@@ -446,8 +477,10 @@ fn run_daemon(first: Command, listener: UnixListener) {
             hide_palette,
             webview_ready,
             braindump_ready,
-            hide_braindump
+            hide_braindump,
+            save_braindump_file
         ])
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let handle = app.handle().clone();
             build_palette(&handle)?;
@@ -570,6 +603,13 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ensure_md_keeps_extensions() {
+        assert_eq!(ensure_md("a".into()), PathBuf::from("a.md"));
+        assert_eq!(ensure_md("a.md".into()), PathBuf::from("a.md"));
+        assert_eq!(ensure_md("a.txt".into()), PathBuf::from("a.txt"));
+    }
 
     fn args(list: &[&str]) -> Result<Cli, String> {
         parse_args(list.iter().map(|arg| arg.to_string()))
