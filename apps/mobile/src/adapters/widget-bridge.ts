@@ -50,10 +50,12 @@ export class InMemorySharedContainer implements SharedContainer {
 const isTodoPath = (path: string): boolean =>
   /^\.(kh|lifeos)\//.test(path) && path.endsWith('.todos.md');
 
-/** Files buildWidgetExtras reads for the habit, timer and idea widgets. */
+/** Files buildWidgetExtras reads for the habit, timer, idea and birthday (Siri) extras. */
 const isExtraPath = (path: string): boolean =>
   (/^\.(kh|lifeos)\//.test(path) &&
-    (path.endsWith('.habit.csv') || path.endsWith('.timetracking.csv'))) ||
+    (path.endsWith('.habit.csv') ||
+      path.endsWith('.timetracking.csv') ||
+      path.endsWith('.events.csv'))) ||
   (path.startsWith(`${IDEAS_FOLDER}/`) && path.endsWith('.md'));
 
 export const currentSnapshot = (filter = focusFilter.peek()) => {

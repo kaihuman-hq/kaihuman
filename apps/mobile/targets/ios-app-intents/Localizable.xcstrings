@@ -496,6 +496,102 @@
           }
         }
       }
+    },
+    "Next birthday": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächster Geburtstag"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next birthday"
+          }
+        }
+      }
+    },
+    "Tells you whose birthday is next and when.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sagt dir, wer als Nächstes Geburtstag hat und wann."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tells you whose birthday is next and when."
+          }
+        }
+      }
+    },
+    "No upcoming birthdays found in kaihuman.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine anstehenden Geburtstage in kaihuman gefunden."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No upcoming birthdays found in kaihuman."
+          }
+        }
+      }
+    },
+    "%@ has a birthday today.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hat heute Geburtstag."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ has a birthday today."
+          }
+        }
+      }
+    },
+    "Next birthday: %@, tomorrow, %@.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächster Geburtstag: %@, morgen, %@."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next birthday: %@, tomorrow, %@."
+          }
+        }
+      }
+    },
+    "Next birthday: %@, %@, in %lld days.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächster Geburtstag: %@, %@, in %lld Tagen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next birthday: %@, %@, in %lld days."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -57,6 +57,7 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   cards: [{ path: '', title: '', excerpt: '', tags: [] }],
   habits: [{ path: '', name: '', doneToday: false, streakDays: 0, days: [], pending: false }],
   timer: { path: '', label: '', startedAt: 0, todayMinutes: 0, pending: false },
+  birthdays: [{ name: '', date: '', turns: 0 }],
   filter: { tags: [], area: '', board: '', label: '' },
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
@@ -95,6 +96,7 @@ describe('ios widget target', () => {
       ...Object.keys(snapshot.habits[0] ?? {}),
       ...Object.keys(snapshot.todayCounts),
       ...Object.keys(snapshot.timer),
+      ...Object.keys(snapshot.birthdays[0] ?? {}),
       ...Object.keys(snapshot.filter),
       ...Object.keys({ sha: '', content: '' }),
     ];
@@ -567,7 +569,7 @@ describe('ios widget target', () => {
       expect(shortcuts).toContain('AppShortcutsProvider');
       const blocks = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)].map((m) => m[1] ?? '');
       // The system caps an app at 10 App Shortcuts; two slots stay free for phase 2.
-      expect(blocks).toHaveLength(8);
+      expect(blocks).toHaveLength(9);
       for (const block of blocks) {
         const phrases = block.match(/"[^"]*"/g) ?? [];
         expect(phrases.length).toBeGreaterThan(0);
@@ -633,13 +635,14 @@ describe('ios widget target', () => {
         ...[...shortcuts.matchAll(/shortTitle: "([^"]+)"/g)].map((m) => m[1] ?? ''),
         ...['AddTodoIntent', 'WhatsNextIntent', 'CompleteTodoIntent', 'AddNoteIntent']
           .concat(['AddLogIntent', 'SearchKaihumanIntent', 'DueTodayIntent', 'OpenItemIntent'])
+          .concat(['NextBirthdayIntent'])
           .map((name) => {
             const body = sources.slice(sources.indexOf(`struct ${name}`));
             return /static let title: LocalizedStringResource = "([^"]+)"/.exec(body)?.[1] ?? name;
           }),
       ];
       wanted.push('Due date');
-      expect(wanted).toHaveLength(17);
+      expect(wanted).toHaveLength(19);
       for (const key of wanted) {
         expect(strings[key]?.localizations?.de?.stringUnit.value, key).toBeTruthy();
       }

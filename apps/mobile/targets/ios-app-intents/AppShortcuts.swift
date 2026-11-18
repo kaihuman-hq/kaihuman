@@ -88,5 +88,14 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
             shortTitle: "Open item",
             systemImageName: "doc.text.magnifyingglass"
         )
+        AppShortcut(
+            intent: NextBirthdayIntent(),
+            phrases: [
+                "What's the next birthday in \(.applicationName)",
+                "Next birthday in \(.applicationName)",
+            ],
+            shortTitle: "Next birthday",
+            systemImageName: "gift"
+        )
     }
 }

@@ -96,6 +96,13 @@ struct SharedMilestone: Codable, Identifiable {
     var done: Int
 }
 
+/// Mirrors WidgetBirthday in packages/core/src/widget-birthdays.ts; `date` is the next occurrence.
+struct SharedBirthday: Codable {
+    var name: String
+    var date: String
+    var turns: Int?
+}
+
 struct SharedPrivacy: Codable {
     var lockScreenText: Bool
 }
@@ -129,6 +136,7 @@ struct SharedTodoSnapshot: Codable {
     var ideas: SharedIdeas?
     var cards: [SharedCard]?
     var habits: [SharedHabit]?
+    var birthdays: [SharedBirthday]?
     // Today widget, habit week and timer (additive in v2; the widget derives today from `items`
     // itself so a midnight entry and local toggles stay right, see SnapshotQueries.todayTasks).
     var todayItems: [SharedTodoItem]?

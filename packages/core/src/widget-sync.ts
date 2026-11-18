@@ -20,6 +20,7 @@ import {
   type TodoPriority,
   type TodoStatus,
 } from '@kaihuman/formats';
+import { nextBirthdays, type WidgetBirthday } from './widget-birthdays.js';
 
 /** Bump only for breaking changes; v2 is purely additive over v1. */
 export const WIDGET_SCHEMA_VERSION = 2 as const;
@@ -122,6 +123,7 @@ export interface WidgetTodayCounts {
 
 export interface WidgetExtras {
   knowledgeInbox: number;
+  birthdays?: WidgetBirthday[];
   ideas?: WidgetIdeaSummary;
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
@@ -152,6 +154,7 @@ export interface WidgetSnapshotOptions {
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
   timer?: WidgetTimer;
+  birthdays?: WidgetBirthday[];
 }
 
 export interface WidgetTodoSnapshot {
@@ -195,6 +198,8 @@ export interface WidgetTodoSnapshot {
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
   timer?: WidgetTimer;
+  /** Upcoming birthdays, soonest first (Siri: "next birthday"). A reader skips any already past. */
+  birthdays?: WidgetBirthday[];
   /** Active Focus filter; `items` stay unfiltered so mutations resolve, readers apply it. */
   filter?: WidgetFilter;
 }
@@ -411,6 +416,7 @@ export const buildWidgetTodoSnapshot = (
     ...(options.cards && { cards: options.cards }),
     ...(options.habits && { habits: options.habits }),
     ...(options.timer && { timer: options.timer }),
+    ...(options.birthdays && { birthdays: options.birthdays }),
     ...(options.filter && { filter: options.filter }),
   };
 };
@@ -432,6 +438,7 @@ const optionsOf = (snapshot: WidgetTodoSnapshot): WidgetSnapshotOptions => ({
   cards: snapshot.cards,
   habits: snapshot.habits,
   timer: snapshot.timer,
+  birthdays: snapshot.birthdays,
 });
 
 const rebuild = (
@@ -726,11 +733,18 @@ export const buildWidgetExtras = (
       (a, b) => (b.startedAt ?? -1) - (a.startedAt ?? -1) || b.todayMinutes - a.todayMinutes,
     )[0];
 
+  const birthdays = paths
+    .filter((p) => p.startsWith(`${folder}/`) && p.endsWith('.events.csv'))
+    .flatMap((p) => nextBirthdays(content(p), today));
+  birthdays.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  birthdays.splice(5);
+
   return {
     knowledgeInbox,
     ...(ideaCount > 0 && { ideas: { byStatus, hot } }),
     ...(cards.length > 0 && { cards }),
     ...(habits.length > 0 && { habits }),
     ...(timer && { timer }),
+    ...(birthdays.length > 0 && { birthdays }),
   };
 };
