@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-18 — Business documents: print offers in the browser
+
+- Console Business → Documents (`/business/documents`, `/business/documents/:slug`): lists `.kh/business/documents/<slug>.md`, live preview in an iframe, **Print / Save as PDF** (hidden-iframe `window.print()`), problems with field names; "New document" from a sample; print settings form.
+- Formats: `BusinessProfile.print` (letterhead, paper, accent, font, website, logo, bank_name, validated), `documents.ts` (frontmatter split, `companyFromProfile` mapper, client slug resolution, `extends`-style merge, `setProfilePrint`), `document` and `asset` path kinds, `repo.documents`. Business tools version 1.5.0 (the check knows the new paths).
+- Console `lib/business/print/`: the spike as a module. narro bundled for Preact by `narro.vite.ts`, whose node stubs apply only to narro's own imports; fs-free render with repository images and logo as data URIs, narro's render rules; `offer-whole-product` as a built-in TS template (no repository code runs). The chunk loads by `import()` (≈143 kB); main bundle +3.8 kB gzip for the pages.
+- Tests: mapper, client resolution, print settings, ladder (325.000 − 75.000 − 200.000 = 50.000 €), summary wrap, wording overrides, parity with narro `renderHtml` on its example, pages. The spike folder (incl. `reference/`) is removed.
+
 ## 2026-11-18 — Spike: `@getnarro/pdf` in the browser
 
 - New runtime dependency `@getnarro/pdf@0.0.0` in `apps/console` (listed in `minimumReleaseAgeExclude`; approved). Spike only, no UI yet: `apps/console/src/spikes/narro/` bundles it with fs/path stubs on Preact, renders an offer to full HTML without fs (parity-tested against `renderHtml`), and the Chromium PDF check shows DIN 5008 pagination and per-page footer work. Findings in `FINDINGS.md`.

@@ -49,11 +49,12 @@ describe('DocumentsPage', () => {
   });
 });
 
-describe('DocumentPage', () => {
+// The first render loads the narro chunk, which takes a while on a busy machine.
+describe('DocumentPage', { timeout: 15000 }, () => {
   it('previews the rendered document and prints it', async () => {
     hooks.state = ready(good);
     act(() => render(<DocumentPage slug="offer-acme" />, host));
-    for (let i = 0; i < 20 && !host.querySelector('iframe'); i++) await flush();
+    for (let i = 0; i < 200 && !host.querySelector('iframe'); i++) await flush();
     const frame = host.querySelector('iframe');
     expect(frame?.getAttribute('title')).toBe('Preview: Angebot AN-2026-0001');
     expect(frame?.getAttribute('srcdoc')).toContain('Acme GmbH');
@@ -68,7 +69,7 @@ describe('DocumentPage', () => {
   it('shows problems with field names instead of a preview', async () => {
     hooks.state = ready(good.replace('client: acme-gmbh', 'client: nobody'));
     act(() => render(<DocumentPage slug="offer-acme" />, host));
-    for (let i = 0; i < 20 && !host.textContent?.includes('has problems'); i++) await flush();
+    for (let i = 0; i < 200 && !host.textContent?.includes('has problems'); i++) await flush();
     expect(host.querySelector('iframe')).toBeNull();
     expect(host.textContent).toContain('client: no client "nobody"');
   });
