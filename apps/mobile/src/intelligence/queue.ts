@@ -78,6 +78,7 @@ export function toRaw(c: SmartCapture): Record<string, unknown> {
         text: c.text,
         tags: c.tags,
         ...(c.due ? { due: c.due.time ? `${c.due.date}T${c.due.time}` : c.due.date } : {}),
+        ...(c.target ? { target: c.target } : {}),
       };
     case 'log':
       return { kind: 'log', text: c.text, tags: c.tags };

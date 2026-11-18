@@ -496,6 +496,102 @@
           }
         }
       }
+    },
+    "Add to stream": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zu Stream hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to stream"
+          }
+        }
+      }
+    },
+    "Add a todo to a stream": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo zu einem Stream hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a todo to a stream"
+          }
+        }
+      }
+    },
+    "Adds a todo to one of your kaihuman todo streams.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fügt ein Todo zu einem deiner kaihuman-Todo-Streams hinzu."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds a todo to one of your kaihuman todo streams."
+          }
+        }
+      }
+    },
+    "Stream": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stream"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stream"
+          }
+        }
+      }
+    },
+    "I couldn't find that stream in kaihuman. Nothing was added.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ich habe diesen Stream in kaihuman nicht gefunden. Es wurde nichts hinzugefügt."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I couldn't find that stream in kaihuman. Nothing was added."
+          }
+        }
+      }
+    },
+    "Saved to %@. kaihuman files it when it opens next.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gespeichert in %@. kaihuman legt es beim nächsten Öffnen ab."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved to %@. kaihuman files it when it opens next."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

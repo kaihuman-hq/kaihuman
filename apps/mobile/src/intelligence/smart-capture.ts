@@ -4,7 +4,8 @@ import type { LanguageModel, ObjectSchema } from './model.js';
 
 /** One typed capture; each kind maps to the file the matching quick-capture form writes. */
 export type SmartCapture =
-  | { kind: 'todo'; text: string; tags: string[]; due?: TodoDue }
+  /** `target` is a todo file (path or stream name) from Siri's "add a todo to <stream>"; default inbox. */
+  | { kind: 'todo'; text: string; tags: string[]; due?: TodoDue; target?: string }
   | { kind: 'log'; text: string; tags: string[] }
   /** `amount` is always positive; the category says whether it is money in or out. */
   | { kind: 'budget'; name: string; amount: number; category: string; date: string }
@@ -75,7 +76,13 @@ export function toCapture(raw: unknown, now: Date): SmartCapture | null {
   switch (r.kind) {
     case 'todo':
       if (!text) return null;
-      return due ? { kind: 'todo', text, tags, due } : { kind: 'todo', text, tags };
+      return {
+        kind: 'todo',
+        text,
+        tags,
+        ...(due && { due }),
+        ...(str(r.target) && { target: str(r.target) }),
+      };
     case 'log':
       return text ? { kind: 'log', text, tags } : null;
     case 'budget': {

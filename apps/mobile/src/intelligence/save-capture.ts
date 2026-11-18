@@ -44,6 +44,35 @@ export function findHabit(paths: readonly string[], habit: string): string | und
   );
 }
 
+const TODO_SUFFIX = '.todos.md';
+const baseName = (path: string): string =>
+  (path.split('/').pop() ?? path).slice(0, -TODO_SUFFIX.length);
+const fold = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
+/**
+ * Todo file a spoken stream name or a path means: exact path, then exact name, then the unique
+ * file whose name contains the spoken one (or the reverse); case, accents and punctuation ignored.
+ * Ambiguous or unknown gives undefined, so the caller never guesses a file.
+ */
+export function findStream(paths: readonly string[], target: string): string | undefined {
+  const exact = paths.find((p) => p === target);
+  if (exact) return exact;
+  const want = fold(target.replace(/\.todos\.md$/, ''));
+  if (!want) return undefined;
+  const named = paths.filter((p) => fold(baseName(p)) === want);
+  if (named.length) return named.length === 1 ? named[0] : undefined;
+  const near = paths.filter((p) => {
+    const n = fold(baseName(p));
+    return n.length > 0 && (n.includes(want) || want.includes(n));
+  });
+  return near.length === 1 ? near[0] : undefined;
+}
+
 const fail = (error: string): CaptureResult => ({ ok: false, error });
 
 /**
@@ -56,8 +85,12 @@ export async function saveCapture(
 ): Promise<CaptureResult> {
   const { controller, files } = deps;
   switch (capture.kind) {
-    case 'todo':
-      return controller.quickTodo(capture.text, capture.tags, capture.due);
+    case 'todo': {
+      if (!capture.target) return controller.quickTodo(capture.text, capture.tags, capture.due);
+      const path = findStream(files.list(TODO_SUFFIX), capture.target);
+      // The stream vanished since Siri saw it: keep the todo in the inbox rather than lose it.
+      return controller.quickTodo(capture.text, capture.tags, capture.due, undefined, path);
+    }
     case 'log':
       return controller.quickLog(capture.text, capture.tags);
     case 'budget': {

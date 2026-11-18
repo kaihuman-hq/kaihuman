@@ -566,8 +566,8 @@ describe('ios widget target', () => {
     it('provides Siri phrases that all name the app', () => {
       expect(shortcuts).toContain('AppShortcutsProvider');
       const blocks = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)].map((m) => m[1] ?? '');
-      // The system caps an app at 10 App Shortcuts; two slots stay free for phase 2.
-      expect(blocks).toHaveLength(8);
+      // The system caps an app at 10 App Shortcuts.
+      expect(blocks).toHaveLength(9);
       for (const block of blocks) {
         const phrases = block.match(/"[^"]*"/g) ?? [];
         expect(phrases.length).toBeGreaterThan(0);
@@ -639,7 +639,7 @@ describe('ios widget target', () => {
           }),
       ];
       wanted.push('Due date');
-      expect(wanted).toHaveLength(17);
+      expect(wanted).toHaveLength(18);
       for (const key of wanted) {
         expect(strings[key]?.localizations?.de?.stringUnit.value, key).toBeTruthy();
       }
@@ -719,6 +719,46 @@ describe('ios widget target', () => {
         expect(de).toContain(phrase.replace('$', token('applicationName')));
       }
       expect(block).toContain('"Add to \\(.applicationName) inbox"');
+    });
+
+    it('adds a todo to a named stream through the capture queue, not a second write path', () => {
+      const stream = readFileSync(join(intentsDir, 'StreamIntents.swift'), 'utf8');
+      const smart = readFileSync(join(dir, 'SmartCaptureModel.swift'), 'utf8');
+      expect(stream).toContain('struct TodoStreamEntity: AppEntity');
+      expect(stream).toContain('struct TodoStreamQuery: EntityStringQuery');
+      expect(stream).toContain('snapshot?.files.keys');
+      expect(stream).toMatch(/struct AddTodoToStreamIntent: AppIntent[^}]*openAppWhenRun = false/);
+      expect(stream).toMatch(/@Parameter\(title: "Due date"\)\s+var due: Date\?/);
+      expect(stream).toContain('SmartCaptureQueue.append(');
+      expect(stream).toContain('target: stream.id');
+      // Unknown stream: a spoken reply and an early return before the queue append.
+      expect(stream.indexOf("couldn't find that stream")).toBeLessThan(
+        stream.indexOf('SmartCaptureQueue.append('),
+      );
+      expect(smart).toContain('fields["target"] = target');
+      expect(shortcuts).toContain('"Add a todo to \\(\\.$stream) in \\(.applicationName)"');
+      expect(shortcuts).toContain('"New todo for \\(\\.$stream) in \\(.applicationName)"');
+    });
+
+    it('translates the stream intent to German, with the requested phrases', () => {
+      const phrases = catalog('AppShortcuts.xcstrings').strings;
+      const de = (k: string) => phrases[k]?.localizations?.de?.stringUnit.value;
+      expect(de(`Add a todo to ${token('stream')} in ${token('applicationName')}`)).toBe(
+        `Todo zu ${token('stream')} in ${token('applicationName')} hinzufügen`,
+      );
+      expect(de(`New todo for ${token('stream')} in ${token('applicationName')}`)).toBe(
+        `Neues Todo für ${token('stream')} in ${token('applicationName')}`,
+      );
+      const { strings } = catalog('Localizable.xcstrings');
+      for (const key of [
+        'Add to stream',
+        'Add a todo to a stream',
+        'Stream',
+        "I couldn't find that stream in kaihuman. Nothing was added.",
+        'Saved to %@. kaihuman files it when it opens next.',
+      ]) {
+        expect(strings[key]?.localizations?.de?.stringUnit.value, key).toBeTruthy();
+      }
     });
 
     it('stays out of the widget extension and has no second @main', () => {

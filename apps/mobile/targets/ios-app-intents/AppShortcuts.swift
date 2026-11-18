@@ -88,5 +88,14 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
             shortTitle: "Open item",
             systemImageName: "doc.text.magnifyingglass"
         )
+        AppShortcut(
+            intent: AddTodoToStreamIntent(),
+            phrases: [
+                "Add a todo to \(\.$stream) in \(.applicationName)",
+                "New todo for \(\.$stream) in \(.applicationName)",
+            ],
+            shortTitle: "Add to stream",
+            systemImageName: "text.badge.plus"
+        )
     }
 }

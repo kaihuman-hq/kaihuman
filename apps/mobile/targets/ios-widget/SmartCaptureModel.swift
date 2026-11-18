@@ -11,6 +11,8 @@ struct SmartCapture: Codable {
     var due: String?
     var amount: Double?
     var category: String?
+    /// Todo file path for "add a todo to <stream>"; nil files into the inbox.
+    var target: String?
 
     /// Inbox markdown line: text followed by " #tag" per tag.
     var inboxLine: String {
@@ -87,6 +89,7 @@ enum SmartCaptureQueue {
         if let due = capture.due { fields["due"] = due }
         if let amount = capture.amount { fields["amount"] = amount }
         if let category = capture.category { fields["category"] = category }
+        if let target = capture.target { fields["target"] = target }
         entries.append([
             "text": original,
             "capturedAt": iso.string(from: Date()),

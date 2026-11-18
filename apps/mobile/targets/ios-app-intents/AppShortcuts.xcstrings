@@ -352,6 +352,38 @@
           }
         }
       }
+    },
+    "Add a todo to ${stream} in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo zu ${stream} in ${applicationName} hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a todo to ${stream} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "New todo for ${stream} in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Todo für ${stream} in ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New todo for ${stream} in ${applicationName}"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
