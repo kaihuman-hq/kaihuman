@@ -17,6 +17,10 @@ export type BusinessPath =
   | { kind: 'links' }
   | { kind: 'expense'; year: number; id: Ulid }
   | { kind: 'receipt' }
+  /** `documents/<slug>.md`: letter content the console renders and prints. */
+  | { kind: 'document'; slug: Slug }
+  /** Images under `documents/` or `assets/` (logos, diagrams); known from the tree alone. */
+  | { kind: 'asset' }
   | { kind: 'notes' | 'todos' | 'log'; client: Slug }
   /** SKILL.md, VERFAHRENSDOKUMENTATION.md, .tools/**, .gitkeep */
   | { kind: 'meta' }
@@ -30,6 +34,9 @@ export const timePath = (month: string): string => `${BUSINESS_ROOT}/time/${mont
 export const TIMER_PATH = `${BUSINESS_ROOT}/time/running.yaml`;
 export const EVENTS_PATH = `${BUSINESS_ROOT}/events.jsonl`;
 export const LINKS_PATH = `${BUSINESS_ROOT}/links.jsonl`;
+export const DOCUMENTS_DIR = `${BUSINESS_ROOT}/documents`;
+export const documentPath = (slug: Slug): string => `${DOCUMENTS_DIR}/${slug}.md`;
+export const ASSET_EXTENSIONS = ['svg', 'png', 'jpg', 'jpeg', 'webp'] as const;
 export const paymentsPath = (year: number): string => `${BUSINESS_ROOT}/payments/${year}.jsonl`;
 
 /** Largest receipt or contract file; images are stored as they are, so this bounds the commit too. */
@@ -53,7 +60,17 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** What an issued file name (without `.yaml`) may be; numbering patterns must produce it. */
 export const ISSUED_NUMBER = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 /** Folders the scaffold creates with a `.gitkeep`. */
-const DATA_DIRS = ['clients', 'drafts', 'offers', 'invoices', 'time', 'payments', 'expenses'];
+const DATA_DIRS = [
+  'clients',
+  'drafts',
+  'offers',
+  'invoices',
+  'time',
+  'payments',
+  'expenses',
+  'documents',
+  'assets',
+];
 const ARTIFACT_EXT = ['pdf', 'xml', 'sha256'] as const;
 
 const split = (name: string): [string, string] | null => {
@@ -133,6 +150,15 @@ export const classifyBusinessPath = (path: string): BusinessPath => {
   }
   if ((top === 'invoices' || top === 'offers') && parts.length === 3 && a && b) {
     return issuedDir(top === 'invoices' ? 'invoice' : 'offer', a, b);
+  }
+  if (top === 'documents' || top === 'assets') {
+    const ext = split(parts[parts.length - 1] ?? '')?.[1]?.toLowerCase();
+    if (ASSET_EXTENSIONS.some((e) => e === ext)) return { kind: 'asset' };
+    if (top === 'documents' && parts.length === 2 && ext === 'md') {
+      const slug = asSlug((a ?? '').slice(0, -'.md'.length));
+      return slug ? { kind: 'document', slug } : UNKNOWN;
+    }
+    return UNKNOWN;
   }
   if (top === 'time' && parts.length === 2 && a === 'running.yaml') return { kind: 'timer' };
   if (top === 'time' && parts.length === 2 && a?.endsWith('.jsonl')) {
