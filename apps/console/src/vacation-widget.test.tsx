@@ -233,3 +233,65 @@ describe('VacationEditForm', () => {
     expect(host.textContent).toContain('Destination not found');
   });
 });
+
+describe('vacation form review fixes', () => {
+  const saveButton = () =>
+    [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'SAVE');
+
+  it('blocks saving a destination with a cleared name', () => {
+    const onChange = vi.fn();
+    act(() => {
+      render(
+        <VacationEditForm
+          content={sample()}
+          destinationId="d1"
+          onChange={onChange}
+          onDone={() => {}}
+        />,
+        host,
+      );
+    });
+    typeInto(byLabel('Destination name'), '  ');
+    expect(saveButton()?.disabled).toBe(true);
+    clickText('SAVE');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('never overwrites a non-blank file that is not valid JSON', () => {
+    const onChange = vi.fn();
+    act(() => {
+      render(<VacationEditForm content="{broken" onChange={onChange} onDone={() => {}} />, host);
+    });
+    expect(saveButton()?.disabled).toBe(true);
+    clickText('SAVE');
+    act(() => {
+      render(<VacationAddForm content="{broken" onChange={onChange} />, host);
+    });
+    typeInto(host.querySelector('#vacation-name'), 'Porto');
+    expect(host.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('lets currency be cleared while typing and falls back to EUR on save', () => {
+    const onChange = vi.fn();
+    act(() => {
+      render(<VacationEditForm content={sample()} onChange={onChange} onDone={() => {}} />, host);
+    });
+    typeInto(byLabel('Vacation currency'), '');
+    expect(byLabel('Vacation currency').value).toBe('');
+    clickText('SAVE');
+    expect(parseVacation(onChange.mock.calls[0]?.[0]).currency).toBe('EUR');
+  });
+
+  it('drops travelers of 0 or a fraction', () => {
+    for (const v of ['0', '1.5']) {
+      const onChange = vi.fn();
+      act(() => {
+        render(<VacationEditForm content={sample()} onChange={onChange} onDone={() => {}} />, host);
+      });
+      typeInto(byLabel('Vacation travelers'), v);
+      clickText('SAVE');
+      expect(parseVacation(onChange.mock.calls[0]?.[0]).travelers).toBeUndefined();
+    }
+  });
+});

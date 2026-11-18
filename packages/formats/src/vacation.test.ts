@@ -7,10 +7,12 @@ import {
   emptyDestination,
   emptyVacation,
   filterDestinations,
+  isUnreadableVacation,
   moveDestination,
   parseVacation,
   serializeVacation,
   sortDestinations,
+  toAmount,
   updateDestination,
 } from './vacation.js';
 
@@ -99,5 +101,22 @@ describe('helpers', () => {
       'https://www.google.com/maps/search/?api=1&query=a%20b',
     );
     expect(destinationMapsLink(dest({}))).toBeUndefined();
+  });
+});
+
+describe('vacation review fixes', () => {
+  it('keeps travelers only as an integer >= 1', () => {
+    const t = (travelers: unknown) => parseVacation(JSON.stringify({ travelers })).travelers;
+    for (const v of [0, 1.5, -1, '2']) expect(t(v)).toBeUndefined();
+    expect(t(3)).toBe(3);
+  });
+  it('toAmount rejects empty, negative and non-numeric text', () => {
+    expect(['', '-1', 'x'].map(toAmount)).toEqual([undefined, undefined, undefined]);
+    expect([toAmount('0'), toAmount('12.5')]).toEqual([0, 12.5]);
+  });
+  it('flags non-blank invalid JSON as unreadable so forms never overwrite it', () => {
+    expect(isUnreadableVacation('{oops')).toBe(true);
+    for (const s of ['', '  \n', '{}', serializeVacation(emptyVacation())])
+      expect(isUnreadableVacation(s)).toBe(false);
   });
 });

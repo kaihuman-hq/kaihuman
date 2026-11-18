@@ -3,9 +3,11 @@ import {
   type Destination,
   type DestinationStatus,
   deleteDestination,
+  isUnreadableVacation,
   moveDestination,
   parseVacation,
   serializeVacation,
+  toAmount,
   type VacationDoc,
 } from '@kaihuman/formats';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-preact';
@@ -29,9 +31,10 @@ const iconButtonClass =
 const selectClass =
   'w-full bg-[var(--los-bg)] border border-[var(--los-border)] px-2 py-1 text-xs font-mono text-[var(--los-fg)]';
 
-// Empty or invalid text must not become NaN, which JSON stores as null.
-const toAmount = (v: string): number | undefined =>
-  v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : undefined;
+const toTravelers = (v: string): number | undefined => {
+  const n = Number(v);
+  return v !== '' && Number.isInteger(n) && n >= 1 ? n : undefined;
+};
 const toRating = (v: string): number | undefined => {
   const n = Number(v);
   return v !== '' && Number.isInteger(n) && n >= 1 && n <= 5 ? n : undefined;
@@ -58,8 +61,10 @@ export const VacationEditForm = ({
 const Actions = ({
   onSave,
   onCancel,
+  canSave = true,
   children,
 }: {
+  canSave?: boolean;
   onSave: () => void;
   onCancel: () => void;
   children?: preact.ComponentChildren;
@@ -68,7 +73,8 @@ const Actions = ({
     <button
       type="button"
       onClick={onSave}
-      className="bg-[var(--los-accent)] text-black font-bold px-4 py-2 text-xs font-mono hover:opacity-90"
+      disabled={!canSave}
+      className="bg-[var(--los-accent)] text-black font-bold px-4 py-2 text-xs font-mono hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       SAVE
     </button>
@@ -98,7 +104,13 @@ const MetaForm = ({
 
   // Re-read content so destination edits made elsewhere survive the save.
   const save = () => {
-    onChange(serializeVacation({ ...draft, destinations: parseVacation(content).destinations }));
+    onChange(
+      serializeVacation({
+        ...draft,
+        currency: draft.currency || 'EUR',
+        destinations: parseVacation(content).destinations,
+      }),
+    );
     onDone();
   };
 
@@ -116,7 +128,7 @@ const MetaForm = ({
           label="Currency"
           ariaLabel="Vacation currency"
           value={draft.currency}
-          onValue={(currency) => patch({ currency: currency || 'EUR' })}
+          onValue={(currency) => patch({ currency })}
         />
         <LabeledInput
           label="From"
@@ -144,7 +156,7 @@ const MetaForm = ({
           ariaLabel="Vacation travelers"
           type="number"
           value={String(draft.travelers ?? '')}
-          onValue={(v) => patch({ travelers: toAmount(v) })}
+          onValue={(v) => patch({ travelers: toTravelers(v) })}
         />
       </div>
       <LabeledInput
@@ -158,7 +170,7 @@ const MetaForm = ({
         fields={draft.custom}
         onFields={(custom) => patch({ custom })}
       />
-      <Actions onSave={save} onCancel={onDone} />
+      <Actions onSave={save} onCancel={onDone} canSave={!isUnreadableVacation(content)} />
     </div>
   );
 };
@@ -279,7 +291,11 @@ const DestinationForm = ({
         fields={draft.custom}
         onFields={(custom) => patch({ custom })}
       />
-      <Actions onSave={save} onCancel={onDone}>
+      <Actions
+        onSave={save}
+        onCancel={onDone}
+        canSave={!!draft.name.trim() && !isUnreadableVacation(content)}
+      >
         <button
           type="button"
           aria-label="Move destination up"

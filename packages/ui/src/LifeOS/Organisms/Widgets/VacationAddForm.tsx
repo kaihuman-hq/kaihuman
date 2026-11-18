@@ -3,8 +3,10 @@ import {
   DESTINATION_STATUSES,
   type DestinationStatus,
   emptyDestination,
+  isUnreadableVacation,
   parseVacation,
   serializeVacation,
+  toAmount,
 } from '@kaihuman/formats';
 import { useState } from 'preact/hooks';
 import { MonoHeader } from '../../Atoms/Typography';
@@ -25,17 +27,19 @@ export const VacationAddForm = ({ content, onChange, onDone }: VacationAddFormPr
   const [price, setPrice] = useState('');
   const [address, setAddress] = useState('');
 
+  const canSubmit = !!name.trim() && !isUnreadableVacation(content);
+
   const handleSubmit = (e: Event) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    const priceNum = price !== '' && Number.isFinite(Number(price)) ? Number(price) : undefined;
+    if (!canSubmit) return;
+    const priceNum = toAmount(price);
     onChange(
       serializeVacation(
         addDestination(parseVacation(content), {
           ...emptyDestination(),
           name: name.trim(),
           status,
-          ...(priceNum !== undefined && priceNum >= 0 && { price: priceNum }),
+          ...(priceNum !== undefined && { price: priceNum }),
           ...(address.trim() && { address: address.trim() }),
         }),
       ),
@@ -111,7 +115,7 @@ export const VacationAddForm = ({ content, onChange, onDone }: VacationAddFormPr
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={!name.trim()}
+            disabled={!canSubmit}
             className="bg-[var(--los-accent)] text-black font-bold px-4 py-2 text-xs font-mono hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             ADD DESTINATION

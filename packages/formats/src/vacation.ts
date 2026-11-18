@@ -46,6 +46,8 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+const isTravelers = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 1;
 const isStatus = (v: unknown): v is DestinationStatus =>
   DESTINATION_STATUSES.includes(v as DestinationStatus);
 
@@ -102,8 +104,7 @@ export function parseVacation(content: string): VacationDoc {
   }
   const budget = num(raw.budget);
   if (budget !== undefined) doc.budget = budget;
-  const travelers = num(raw.travelers);
-  if (travelers !== undefined) doc.travelers = travelers;
+  if (isTravelers(raw.travelers)) doc.travelers = raw.travelers;
   const notes = str(raw.notes);
   if (notes !== undefined) doc.notes = notes;
   doc.custom = parseCustom(raw.custom);
@@ -115,6 +116,21 @@ export function parseVacation(content: string): VacationDoc {
   }
   return doc;
 }
+
+/** Form text to a non-negative amount; empty or invalid text must not become NaN (JSON null). */
+export const toAmount = (v: string): number | undefined =>
+  v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : undefined;
+
+/** Non-blank text that is not JSON parses to an empty doc, so a save would overwrite it. */
+export const isUnreadableVacation = (content: string): boolean => {
+  if (content.trim() === '') return false;
+  try {
+    JSON.parse(content);
+    return false;
+  } catch {
+    return true;
+  }
+};
 
 export const serializeVacation = (doc: VacationDoc): string => JSON.stringify(doc, null, 2);
 
