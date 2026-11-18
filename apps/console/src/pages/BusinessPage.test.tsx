@@ -145,6 +145,7 @@ describe('BusinessPage', () => {
       '/clients',
       '/business/pipeline',
       '/business/invoices',
+      '/business/documents',
       '/business/expenses',
       '/business/shared',
     ]);

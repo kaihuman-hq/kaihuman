@@ -73,6 +73,7 @@ const repoOf = (
   links: [],
   expenses: opts.expenses ?? [],
   clientFiles: [],
+  documents: [],
   artifacts: new Set(),
   findings: [],
 });

@@ -460,6 +460,10 @@ affected. The README lists the setup steps.
   `VITE_SHARE_URL=http://localhost:8788`. Add the console's origin to `CONSOLE_ORIGINS`. Your GitHub
   sign-in token goes to that service, and the consent names it.
 
+## Documents and printing
+
+`documents/<slug>.md` (Markdown + frontmatter) and images under `documents/` or `assets/` are printed from the console (Business → Documents) with narro in the browser; the letterhead comes from `business.yaml` and its optional `print:` key. File format and print steps: `doc/documentation.md`, "Business documents".
+
 ## kb-mcp tools
 
 The MCP server in `apps/kb-mcp` gives an agent without a shell (Claude Desktop) access to the business data. It always reads `.kh/business`, even when the knowledge base uses the legacy `.lifeos`.

@@ -10,6 +10,7 @@ export * from './actions/stage.js';
 export * from './actions/time.js';
 export * from './check.js';
 export * from './csv.js';
+export * from './documents.js';
 export * from './en16931.js';
 export * from './ids.js';
 export * from './issue.js';
