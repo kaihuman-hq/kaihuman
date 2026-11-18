@@ -49,7 +49,7 @@ const spark = (pts, col = 'var(--hi)', fill = true, h = 34, w = 146) => {
     mn = Math.min(...pts),
     sx = w / (pts.length - 1);
   const xy = pts.map((p, i) => [i * sx, h - 3 - ((p - mn) / (mx - mn || 1)) * (h - 6)]);
-  const d = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const d = xy.map((p, i) => `${(i ? 'L' : 'M') + p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
   const l = xy[xy.length - 1];
   return `<svg width="${w}" height="${h}" style="display:block;overflow:visible">${fill ? `<path d="${d} L${w} ${h} L0 ${h}Z" fill="${col}" opacity=".18"/>` : ''}<path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${l[0]}" cy="${l[1]}" r="3.5" fill="${col}"/></svg>`;
 };

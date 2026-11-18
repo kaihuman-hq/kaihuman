@@ -94,13 +94,14 @@ describe('trackActions', () => {
 });
 
 describe('capture actions', () => {
-  it('opens the five existing quick sheets', () => {
+  it('opens the quick sheets', () => {
     expect(CAPTURE_ACTIONS.map((a) => a.kind === 'capture' && a.href)).toEqual([
       '/quick-todo',
       '/quick-note',
       '/quick-log',
       '/quick-idea',
       '/quick-knowledge',
+      '/quick-braindump',
     ]);
   });
 });

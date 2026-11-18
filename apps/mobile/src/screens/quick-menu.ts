@@ -11,7 +11,7 @@ import type { ContentFiles } from './file-editor-screen.js';
  * group built from the user's tiles, and the remembered last action with today's use count.
  */
 
-export type CaptureKind = 'todo' | 'note' | 'log' | 'idea' | 'knowledge';
+export type CaptureKind = 'todo' | 'note' | 'log' | 'idea' | 'knowledge' | 'braindump';
 
 interface ActionLook {
   /** Stable key for usage counts and the remembered last action. */
@@ -50,6 +50,7 @@ export const CAPTURE_ACTIONS: readonly QuickMenuAction[] = [
   capture('log', 'Log', 'edit', 'purple'),
   capture('idea', 'Idea', 'ideas', 'orange'),
   capture('knowledge', 'Knowledge', 'knowledge', 'blue'),
+  capture('braindump', 'Braindump', 'prompt', 'purple'),
 ];
 
 export const quickEntryHref = (path: string): string =>

@@ -23,6 +23,7 @@ export const CAPTURE_TITLES: Record<QuickKind, string> = {
   log: 'New log entry',
   idea: 'New idea',
   knowledge: 'New knowledge',
+  braindump: 'New braindump',
   inbox: 'Add to inbox',
 };
 
@@ -67,6 +68,7 @@ const COPY: Record<QuickKind, KindCopy> = {
       helper: 'Defaults to the first line.',
     },
   },
+  braindump: { label: 'Braindump', placeholder: 'Dump everything on your mind', multiline: true },
   // One line and Return saves: nothing to fill in before the keyboard can go away.
   inbox: { label: 'Inbox', placeholder: 'What is on your mind?', multiline: false },
 };
@@ -127,7 +129,10 @@ export function QuickCaptureView({
       const resolved = spec && place.custom ? resolveTarget(spec, place.target, paths) : null;
       if (resolved && !resolved.ok) throw new Error(resolved.error);
       const target = resolved?.ok ? resolved.path : undefined;
-      if (kind === 'idea') {
+      if (kind === 'braindump') {
+        const res = await controller.quickBraindump(text);
+        result = res.ok ? { ok: true, text: res.message } : { ok: false, text: res.error };
+      } else if (kind === 'idea') {
         const res = await controller.quickIdea(text, value ? { slug: value } : {});
         result = res.ok
           ? { ok: true, text: `Saved ${res.results.map((r) => r.path).join(', ')}` }
