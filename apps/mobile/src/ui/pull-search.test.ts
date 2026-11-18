@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { pullDistance, pullIntent, REFRESH_PULL, SEARCH_PULL } from './pull-search.js';
+import {
+  createPullTracker,
+  pullDistance,
+  pullIntent,
+  REFRESH_PULL,
+  SEARCH_PULL,
+} from './pull-search.js';
 
 describe('pullIntent', () => {
   it('ignores small bounces', () => {
@@ -23,5 +29,38 @@ describe('pullDistance', () => {
   });
   it('is zero when scrolled down', () => {
     expect(pullDistance(200, -100)).toBe(0);
+  });
+});
+
+describe('createPullTracker', () => {
+  it('decides from the deepest pull of the drag, measured from where it began', () => {
+    const t = createPullTracker();
+    t.begin(-100);
+    t.move(-120);
+    t.move(-150); // 50pt: search range
+    t.move(-135); // finger drifting back must not lower the peak
+    expect(t.end()).toBe('search');
+  });
+  it('refreshes only after a long pull, and never mid-drag', () => {
+    const t = createPullTracker();
+    t.begin(-100);
+    t.move(-100 - REFRESH_PULL + 1);
+    expect(t.end()).toBe('search'); // regression: native control used to sync here
+    t.begin(-100);
+    t.move(-100 - REFRESH_PULL);
+    expect(t.end()).toBe('refresh');
+  });
+  it('ignores scroll events outside a drag (momentum bounce-back)', () => {
+    const t = createPullTracker();
+    t.move(-300);
+    expect(t.end()).toBe('none');
+  });
+  it('resets between drags', () => {
+    const t = createPullTracker();
+    t.begin(0);
+    t.move(-50);
+    t.end();
+    t.begin(0);
+    expect(t.end()).toBe('none');
   });
 });

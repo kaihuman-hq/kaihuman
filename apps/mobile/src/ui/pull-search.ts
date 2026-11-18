@@ -23,3 +23,30 @@ export function pullIntent(pull: number): PullIntent {
 export function pullDistance(offsetY: number, restingY: number): number {
   return Math.max(0, restingY - offsetY);
 }
+
+/**
+ * Tracks one finger drag so the decision is made on release, from the deepest pull. The native
+ * RefreshControl cannot be gated (UIKit fires it as soon as its own threshold is crossed), so the
+ * screen runs refresh itself from this. The resting offset is read when the drag begins rather
+ * than computed from the header height, so it is right whatever inset iOS applied.
+ */
+export function createPullTracker() {
+  let resting: number | null = null;
+  let peak = 0;
+  return {
+    begin(offsetY: number) {
+      resting = offsetY;
+      peak = 0;
+    },
+    move(offsetY: number) {
+      if (resting === null) return;
+      peak = Math.max(peak, pullDistance(offsetY, resting));
+    },
+    end(): PullIntent {
+      const intent = resting === null ? 'none' : pullIntent(peak);
+      resting = null;
+      peak = 0;
+      return intent;
+    },
+  };
+}

@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-18 — Mobile: pull-down always synced, never opened search (fix)
+
+- Root cause: UIKit's refresh control fires `onRefresh` as soon as its own threshold is crossed while still dragging, so sync always won before the release-offset check ran (which also assumed the offset from the header height). `Screen` now decides on release from the deepest pull of the drag, measured from the offset where the drag began (`createPullTracker`): <36pt nothing, 36–80pt search, ≥80pt sync. The native control only shows the spinner. Regression tests in `pull-search.test.ts`. Needs a device check.
+
 ## 2026-11-18 — Mobile: Siri add todo (inbox, stream, due date), next birthday
 
 - Root cause of "Neues Todo zu kaihuman" failing: the only German phrase was "Neues Todo in kaihuman", and the intent only opened the app. New phrases "New todo for / Add a todo to kaihuman" (DE "Neues Todo zu … / Todo zu … hinzufügen"); the todo is saved without opening the app, with an optional due date (dated todos are queued and added on next app open).

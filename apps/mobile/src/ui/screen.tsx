@@ -15,7 +15,7 @@ import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
 import { KeyboardLift, keyboardScrollProps } from './keyboard.js';
-import { pullDistance, pullIntent } from './pull-search.js';
+import { createPullTracker } from './pull-search.js';
 import { Text } from './text.js';
 import { useKeyboardVisible } from './use-keyboard.js';
 
@@ -89,13 +89,23 @@ export function Screen({
       animated: false,
     });
   }, [scrollToTopKey]);
-  // A short pull-down opens search; a long one is left to the refresh control. iOS only: it is
+  // A short pull-down opens search; a long one syncs. iOS only: it is
   // the platform with a rubber-band overscroll and the search-under-header convention.
   const pullSearch = Platform.OS === 'ios' && scroll && onRefresh !== undefined;
-  const onScrollEndDrag = pullSearch
-    ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const pull = pullDistance(e.nativeEvent.contentOffset.y, -(headerHeight ?? 0));
-        if (pullIntent(pull) === 'search' && !refreshing) router.push('/search');
+  const tracker = useRef(createPullTracker()).current;
+  const pullHandlers = pullSearch
+    ? {
+        scrollEventThrottle: 16,
+        onScrollBeginDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+          tracker.begin(e.nativeEvent.contentOffset.y),
+        onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+          tracker.move(e.nativeEvent.contentOffset.y),
+        onScrollEndDrag: () => {
+          const intent = tracker.end();
+          if (refreshing) return;
+          if (intent === 'search') router.push('/search');
+          else if (intent === 'refresh') onRefresh?.();
+        },
       }
     : undefined;
   const { spacing, colors } = theme;
@@ -115,13 +125,15 @@ export function Screen({
       contentInsetAdjustmentBehavior="automatic"
       {...keyboardScrollProps(lifted)}
       keyboardDismissMode="interactive"
-      onScrollEndDrag={onScrollEndDrag}
+      {...pullHandlers}
       refreshControl={
         onRefresh ? (
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.secondaryLabel}
+            // On iOS the release handler above starts the sync; the native control would fire
+            // mid-drag, so it only shows the spinner while `refreshing`.
+            onRefresh={pullSearch ? noop : onRefresh}
+            tintColor={pullSearch && !refreshing ? 'transparent' : colors.secondaryLabel}
           />
         ) : undefined
       }
@@ -182,5 +194,7 @@ export function Screen({
 export function useScreenInset(): ScreenInset {
   return useContext(ScreenInsetContext);
 }
+
+function noop() {}
 
 const styles = StyleSheet.create({ flex: { flex: 1 } });
