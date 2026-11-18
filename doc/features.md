@@ -51,6 +51,7 @@
 | Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
 | Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
 | Travel (`YYYY.travel.json`) — one file per year; tile shows next trip, countdown and total cost; read-only focus view shows trips, steps (general, car toll, rental, flight, train, hotel), addresses, custom fields and Open in Maps links; EDIT opens a per-trip editor (save/cancel) | New File → Travel | 2026-11-04 |
+| Vacation research (`*.vacation.json`) — one file per search; destinations with status (idea, shortlist, booked, dropped), rating, price, duration, addresses and Open in Maps links; filter by status, sort by price, rating or name; add and edit forms | New File → Vacation research | 2026-11-18 |
 | Command library (`.commands.md`) — shell commands with `{{name}}` parameters, a field per parameter and copy; run from the desktop palette (`>x`) | New File → Commands | 2026-09-23 |
 | Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
 | Cheatsheet (tabbed reference: KB how-to, capture, CLI keys, slash commands) | `/cheatsheet` | 2026-07-18 |

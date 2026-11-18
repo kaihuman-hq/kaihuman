@@ -26,6 +26,7 @@ Widgets are the interactive views the web console (`apps/console`) shows for rep
 | `.stocks.csv` | Stocks (`StocksWidget`) |
 | `.timezones.json` | Timezones (`TimezoneWidget`) |
 | `.rss.json` | RSS reader (`RssWidget`) |
+| `.vacation.json` | Vacation research (`VacationWidget`) |
 
 Other files show "No widget available for this file extension" as a tile and open in the editor. A focused tile switches between a **WIDGET** view and a **CODE** view (the raw file). CSV files also get a **TABLE** view (`CsvTableView`).
 
@@ -161,6 +162,11 @@ A `.board-overview.json` file opens in `BoardOverviewWidget` (**BOARD OVERVIEW**
   "minAgeDays": 0
 }
 ```
+
+## Researching vacation destinations
+<!-- docspack: tags=vacation,vacation research,destinations -->
+
+A `.vacation.json` file opens in `VacationWidget`. Each destination has a status (idea, shortlist, booked, dropped), a 1-5 rating, a price and a duration. The widget filters by status and sorts by price, rating or name. Add and edit use `VacationAddForm` and `VacationEditForm`. Maps links come from `mapsUrl`, or from `address` when no `mapsUrl` is set. Create the file from New File → Vacation research.
 
 ## Tracking habits, time, money and other data
 <!-- docspack: tags=habit tracker,time tracking,budget,stocks,consumption,events,timezones,rss,data collection -->

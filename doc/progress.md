@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-18 — Vacation research file (`.vacation.json`)
+
+- New file kind for comparing vacation destinations, one file per search. Format and tolerant parser in `packages/formats/src/vacation.ts`; console `VacationWidget` with filter by status and sort by price, rating or name, plus add and edit forms. New File → Vacation research. Standalone: no link to `.travel.json`.
+- Docs: `packages/docspack/docs/70-file-formats.md` and `31-console-widgets.md`; feature row in `doc/features.md`.
+
 ## 2026-11-18 — Braindump: save to file (⌃⇧S)
 
 - Desktop palette braindump window: ⌃⇧S (⌘⇧S on macOS) opens a native save dialog and writes the text to a file on disk. The name is suggested from the first line with `.md` as the default; the extension the user types is kept. GitHub autosave is unchanged.
