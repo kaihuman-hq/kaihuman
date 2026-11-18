@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-18 — Spike: `@getnarro/pdf` in the browser
+
+- New runtime dependency `@getnarro/pdf@0.0.0` in `apps/console` (listed in `minimumReleaseAgeExclude`; approved). Spike only, no UI yet: `apps/console/src/spikes/narro/` bundles it with fs/path stubs on Preact, renders an offer to full HTML without fs (parity-tested against `renderHtml`), and the Chromium PDF check shows DIN 5008 pagination and per-page footer work. Findings in `FINDINGS.md`.
+
 ## 2026-11-18 — Braindump: save to file (⌃⇧S)
 
 - Desktop palette braindump window: ⌃⇧S (⌘⇧S on macOS) opens a native save dialog and writes the text to a file on disk. The name is suggested from the first line with `.md` as the default; the extension the user types is kept. GitHub autosave is unchanged.
