@@ -230,3 +230,4 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
 export { BoardOverview } from './board-overview-body.js';
 export { PaletteSettings } from './palette-settings-body.js';
 export { Travel } from './travel-body.js';
+export { Vacation } from './vacation-body.js';

@@ -6,7 +6,7 @@ import {
   newDashboardId,
   parseDashboardConfig,
 } from '@kaihuman/core';
-import { parseTravel, serializeTravel } from '@kaihuman/formats';
+import { parseTravel, parseVacation, serializeTravel, serializeVacation } from '@kaihuman/formats';
 import { type TileKind, tileKindForPath } from '../components/widgets/tile-controllers.js';
 import { type CreateSpec, resolveTarget, tileSpec } from '../files/create-target.js';
 import type { ContentFiles } from './file-editor-screen.js';
@@ -54,6 +54,7 @@ export const NEW_TILE_FILES: readonly { kind: TileKind; suffix: string; starter:
     starter: JSON.stringify({ feeds: [], readItems: [] }, null, 2),
   },
   { kind: 'travel', suffix: '.travel.json', starter: serializeTravel(parseTravel('')) },
+  { kind: 'vacation', suffix: '.vacation.json', starter: serializeVacation(parseVacation('')) },
   { kind: 'boardoverview', suffix: '.board-overview.json', starter: '{}' },
 ];
 

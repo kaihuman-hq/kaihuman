@@ -112,6 +112,10 @@ const fixtures: Record<string, { path: string; content: string }> = {
   commands: { path: '.kh/a.commands.md', content: commands.content },
   rss: demo('.rss.json'),
   travel: demo('.travel.json'),
+  vacation: {
+    path: '.kh/a.vacation.json',
+    content: JSON.stringify({ version: 1, title: 'X', destinations: [{ id: 'a', name: 'Rome' }] }),
+  },
   boardoverview: demo('.board-overview.json'),
   palettesettings: demo('command-palette.settings.json'),
 };

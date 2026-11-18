@@ -3,6 +3,7 @@
 ## 2026-11-18 — Vacation research file (`.vacation.json`)
 
 - New file kind for comparing vacation destinations, one file per search. Format and tolerant parser in `packages/formats/src/vacation.ts`; console `VacationWidget` with filter by status and sort by price, rating or name, plus add and edit forms. New File → Vacation research. Standalone: no link to `.travel.json`.
+- Mobile: `.vacation.json` tile (window, destinations with status filter, price, rating, Maps link) and an Add destination sheet; never writes over unreadable content.
 - Docs: `packages/docspack/docs/70-file-formats.md` and `31-console-widgets.md`; feature row in `doc/features.md`.
 
 ## 2026-11-18 — Business documents: print offers in the browser
