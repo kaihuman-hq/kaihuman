@@ -109,6 +109,7 @@ describe('summaries of the file-kind tiles', () => {
   it('sizes the four newer kinds', () => {
     expect(TILE_SIZE.rss).toBe('medium');
     expect(TILE_SIZE.travel).toBe('medium');
+    expect(TILE_SIZE.vacation).toBe('medium');
     expect(TILE_SIZE.boardoverview).toBe('medium');
     expect(TILE_SIZE.palettesettings).toBe('compact');
   });

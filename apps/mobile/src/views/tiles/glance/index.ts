@@ -11,6 +11,7 @@ import {
   rssGlance,
   todosGlance,
   travelGlance,
+  vacationGlance,
 } from './lists.js';
 import {
   budgetGlance,
@@ -60,6 +61,8 @@ export function glanceOf(input: GlanceInput, tile: TileView): Glance | null {
       return rssGlance(input, tile.view);
     case 'travel':
       return travelGlance(input, tile.view);
+    case 'vacation':
+      return vacationGlance(input, tile.view);
     case 'boardoverview':
       return boardGlance(input, tile.view);
     case 'palettesettings':

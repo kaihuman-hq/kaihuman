@@ -15,12 +15,17 @@ import {
   type Expense,
   type Issued,
   KEY_ORDER,
+  LETTERHEADS,
   LINE_KEYS,
   type Line,
   type LinkRecord,
+  PAPERS,
   PARTY_KEYS,
   type Party,
   type Payment,
+  PRINT_FONTS,
+  PRINT_KEYS,
+  type PrintSettings,
   type Project,
   type RunningTimer,
   type TimeEntry,
@@ -149,6 +154,33 @@ const contactPerson: Reader<{ name: string; email?: string; phone?: string }> = 
   }) as { name: string; email?: string; phone?: string };
 };
 
+const ACCENT = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const printSettings: Reader<PrintSettings> = (raw, path, issues) => {
+  const k = obj(raw, path, PRINT_KEYS, issues);
+  if (!k) return undefined;
+  const accent = opt(k, path, 'accent', issues, str);
+  if (accent !== undefined && !ACCENT.test(accent)) {
+    note(issues, at(path, 'accent'), 'expected a colour such as "#0b6cf0"');
+  }
+  const logo = opt(k, path, 'logo', issues, str);
+  if (logo !== undefined && (logo.startsWith('/') || logo.split('/').includes('..'))) {
+    note(
+      issues,
+      at(path, 'logo'),
+      'expected a path inside the business folder, e.g. assets/logo.svg',
+    );
+  }
+  return compact({
+    letterhead: opt(k, path, 'letterhead', issues, oneOf(LETTERHEADS)),
+    paper: opt(k, path, 'paper', issues, oneOf(PAPERS)),
+    accent,
+    font: opt(k, path, 'font', issues, oneOf(PRINT_FONTS)),
+    website: opt(k, path, 'website', issues, str),
+    logo,
+    bank_name: opt(k, path, 'bank_name', issues, str),
+  }) as PrintSettings;
+};
+
 export const validateProfile = (raw: unknown): Result<BusinessProfile> => {
   const issues: Issue[] = [];
   const r = obj(raw, '', KEY_ORDER.profile, issues);
@@ -210,6 +242,7 @@ export const validateProfile = (raw: unknown): Result<BusinessProfile> => {
     default_vat_rate: req(r, '', 'default_vat_rate', issues, decimalStr),
     electronic_address: opt(r, '', 'electronic_address', issues, str),
     numbering,
+    print: opt(r, '', 'print', issues, printSettings),
   });
   return finish(issues, value);
 };

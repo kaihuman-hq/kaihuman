@@ -192,6 +192,70 @@ The CLI understands this structure:
 
 `files` lists primary files always shown at the top of the dashboard view.
 
+## Business documents: print offers and letters (console)
+
+Offers, letters and invoices to print live as Markdown in the business folder. You keep only the
+content; the console lays it out with narro (`@getnarro/pdf`, pinned `0.0.0`) and prints it in the
+browser. Nothing is installed and no code from the repository runs.
+
+**Company, once.** Sender, address, e-mail, phone, VAT id, tax number and bank come from
+`.kh/business/business.yaml`. How documents look is its optional `print:` key, edited under
+Business → Documents → Print settings:
+
+```yaml
+print:
+  letterhead: din5008-b     # din5008-a | din5008-b | minimal
+  paper: A4                 # A4 | Letter
+  accent: "#0b6cf0"
+  font: Inter               # Inter | Source Serif 4 | IBM Plex Sans
+  website: example.com
+  logo: assets/logo.svg     # SVG/PNG/JPEG/WebP, relative to .kh/business/
+  bank_name: Musterbank
+```
+
+**One file per document:** `.kh/business/documents/<slug>.md` (slug: lowercase letters, digits,
+dashes). YAML frontmatter between `---` lines, then the Markdown body:
+
+```markdown
+---
+template: offer-whole-product   # offer (default) | invoice | offer-whole-product
+client: muster-ag               # a slug from clients/, or an inline mapping (name, contact, address, vatId)
+date: 2026-11-12
+subject: Angebot – Komplettpaket
+acceptance: true
+items:
+  - { description: Core, details: Pflicht, qty: 1, unit: Lizenz, price: 95000, vat: 19 }
+  - { description: Vorteil Komplettpaket, qty: 1, unit: Pauschale, price: -75000, vat: 19 }
+---
+
+Sehr geehrter Herr Muster, …
+
+![Diagramm](../assets/diagram.svg)
+
+<!-- items -->
+
+Mit freundlichen Grüßen
+```
+
+- All other frontmatter fields are narro's (`number`, `validUntil`/`validDays`, `paymentTerms`,
+  `discount`, `reverseCharge`, …). A field set in the document wins over `business.yaml`
+  (mappings such as `theme` merge).
+- `<!-- items -->` places the items table; without it the table follows the body.
+- Images are relative to `documents/` and must be files in the repository (SVG, PNG, JPEG, WebP);
+  they are embedded into the page.
+- `offer-whole-product`: no offer number, customer number or validity date printed; one price
+  column; items with a negative price are credits that ladder down from "Summe der Einzelpreise"
+  to the price; VAT as a note. A `---` in the body is a page break; the block from the heading
+  `## Teil 1…` to the next `---` is set compact to fit one page. Optional keys:
+  `summaryHeading` (default `Teil 1`) and `labels` (`steps` list, `subtotal`, `price`, `vatNote`,
+  `listSum`, `priceColumn`, `netTotal`; German defaults).
+
+**Print.** Business → Documents lists the files; open one for a live preview and **Print / Save as
+PDF**. In the print dialog choose "Save as PDF", turn off the browser's headers and footers and
+"fit to page". Chromium-based browsers give the exact layout (page footer, "Seite n von N");
+Safari and Firefox support `@page` margin boxes less well. Problems (unknown client, missing image,
+a field narro rejects) are listed with their field instead of the preview.
+
 ## Knowledge base MCP server (`apps/kb-mcp`)
 
 A stdio MCP server that exposes a repo's `.kh/` knowledge base (falls back to `.lifeos/`) to Claude

@@ -14,7 +14,7 @@ import { type Ctx, Events, Todos } from './tiles/bodies.js';
 import { Bookmarks } from './tiles/bookmarks-body.js';
 import { Budget } from './tiles/budget-body.js';
 import { Collection } from './tiles/collection-body.js';
-import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
+import { BoardOverview, PaletteSettings, Rss, Travel, Vacation } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
 import { ReadLater } from './tiles/read-later-body.js';
 import { Templates } from './tiles/templates-body.js';
@@ -62,6 +62,7 @@ export const TILE_META: Record<TileKind, { title: string; icon: IconName }> = {
   commands: { title: 'Commands', icon: 'terminal' },
   rss: { title: 'RSS feeds', icon: 'rss' },
   travel: { title: 'Travel', icon: 'travel' },
+  vacation: { title: 'Vacation', icon: 'travel' },
   boardoverview: { title: 'Board overview', icon: 'board' },
   palettesettings: { title: 'Palette settings', icon: 'settings' },
 };
@@ -220,6 +221,8 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
       return <Rss view={tile.view} ctx={ctx} />;
     case 'travel':
       return <Travel view={tile.view} ctx={ctx} />;
+    case 'vacation':
+      return <Vacation view={tile.view} ctx={ctx} />;
     case 'boardoverview':
       return <BoardOverview view={tile.view} ctx={ctx} />;
     case 'palettesettings':

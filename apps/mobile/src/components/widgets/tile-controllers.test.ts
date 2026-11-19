@@ -57,7 +57,7 @@ const demo = (suffix: string): { path: string; content: string } => {
 
 describe('dispatch', () => {
   it('maps every dashboard extension to a tile and presents each demo file', () => {
-    expect(TILE_EXTENSIONS).toHaveLength(18);
+    expect(TILE_EXTENSIONS).toHaveLength(19);
     for (const ext of TILE_EXTENSIONS) {
       expect(tileKindForPath(`.kh/x${ext}`)).toBeDefined();
     }

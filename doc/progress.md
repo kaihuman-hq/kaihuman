@@ -17,6 +17,22 @@
 - Braindumps: ＋ menu → Braindump creates one; More → Braindumps lists them (`app/braindumps.tsx`, `src/views/braindumps-view.tsx`).
 - Scan document no longer crashes: `app.json` gets `NSCameraUsageDescription`; the native scan call and scan view report errors instead of crashing. Needs a native rebuild.
 - Dashboard clock: `DashboardPager` ticks `now` every minute via `useLiveNow` instead of only on reload. Regression test added.
+## 2026-11-18 — Vacation research file (`.vacation.json`)
+
+- New file kind for comparing vacation destinations, one file per search. Format and tolerant parser in `packages/formats/src/vacation.ts`; console `VacationWidget` with filter by status and sort by price, rating or name, plus add and edit forms. New File → Vacation research. Standalone: no link to `.travel.json`.
+- Mobile: `.vacation.json` tile (window, destinations with status filter, price, rating, Maps link) and an Add destination sheet; never writes over unreadable content.
+- Docs: `packages/docspack/docs/70-file-formats.md` and `31-console-widgets.md`; feature row in `doc/features.md`.
+
+## 2026-11-18 — Business documents: print offers in the browser
+
+- Console Business → Documents (`/business/documents`, `/business/documents/:slug`): lists `.kh/business/documents/<slug>.md`, live preview in an iframe, **Print / Save as PDF** (hidden-iframe `window.print()`), problems with field names; "New document" from a sample; print settings form.
+- Formats: `BusinessProfile.print` (letterhead, paper, accent, font, website, logo, bank_name, validated), `documents.ts` (frontmatter split, `companyFromProfile` mapper, client slug resolution, `extends`-style merge, `setProfilePrint`), `document` and `asset` path kinds, `repo.documents`. Business tools version 1.5.0 (the check knows the new paths).
+- Console `lib/business/print/`: the spike as a module. narro bundled for Preact by `narro.vite.ts`, whose node stubs apply only to narro's own imports; fs-free render with repository images and logo as data URIs, narro's render rules; `offer-whole-product` as a built-in TS template (no repository code runs). The chunk loads by `import()` (≈143 kB); main bundle +3.8 kB gzip for the pages.
+- Tests: mapper, client resolution, print settings, ladder (325.000 − 75.000 − 200.000 = 50.000 €), summary wrap, wording overrides, parity with narro `renderHtml` on its example, pages. The spike folder (incl. `reference/`) is removed.
+
+## 2026-11-18 — Spike: `@getnarro/pdf` in the browser
+
+- New runtime dependency `@getnarro/pdf@0.0.0` in `apps/console` (listed in `minimumReleaseAgeExclude`; approved). Spike only, no UI yet: `apps/console/src/spikes/narro/` bundles it with fs/path stubs on Preact, renders an offer to full HTML without fs (parity-tested against `renderHtml`), and the Chromium PDF check shows DIN 5008 pagination and per-page footer work. Findings in `FINDINGS.md`.
 
 ## 2026-11-18 — Braindump: save to file (⌃⇧S)
 

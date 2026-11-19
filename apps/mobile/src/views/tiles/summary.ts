@@ -28,6 +28,7 @@ export const TILE_SIZE: Record<TileKind, TileSize> = {
   commands: 'medium',
   rss: 'medium',
   travel: 'medium',
+  vacation: 'medium',
   boardoverview: 'medium',
   palettesettings: 'compact',
   todos: 'full',
@@ -165,6 +166,12 @@ export function summarizeTile(
             plural(tile.view.trips.length, 'trip'),
             tile.view.trips.map((t) => `${t.name} ${t.dateRange}`),
           );
+    case 'vacation':
+      return out(
+        String(tile.view.destinations.length),
+        plural(tile.view.destinations.length, 'destination'),
+        tile.view.destinations.map((d) => `${d.name} (${d.status})`),
+      );
     case 'boardoverview':
       return out(
         String(tile.view.columns.reduce((n, c) => n + (c.status === 'done' ? 0 : c.count), 0)),

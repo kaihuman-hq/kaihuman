@@ -212,6 +212,7 @@ whose rows carry no date.
 | \`*.events.csv\` | Events that happened or were planned |
 | \`*.readitlater.json\`, \`*.bookmarks.json\` | New items, as leads for future sources |
 | \`*.travel.json\` | Trips taken or planned, with dates, destinations and total cost |
+| \`*.vacation.json\` | Vacation research: candidate destinations with status, rating, price and links |
 
 Skip the knowledge base itself: \`.kh/raw/\`, \`.kh/wiki/\`, \`.kh/assets/\`, \`log.md\`,
 \`index.kb.md\`, \`search.kb.json\`, \`schema.md\`. Never modify the files you read.

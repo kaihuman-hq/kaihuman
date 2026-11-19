@@ -97,6 +97,9 @@ import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
 import { TravelAddForm } from '../Organisms/Widgets/TravelAddForm';
 import { TravelEditForm } from '../Organisms/Widgets/TravelEditForm';
 import { TravelWidget } from '../Organisms/Widgets/TravelWidget';
+import { VacationAddForm } from '../Organisms/Widgets/VacationAddForm';
+import { VacationEditForm } from '../Organisms/Widgets/VacationEditForm';
+import { VacationWidget } from '../Organisms/Widgets/VacationWidget';
 import { AIPanel } from '../Templates/AIPanel';
 import type { DashboardConfig, DashboardEntry } from '../types';
 import { MainGrid } from './MainGrid';
@@ -768,6 +771,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.board-overview.json')) ext = '.board-overview.json';
       else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
       else if (lowerPath.endsWith('.travel.json')) ext = '.travel.json';
+      else if (lowerPath.endsWith('.vacation.json')) ext = '.vacation.json';
       else if (lowerPath.endsWith('command-palette.settings.json'))
         ext = 'command-palette.settings.json';
       else {
@@ -918,6 +922,9 @@ abbreviations: undefined
     if (tile.extension?.toLowerCase() === '.travel.json') {
       // Empty file is valid: parseTravel turns it into an empty doc.
       return <TravelWidget content={tile.rawContent ?? ''} mode={mode} />;
+    }
+    if (tile.extension?.toLowerCase() === '.vacation.json') {
+      return <VacationWidget content={tile.rawContent ?? ''} mode={mode} />;
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
@@ -1145,6 +1152,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
       else if (lowerPath.endsWith('.travel.json')) ext = '.travel.json';
+      else if (lowerPath.endsWith('.vacation.json')) ext = '.vacation.json';
       else if (lowerPath.endsWith('command-palette.settings.json'))
         ext = 'command-palette.settings.json';
       else {
@@ -2265,6 +2273,7 @@ const FocusedTileInternal = ({
   const isBoardOverview = tile.extension === '.board-overview.json';
   const isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
   const isTravel = tile.extension?.toLowerCase() === '.travel.json';
+  const isVacation = tile.extension?.toLowerCase() === '.vacation.json';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2296,7 +2305,8 @@ const FocusedTileInternal = ({
     isAnyCsv || // && !!tile.rawContent;
     isBoardOverview ||
     isBookmarks ||
-    isTravel;
+    isTravel ||
+    isVacation;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [viewMode, setViewMode] = useState<string>(
@@ -2304,6 +2314,9 @@ const FocusedTileInternal = ({
   );
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [editTripId, setEditTripId] = useState<string | null>(null);
+  // '' edits the file-level details rather than one destination.
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
+  const [editDestId, setEditDestId] = useState<string | null>(null);
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [showHistory, setShowHistory] = useState(false);
 
@@ -2381,6 +2394,7 @@ const FocusedTileInternal = ({
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
     const _isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
     const _isTravel = tile.extension?.toLowerCase() === '.travel.json';
+    const _isVacation = tile.extension?.toLowerCase() === '.vacation.json';
 
     const _hasWidget =
       _isTimeTracking ||
@@ -2399,7 +2413,8 @@ const FocusedTileInternal = ({
       _isConsumption ||
       _isAnyCsv ||
       _isBookmarks ||
-      _isTravel;
+      _isTravel ||
+      _isVacation;
 
     if (viewMode === 'CODE') {
       // console.log('[FocusedTileInternal] ViewMode is CODE. HasWidget:', _hasWidget, 'RawContent length:', tile.rawContent?.length);
@@ -2687,6 +2702,21 @@ const FocusedTileInternal = ({
                     )}
                   >
                     ADD TRIP
+                  </button>
+                )}
+
+                {isVacation && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD DESTINATION
                   </button>
                 )}
 
@@ -3054,6 +3084,20 @@ const FocusedTileInternal = ({
                   }}
                 />
               )}
+              {isVacation && (
+                <VacationWidget
+                  content={tile.rawContent || ''}
+                  mode="FOCUS"
+                  onEditDestination={(id) => {
+                    setEditDestId(id);
+                    setViewMode('EDIT');
+                  }}
+                  onEditMeta={() => {
+                    setEditDestId('');
+                    setViewMode('EDIT');
+                  }}
+                />
+              )}
               {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
               {isBoardOverview && (
                 <BoardOverviewWidget
@@ -3074,6 +3118,24 @@ const FocusedTileInternal = ({
                 key={editTripId}
                 content={tile.rawContent || ''}
                 tripId={editTripId}
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
+                onDone={() => setViewMode('WIDGET')}
+              />
+            </div>
+          ) : viewMode === 'EDIT' && isVacation && editDestId !== null ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <VacationEditForm
+                key={editDestId}
+                content={tile.rawContent || ''}
+                destinationId={editDestId || undefined}
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
+                onDone={() => setViewMode('WIDGET')}
+              />
+            </div>
+          ) : viewMode === 'ADD' && isVacation ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <VacationAddForm
+                content={tile.rawContent || ''}
                 onChange={(newContent) => tile.onContentChange?.(newContent)}
                 onDone={() => setViewMode('WIDGET')}
               />

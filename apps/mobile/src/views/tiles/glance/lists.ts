@@ -15,6 +15,7 @@ import {
   type TemplatesView,
   type TodosView,
   type TravelView,
+  type VacationView,
   type WorldClock,
 } from '../../../components/widgets/tile-controllers.js';
 import { tileTitle } from './name.js';
@@ -311,6 +312,21 @@ export function travelGlance({ path }: GlanceInput, view: TravelView): Glance {
       ...(parts.length > 0 && { caption: parts.join(' · ') }),
     },
     action,
+  };
+}
+
+export function vacationGlance({ path }: GlanceInput, view: VacationView): Glance {
+  const n = view.destinations.length;
+  return {
+    title: tileTitle(path, 'Vacation'),
+    icon: 'travel',
+    tint: 'blue',
+    hero: String(n),
+    label: n === 1 ? 'destination' : 'destinations',
+    ...(view.window && {
+      viz: { kind: 'text', title: view.title || view.window, caption: view.window },
+    }),
+    action: { kind: 'open', icon: 'add', label: 'Add destination', href: addHref(path) },
   };
 }
 

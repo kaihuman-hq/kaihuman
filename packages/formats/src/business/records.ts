@@ -6,6 +6,32 @@ export type Address = { street: string; postcode: string; city: string; country:
 
 export type Jurisdiction = 'de' | 'generic';
 
+export const LETTERHEADS = ['din5008-a', 'din5008-b', 'minimal'] as const;
+export const PAPERS = ['A4', 'Letter'] as const;
+export const PRINT_FONTS = ['Inter', 'Source Serif 4', 'IBM Plex Sans'] as const;
+export const PRINT_KEYS = [
+  'letterhead',
+  'paper',
+  'accent',
+  'font',
+  'website',
+  'logo',
+  'bank_name',
+] as const;
+
+/** How printed documents look; everything else on the letterhead comes from the profile. */
+export type PrintSettings = {
+  letterhead?: (typeof LETTERHEADS)[number];
+  paper?: (typeof PAPERS)[number];
+  /** `#rgb` or `#rrggbb`. */
+  accent?: string;
+  font?: (typeof PRINT_FONTS)[number];
+  website?: string;
+  /** Image path relative to the business folder, e.g. `assets/logo.svg`. */
+  logo?: string;
+  bank_name?: string;
+};
+
 export type BusinessProfile = {
   name: string;
   address: Address;
@@ -23,6 +49,7 @@ export type BusinessProfile = {
   default_vat_rate: string;
   electronic_address?: string;
   numbering?: { invoice?: string; offer?: string };
+  print?: PrintSettings;
 };
 
 export const CLIENT_STAGES = ['lead', 'contacted', 'offer-sent', 'active', 'past', 'lost'] as const;
@@ -286,6 +313,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'default_vat_rate',
     'electronic_address',
     'numbering',
+    'print',
   ],
   client: [
     'name',
