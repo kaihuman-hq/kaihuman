@@ -447,6 +447,17 @@ describe('buildWidgetExtras', () => {
   });
   const run = (f: Record<string, { content: string }>, at = NOW) => buildWidgetExtras(f, at, 'UTC');
 
+  it('adds the next birthdays from the events file, soonest first', () => {
+    const events = {
+      content:
+        'name;type;start iso date;end iso date\nAnna;birthday;1990-12-24;1990-12-24\nMum;birthday;1960-06-12;1960-06-12\n',
+    };
+    expect(run({ '.kh/main.events.csv': events }).birthdays).toEqual([
+      { name: 'Mum', date: '2026-06-12', turns: 66 },
+      { name: 'Anna', date: '2026-12-24', turns: 36 },
+    ]);
+  });
+
   it('is minimal and omits sections when there is nothing', () => {
     const extras = run({ '.kh/inbox.todos.md': { content: '' } });
     expect(extras).toEqual({ knowledgeInbox: 0 });

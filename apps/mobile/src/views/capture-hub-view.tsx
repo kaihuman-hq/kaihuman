@@ -34,6 +34,13 @@ const OPTIONS: readonly CaptureOption[] = [
     icon: 'knowledge',
     tone: 'success',
   },
+  {
+    kind: 'braindump',
+    title: 'Braindump',
+    subtitle: 'Dump everything on your mind',
+    icon: 'prompt',
+    tone: 'neutral',
+  },
 ];
 
 export function CaptureHubView({ onSelect }: { onSelect: (kind: QuickKind) => void }) {

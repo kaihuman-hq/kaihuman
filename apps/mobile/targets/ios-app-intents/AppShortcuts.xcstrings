@@ -320,6 +320,102 @@
           }
         }
       }
+    },
+    "New todo for ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Todo zu ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New todo for ${applicationName}"
+          }
+        }
+      }
+    },
+    "Add a todo to ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo zu ${applicationName} hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a todo to ${applicationName}"
+          }
+        }
+      }
+    },
+    "Add a todo to ${stream} in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo zu ${stream} in ${applicationName} hinzufügen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a todo to ${stream} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "New todo for ${stream} in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Todo für ${stream} in ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New todo for ${stream} in ${applicationName}"
+          }
+        }
+      }
+    },
+    "What's the next birthday in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wann ist der nächste Geburtstag in ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's the next birthday in ${applicationName}"
+          }
+        }
+      }
+    },
+    "Next birthday in ${applicationName}": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächster Geburtstag in ${applicationName}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next birthday in ${applicationName}"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

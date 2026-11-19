@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nativeModel } from './model.js';
 import { drainQueue, parseQueue, SMART_CAPTURE_QUEUE_FILE, toRaw } from './queue.js';
-import { findHabit, saveCapture } from './save-capture.js';
+import { findHabit, findStream, saveCapture } from './save-capture.js';
 import {
   CAPTURE_SCHEMA,
   captureInstructions,
@@ -245,6 +245,23 @@ describe('Siri queue', () => {
     expect(parseQueue(null, now)).toEqual([]);
   });
 
+  // Row shape InboxCapture.add (CaptureTodoIntent.swift) writes for "Add a todo" with a due date.
+  it('files a Siri todo with a due date as a dated inbox todo', () => {
+    const json = JSON.stringify([
+      {
+        text: 'pay rent',
+        capturedAt: '2026-11-09T08:00:00.000Z',
+        capture: { kind: 'todo', text: 'pay rent', tags: [], due: '2026-11-20' },
+      },
+    ]);
+    expect(parseQueue(json, now)).toEqual([
+      {
+        text: 'pay rent',
+        capture: { kind: 'todo', text: 'pay rent', tags: [], due: { date: '2026-11-20' } },
+      },
+    ]);
+  });
+
   it('drains, keeping failed entries for the next launch', async () => {
     const s = store(
       JSON.stringify([
@@ -273,5 +290,63 @@ describe('Siri queue', () => {
     ] satisfies SmartCapture[]) {
       expect(toCapture(toRaw(c), now)).toEqual(c);
     }
+  });
+});
+
+describe('Siri stream target', () => {
+  const paths = ['.kh/inbox.todos.md', '.kh/bpmnkit.todos.md', '.kh/Café Ideen.todos.md'];
+
+  it('finds a stream by path or spoken name, ignoring case, accents and punctuation', () => {
+    expect(findStream(paths, '.kh/bpmnkit.todos.md')).toBe('.kh/bpmnkit.todos.md');
+    expect(findStream(paths, 'BPMNKit')).toBe('.kh/bpmnkit.todos.md');
+    expect(findStream(paths, 'bpmn')).toBe('.kh/bpmnkit.todos.md');
+    expect(findStream(paths, 'cafe ideen')).toBe('.kh/Café Ideen.todos.md');
+  });
+
+  it('returns nothing for unknown or ambiguous names rather than guessing a file', () => {
+    expect(findStream(paths, 'groceries')).toBeUndefined();
+    expect(findStream(paths, '!!')).toBeUndefined();
+    expect(findStream(['a/x1.todos.md', 'b/x2.todos.md'], 'x')).toBeUndefined();
+    expect(findStream(['a/work.todos.md', 'b/work.todos.md'], 'work')).toBeUndefined();
+  });
+
+  it('round-trips the target through the queue and drops an empty one', () => {
+    const c: SmartCapture = {
+      kind: 'todo',
+      text: 'ship',
+      tags: [],
+      target: '.kh/bpmnkit.todos.md',
+    };
+    expect(toCapture(toRaw(c), new Date('2026-11-10T09:00:00Z'))).toEqual(c);
+    expect(toRaw({ kind: 'todo', text: 'a', tags: [] })).not.toHaveProperty('target');
+    expect(toCapture({ kind: 'todo', text: 'a', tags: [], target: ' ' }, new Date())).toEqual({
+      kind: 'todo',
+      text: 'a',
+      tags: [],
+    });
+  });
+
+  it('files a queued todo into the target stream, with its due date', async () => {
+    const day = new Date('2026-11-10T09:00:00Z');
+    const files = memFiles({ '.kh/bpmnkit.todos.md': '', '.kh/inbox.todos.md': '' });
+    const controller = controllerFor(files, day);
+    const res = await saveCapture(
+      { kind: 'todo', text: 'fix lanes', tags: [], target: 'bpmnkit', due: { date: '2026-11-13' } },
+      { controller, files },
+    );
+    expect(res).toMatchObject({ ok: true });
+    expect(files.data['.kh/bpmnkit.todos.md']).toMatch(/- \[ \] fix lanes\n.*::due:: 2026-11-13/);
+    expect(files.data['.kh/inbox.todos.md']).toBe('');
+  });
+
+  it('keeps the todo in the inbox when the stream is gone, and without a due date sets none', async () => {
+    const files = memFiles({ '.kh/bpmnkit.todos.md': '' });
+    const controller = controllerFor(files, new Date('2026-11-10T09:00:00Z'));
+    await saveCapture(
+      { kind: 'todo', text: 'lost', tags: [], target: 'deleted' },
+      { controller, files },
+    );
+    expect(files.data['.kh/inbox.todos.md']).toContain('lost');
+    expect(files.data['.kh/inbox.todos.md']).not.toContain('::due::');
   });
 });

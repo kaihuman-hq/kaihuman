@@ -66,7 +66,7 @@ export function OnboardingView({
   };
 
   return (
-    <Screen title="Choose a repository" scroll refreshing={loading} onRefresh={refresh} keyboard>
+    <Screen title="Choose a repository" scroll pullSearch keyboard>
       <Text variant="callout" tone="secondary">
         kaihuman reads and saves your todos, notes and ideas as plain files in one GitHub
         repository. Pick the one to use. You can change it later in More.

@@ -57,6 +57,7 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   cards: [{ path: '', title: '', excerpt: '', tags: [] }],
   habits: [{ path: '', name: '', doneToday: false, streakDays: 0, days: [], pending: false }],
   timer: { path: '', label: '', startedAt: 0, todayMinutes: 0, pending: false },
+  birthdays: [{ name: '', date: '', turns: 0 }],
   filter: { tags: [], area: '', board: '', label: '' },
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
@@ -95,6 +96,7 @@ describe('ios widget target', () => {
       ...Object.keys(snapshot.habits[0] ?? {}),
       ...Object.keys(snapshot.todayCounts),
       ...Object.keys(snapshot.timer),
+      ...Object.keys(snapshot.birthdays[0] ?? {}),
       ...Object.keys(snapshot.filter),
       ...Object.keys({ sha: '', content: '' }),
     ];
@@ -567,7 +569,7 @@ describe('ios widget target', () => {
       expect(shortcuts).toContain('AppShortcutsProvider');
       const blocks = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)].map((m) => m[1] ?? '');
       // The system caps an app at 10 App Shortcuts.
-      expect(blocks).toHaveLength(9);
+      expect(blocks).toHaveLength(10);
       for (const block of blocks) {
         const phrases = block.match(/"[^"]*"/g) ?? [];
         expect(phrases.length).toBeGreaterThan(0);
@@ -577,7 +579,6 @@ describe('ios widget target', () => {
         'AddTodoIntent()',
         'WhatsNextIntent()',
         'CompleteTodoIntent()',
-        'CaptureTodoIntent()',
         'AddNoteIntent()',
         'AddLogIntent()',
         'SearchKaihumanIntent()',
@@ -634,12 +635,14 @@ describe('ios widget target', () => {
         ...[...shortcuts.matchAll(/shortTitle: "([^"]+)"/g)].map((m) => m[1] ?? ''),
         ...['AddTodoIntent', 'WhatsNextIntent', 'CompleteTodoIntent', 'AddNoteIntent']
           .concat(['AddLogIntent', 'SearchKaihumanIntent', 'DueTodayIntent', 'OpenItemIntent'])
+          .concat(['NextBirthdayIntent'])
           .map((name) => {
             const body = sources.slice(sources.indexOf(`struct ${name}`));
             return /static let title: LocalizedStringResource = "([^"]+)"/.exec(body)?.[1] ?? name;
           }),
       ];
-      expect(wanted).toHaveLength(17);
+      wanted.push('Due date');
+      expect(wanted).toHaveLength(20);
       for (const key of wanted) {
         expect(strings[key]?.localizations?.de?.stringUnit.value, key).toBeTruthy();
       }
@@ -693,7 +696,72 @@ describe('ios widget target', () => {
       expect(intents).toContain('EntityStringQuery');
       expect(intents).toContain('store.toggle(itemId: todo.id)');
       expect(intents.indexOf('reloadAllTimelines')).toBeLessThan(intents.indexOf('store.push'));
-      expect(intents).toContain('QuickCaptureKind.todo.url');
+    });
+
+    it('adds a todo to the inbox in the background, with an optional due date', () => {
+      const body = intents.slice(intents.indexOf('struct AddTodoIntent: AppIntent'));
+      expect(body).toContain('openAppWhenRun = false');
+      expect(body).toMatch(/@Parameter\(title: "Todo"\)\s+var text: String/);
+      expect(body).toMatch(/@Parameter\(title: "Due date"\)\s+var due: Date\?/);
+      expect(body).toContain('await InboxCapture.add(text, due: due)');
+      expect(intents).not.toContain('QuickCaptureKind.todo.url');
+    });
+
+    // "Neues Todo zu kaihuman" got "the app doesn't support this": no German phrase matched.
+    it('answers the requested English and German add-todo phrases', () => {
+      const start = shortcuts.indexOf('intent: AddTodoIntent()');
+      const block = shortcuts.slice(start, shortcuts.indexOf('AppShortcut(', start));
+      const { strings } = catalog('AppShortcuts.xcstrings');
+      const de = (block.match(/"[^"]*"/g) ?? [])
+        .map((p) => p.slice(1, -1).replaceAll('\\(.applicationName)', token('applicationName')))
+        .map((key) => strings[key]?.localizations?.de?.stringUnit.value);
+      for (const phrase of ['Add a todo in', 'New todo in']) {
+        expect(block).toContain(`"${phrase} \\(.applicationName)"`);
+      }
+      for (const phrase of ['Neues Todo in $', 'Neues Todo zu $', 'Todo zu $ hinzufügen']) {
+        expect(de).toContain(phrase.replace('$', token('applicationName')));
+      }
+      expect(block).toContain('"Add to \\(.applicationName) inbox"');
+    });
+
+    it('adds a todo to a named stream through the capture queue, not a second write path', () => {
+      const stream = readFileSync(join(intentsDir, 'StreamIntents.swift'), 'utf8');
+      const smart = readFileSync(join(dir, 'SmartCaptureModel.swift'), 'utf8');
+      expect(stream).toContain('struct TodoStreamEntity: AppEntity');
+      expect(stream).toContain('struct TodoStreamQuery: EntityStringQuery');
+      expect(stream).toContain('snapshot?.files.keys');
+      expect(stream).toMatch(/struct AddTodoToStreamIntent: AppIntent[^}]*openAppWhenRun = false/);
+      expect(stream).toMatch(/@Parameter\(title: "Due date"\)\s+var due: Date\?/);
+      expect(stream).toContain('SmartCaptureQueue.append(');
+      expect(stream).toContain('target: stream.id');
+      // Unknown stream: a spoken reply and an early return before the queue append.
+      expect(stream.indexOf("couldn't find that stream")).toBeLessThan(
+        stream.indexOf('SmartCaptureQueue.append('),
+      );
+      expect(smart).toContain('fields["target"] = target');
+      expect(shortcuts).toContain('"Add a todo to \\(\\.$stream) in \\(.applicationName)"');
+      expect(shortcuts).toContain('"New todo for \\(\\.$stream) in \\(.applicationName)"');
+    });
+
+    it('translates the stream intent to German, with the requested phrases', () => {
+      const phrases = catalog('AppShortcuts.xcstrings').strings;
+      const de = (k: string) => phrases[k]?.localizations?.de?.stringUnit.value;
+      expect(de(`Add a todo to ${token('stream')} in ${token('applicationName')}`)).toBe(
+        `Todo zu ${token('stream')} in ${token('applicationName')} hinzufügen`,
+      );
+      expect(de(`New todo for ${token('stream')} in ${token('applicationName')}`)).toBe(
+        `Neues Todo für ${token('stream')} in ${token('applicationName')}`,
+      );
+      const { strings } = catalog('Localizable.xcstrings');
+      for (const key of [
+        'Add to stream',
+        'Add a todo to a stream',
+        'Stream',
+        "I couldn't find that stream in kaihuman. Nothing was added.",
+        'Saved to %@. kaihuman files it when it opens next.',
+      ]) {
+        expect(strings[key]?.localizations?.de?.stringUnit.value, key).toBeTruthy();
+      }
     });
 
     it('stays out of the widget extension and has no second @main', () => {
@@ -757,6 +825,9 @@ describe('ios widget target', () => {
     it('adds to the inbox without opening the app and queues on failure', () => {
       expect(capture).toContain('struct CaptureTodoIntent: AppIntent');
       expect(capture).toContain('openAppWhenRun = false');
+      expect(capture).toContain('await InboxCapture.add(text)');
+      // A due date goes through the queue the app drains (saveCapture writes `::due::`).
+      expect(capture).toMatch(/SmartCapture\(kind: "todo", text: line, tags: \[\], due: /);
       expect(capture).toMatch(/@Parameter\(title: "Todo"\)\s+var text: String/);
       expect(capture).toContain('some IntentResult & ProvidesDialog');
       expect(capture).toContain('"Added to inbox"');
@@ -769,7 +840,7 @@ describe('ios widget target', () => {
         join(dir, '..', 'ios-app-intents', 'AppShortcuts.swift'),
         'utf8',
       );
-      const block = shortcuts.slice(shortcuts.indexOf('intent: CaptureTodoIntent()'));
+      const block = shortcuts.slice(shortcuts.indexOf('intent: AddTodoIntent()'));
       expect(block).toContain('"Add to \\(.applicationName) inbox"');
     });
   });

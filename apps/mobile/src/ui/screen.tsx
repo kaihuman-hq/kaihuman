@@ -1,8 +1,10 @@
+import { router } from 'expo-router';
 import { HeaderHeightContext, HeaderShownContext } from 'expo-router/react-navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
-  RefreshControl,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -12,6 +14,7 @@ import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
 import { KeyboardLift, keyboardScrollProps } from './keyboard.js';
+import { createPullTracker } from './pull-search.js';
 import { Text } from './text.js';
 import { useKeyboardVisible } from './use-keyboard.js';
 
@@ -40,8 +43,8 @@ export interface ScreenProps {
   scroll?: boolean;
   title?: string;
   inset?: ScreenInset;
-  refreshing?: boolean;
-  onRefresh?: () => void;
+  /** iOS: a pull-down past a small threshold, decided on release, opens search. Never syncs. */
+  pullSearch?: boolean;
   /** Pinned below the content (e.g. a primary action). */
   footer?: ReactNode;
   /**
@@ -63,8 +66,7 @@ export function Screen({
   scroll = true,
   title,
   inset = 'grouped',
-  refreshing = false,
-  onRefresh,
+  pullSearch: pullSearchProp = false,
   footer,
   keyboard,
   syncStatus = true,
@@ -85,6 +87,21 @@ export function Screen({
       animated: false,
     });
   }, [scrollToTopKey]);
+  // iOS only: it is the platform with a rubber-band overscroll and the search-under-header convention.
+  const pullSearch = Platform.OS === 'ios' && scroll && pullSearchProp;
+  const tracker = useRef(createPullTracker()).current;
+  const pullHandlers = pullSearch
+    ? {
+        scrollEventThrottle: 16,
+        onScrollBeginDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+          tracker.begin(e.nativeEvent.contentOffset.y),
+        onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+          tracker.move(e.nativeEvent.contentOffset.y),
+        onScrollEndDrag: () => {
+          if (tracker.end() === 'search') router.push('/search');
+        },
+      }
+    : undefined;
   const { spacing, colors } = theme;
   const margin = inset === 'grouped' ? theme.metrics.screenMargin : 0;
   // Native headers already show the title. The web preview hides tab-root headers, so only
@@ -102,15 +119,7 @@ export function Screen({
       contentInsetAdjustmentBehavior="automatic"
       {...keyboardScrollProps(lifted)}
       keyboardDismissMode="interactive"
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.secondaryLabel}
-          />
-        ) : undefined
-      }
+      {...pullHandlers}
       contentContainerStyle={{
         paddingHorizontal: margin,
         paddingTop: spacing.sm,

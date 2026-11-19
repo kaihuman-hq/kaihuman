@@ -6,6 +6,7 @@ import { SettingsView } from './settings-view.js';
 
 afterEach(cleanup);
 
+const idle = { running: false, result: null, syncNow: vi.fn() };
 const NOW = new Date(2026, 10, 10, 9, 0, 0);
 
 describe('More → Settings → Command palette', () => {
@@ -15,7 +16,7 @@ describe('More → Settings → Command palette', () => {
     fireEvent.click(screen.getByTestId('more-settings'));
     expect(onNavigate).toHaveBeenLastCalledWith('/more/settings');
     cleanup();
-    render(<SettingsView onNavigate={onNavigate} />);
+    render(<SettingsView onNavigate={onNavigate} sync={idle} />);
     fireEvent.click(screen.getByTestId('settings-palette'));
     expect(onNavigate).toHaveBeenLastCalledWith('/more/palette');
     fireEvent.click(screen.getByTestId('settings-notifications'));
@@ -31,5 +32,36 @@ describe('More → Settings → Command palette', () => {
   it('shows an empty state when the repository has no settings file', async () => {
     render(<PaletteSettingsScreen load={async () => null} onWrite={vi.fn()} now={NOW} />);
     expect(await screen.findByText('No palette settings')).toBeTruthy();
+  });
+});
+
+describe('Settings → Sync now', () => {
+  it('starts a full sync when pressed', () => {
+    const syncNow = vi.fn();
+    render(<SettingsView onNavigate={vi.fn()} sync={{ running: false, result: null, syncNow }} />);
+    fireEvent.click(screen.getByTestId('settings-sync-now'));
+    expect(syncNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows progress and ignores presses while running', () => {
+    const syncNow = vi.fn();
+    render(<SettingsView onNavigate={vi.fn()} sync={{ running: true, result: null, syncNow }} />);
+    expect(screen.getByText('Syncing…')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('settings-sync-now'));
+    expect(syncNow).not.toHaveBeenCalled();
+  });
+
+  it('shows the result and the error', () => {
+    const base = { running: false, syncNow: vi.fn() };
+    render(<SettingsView onNavigate={vi.fn()} sync={{ ...base, result: { ok: true, at: 1 } }} />);
+    expect(screen.getByText('Synced just now')).toBeTruthy();
+    cleanup();
+    render(
+      <SettingsView
+        onNavigate={vi.fn()}
+        sync={{ ...base, result: { ok: false, error: 'Offline' } }}
+      />,
+    );
+    expect(screen.getByText('Sync failed: Offline')).toBeTruthy();
   });
 });

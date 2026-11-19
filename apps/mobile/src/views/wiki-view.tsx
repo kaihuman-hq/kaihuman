@@ -6,7 +6,7 @@ import {
   type WikiSegment,
   wikiPageHref,
 } from '../screens/wiki-screen.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { type TextVariant, useTheme } from '../theme/theme.js';
 import {
   Chip,
@@ -145,8 +145,8 @@ export function WikiPageView({
   const { colors, spacing } = useTheme();
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
+  useFocusRefresh();
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -197,7 +197,7 @@ export function WikiPageView({
   const { title, blocks } = withoutTitleHeading(page.title, wikiBlocks(controller.render(path)));
   const backlinks = controller.backlinks(path);
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen pullSearch>
       <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
         <Text variant="title1" accessibilityRole="header">
           {title}
@@ -238,7 +238,6 @@ export function WikiView({ controller }: { controller: WikiScreenController }) {
   const { colors, spacing } = theme;
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
   const [error, setError] = useState<string | null>(null);
@@ -269,7 +268,7 @@ export function WikiView({ controller }: { controller: WikiScreenController }) {
   const tags = controller.allTags();
 
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen pullSearch>
       <TextField
         label="Search pages"
         value={query}

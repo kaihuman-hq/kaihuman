@@ -15,8 +15,10 @@ import {
   type StocksView,
   type TimerView,
   timeHistoryView,
+  toggleHabitDay,
   toggleHabitToday,
 } from '../../../components/widgets/tile-controllers.js';
+import { habitBehind } from './habit-behind.js';
 import { addHref } from './lists.js';
 import { tileTitle } from './name.js';
 import type { Glance, GlanceInput, GlanceTone } from './types.js';
@@ -85,15 +87,33 @@ const bestStreak = (content: string, current: number): number => {
   return Math.max(best, current);
 };
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 export function habitGlance(input: GlanceInput, view: HabitView): Glance {
   const title = tileTitle(input.path, 'Habit');
+  const { behind, catchUp } = habitBehind(input.content, input.now);
+  const late = Math.max(behind, catchUp.length);
   return {
     title,
     icon: 'flag',
     tint: 'orange',
     hero: String(view.currentStreak),
     unit: 'days',
-    label: `streak · best ${bestStreak(input.content, view.currentStreak)}`,
+    label:
+      late > 0
+        ? `${late} ${late === 1 ? 'day' : 'days'} behind`
+        : `streak · best ${bestStreak(input.content, view.currentStreak)}`,
+    ...(late > 0 && {
+      attention: true as const,
+      heroTone: 'danger' as const,
+      catchUp: {
+        days: catchUp.map((date) => ({
+          date,
+          label: WEEKDAYS[parseIso(date).getDay()] ?? '',
+        })),
+        run: toggleHabitDay,
+      },
+    }),
     viz: {
       kind: 'days',
       days: view.strip.map((d) => ({

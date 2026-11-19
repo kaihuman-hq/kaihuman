@@ -12,6 +12,7 @@ const quickKinds: Record<QuickKind, true> = {
   log: true,
   idea: true,
   knowledge: true,
+  braindump: true,
   inbox: true,
 };
 

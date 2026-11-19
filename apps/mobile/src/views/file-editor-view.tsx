@@ -16,7 +16,7 @@ import type {
   FileEditorController,
   FileEditorState,
 } from '../screens/file-editor-screen.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -128,7 +128,6 @@ export function FileBrowserView({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
 
@@ -190,7 +189,7 @@ export function FileBrowserView({
   };
 
   return (
-    <Screen title="Files" refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen title="Files" pullSearch>
       {/* At the root the title already says where you are. */}
       {folder ? (
         <Breadcrumbs

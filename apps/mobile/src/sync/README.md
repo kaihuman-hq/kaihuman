@@ -28,7 +28,7 @@ returned null and saves created files from scratch, which that `loadTree` discar
 import {
   refreshAll,        // (opts?: { reason?: SyncTrigger }) => Promise<void>; never throws
   notifyLocalWrite,  // () => void; call after any local write (the content ports do it)
-  useRefresh,        // () => { refreshing: boolean; onRefresh: () => void } for RefreshControl
+  useSyncNow,        // () => { running, result, syncNow } for Settings → Sync now
   useSyncRevision,   // () => number; put in a load effect's deps to re-read after a sync
   useFocusRefresh,   // () => void; in a tab screen: refreshes on focus when data is > 30 s old
   useSyncStatus,     // () => SyncStatus
@@ -37,9 +37,8 @@ import {
 } from '../sync/index.js';
 ```
 
-- Pull-to-refresh: `const { refreshing, onRefresh } = useRefresh();` then
-  `<Screen refreshing={refreshing} onRefresh={onRefresh}>`. It forces a sync, fires a light
-  haptic and keeps `refreshing` true only while that sync runs.
+- There is no pull-to-refresh: pulling down only opens search. Sync is automatic (triggers below);
+  Settings → Sync now (`useSyncNow`) forces one and shows progress, result or error.
 - Re-reading after background syncs: `const rev = useSyncRevision();` and add `rev` to the
   deps of the effect that loads the screen's data. Reads are cache-first, so this is cheap.
 

@@ -39,8 +39,6 @@ export interface BusinessViewProps {
   onLogTime: () => void;
   onStopTimer: () => void;
   onCancelTimer: () => void;
-  refreshing?: boolean;
-  onRefresh?: () => void;
 }
 
 export const INVOICE_STATE_LABEL: Record<InvoiceRow['status']['state'], string> = {
@@ -65,7 +63,7 @@ export function FailedNotice({ failed }: { failed: readonly string[] }) {
 }
 
 export function BusinessView(props: BusinessViewProps) {
-  const { state, now, today, refreshing, onRefresh } = props;
+  const { state, now, today } = props;
   const { spacing, colors } = useTheme();
   const [picking, setPicking] = useState(false);
 
@@ -80,7 +78,7 @@ export function BusinessView(props: BusinessViewProps) {
   }
   if (state.status === 'disabled') {
     return (
-      <Screen refreshing={refreshing} onRefresh={onRefresh}>
+      <Screen pullSearch>
         <EmptyState
           icon="wallet"
           title="Business is not set up"
@@ -99,7 +97,7 @@ export function BusinessView(props: BusinessViewProps) {
   const clients = clientRows(repo, today);
 
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen pullSearch>
       <FailedNotice failed={state.failed} />
       {timer ? (
         <Card title="Timer running" icon="timer">

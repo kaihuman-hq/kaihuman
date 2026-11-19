@@ -104,6 +104,13 @@ export interface Glance {
   delta?: { text: string; tone: GlanceTone };
   viz?: GlanceViz;
   action?: QuickAction;
+  /** The tile needs the user (habit behind on check-ins): the view paints it red-ish. */
+  attention?: true;
+  /** Past days that can be checked in straight from the tile; replaces `viz`. */
+  catchUp?: {
+    days: { date: string; label: string }[];
+    run: (content: string, date: string, now: Date) => TileResult;
+  };
 }
 
 export interface GlanceInput {

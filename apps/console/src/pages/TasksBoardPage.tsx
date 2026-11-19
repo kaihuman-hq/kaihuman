@@ -5,7 +5,7 @@ import {
   dueStatus,
   inboxPathFor,
   parseTodos,
-  RESCHEDULE_OPTIONS,
+  QUICK_DUE_OPTIONS,
   rescheduleDate,
   serializeTodos,
   setStatus,
@@ -41,7 +41,7 @@ import {
   Sun,
 } from 'lucide-preact';
 import type { ComponentChildren, JSX } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { DueNotifyToggle } from '../components/DueNotifier';
 import { searchTaskRows } from './taskSearch';
@@ -93,13 +93,31 @@ const RescheduleMenu = ({
 }: {
   title: string;
   now: number;
-  onPick: (date: string) => void;
+  onPick: (date: string | undefined) => void;
 }) => {
   const [open, setOpen] = useState(false);
-  const pick = (date: string) => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const pick = (date: string | undefined) => {
     setOpen(false);
     onPick(date);
   };
+  // Keep the popover inside the viewport: nudge it horizontally and flip above when it would
+  // overflow the bottom, since the trigger sits at the far right of narrow windows.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!open || !el) return;
+    el.style.transform = '';
+    el.style.top = '';
+    el.style.bottom = '';
+    const r = el.getBoundingClientRect();
+    const m = 8;
+    const dx = Math.min(0, window.innerWidth - m - r.right) + Math.max(0, m - r.left);
+    if (dx) el.style.transform = `translateX(${dx}px)`;
+    if (r.bottom > window.innerHeight - m && r.top - r.height - 32 > m) {
+      el.style.top = 'auto';
+      el.style.bottom = '1.5rem';
+    }
+  }, [open]);
   const itemClass = 'block w-full text-left px-3 py-1.5 hover:bg-[var(--los-border)]';
   return (
     <fieldset
@@ -126,11 +144,12 @@ const RescheduleMenu = ({
       </button>
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Reschedule"
           class="absolute right-0 top-6 z-30 min-w-44 py-1 rounded border border-[var(--los-border)] bg-[var(--los-bg)] shadow-lg text-sm text-[var(--los-fg)]"
         >
-          {RESCHEDULE_OPTIONS.map((o) => (
+          {QUICK_DUE_OPTIONS.map((o) => (
             <button
               key={o.id}
               type="button"
@@ -141,6 +160,14 @@ const RescheduleMenu = ({
               {o.label}
             </button>
           ))}
+          <button
+            type="button"
+            role="menuitem"
+            class={`${itemClass} border-t border-[var(--los-border)]`}
+            onClick={() => pick(undefined)}
+          >
+            No date
+          </button>
           <label class="flex items-center gap-2 px-3 py-1.5 border-t border-[var(--los-border)]">
             <span class="text-xs text-[var(--los-muted)]">Pick date</span>
             <input
@@ -278,11 +305,11 @@ export const TasksBoardPage = () => {
     write(path, serializeTodos(next));
   };
 
-  const reschedule = (path: string, id: string, date: string) => {
+  const reschedule = (path: string, id: string, date: string | undefined) => {
     const data = parseTodos(openFiles[path]?.content ?? '');
     const item = data.items.find((it) => it.id === id);
     if (!item) return;
-    write(path, serializeTodos(setTodoDue(data, id, withDate(item, date))));
+    write(path, serializeTodos(setTodoDue(data, id, date ? withDate(item, date) : undefined)));
   };
 
   const add = (e: Event) => {

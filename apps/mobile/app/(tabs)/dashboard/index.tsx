@@ -4,8 +4,9 @@ import { nextDashboardId, saveDashboardEdits } from '../../../src/screens/dashbo
 import { type DashboardPage, loadDashboards, takeLatest } from '../../../src/screens/dashboards.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { setLoadedTiles, tileWrite } from '../../../src/screens/loaded-tiles.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
 import { optimisticWrite } from '../../../src/sync/optimistic.js';
+import { refreshAll } from '../../../src/sync/runtime.js';
 import type { DashboardEditor } from '../../../src/views/dashboard-editor.js';
 import { DashboardPager } from '../../../src/views/dashboard-pager.js';
 import { useSignalValue } from '../../../src/views/use-signal.js';
@@ -23,10 +24,10 @@ export default function Dashboard() {
   const [defaulted, setDefaulted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
-  // Pull-to-refresh on every page goes through the sync engine; `rev` re-reads after a sync.
-  const { refreshing, onRefresh } = useRefresh();
+  // Sync is automatic (launch, foreground, focus, poll, write); `rev` re-reads after one.
   const rev = useSyncRevision();
   useFocusRefresh();
+  const retry = useCallback(() => void refreshAll({ reason: 'pull' }), []);
   const [error, setError] = useState<string | null>(null);
 
   const loadLatest = useMemo(
@@ -93,9 +94,8 @@ export default function Dashboard() {
         defaulted={defaulted}
         now={now}
         loading={loading}
-        refreshing={refreshing}
         error={error}
-        onRefresh={onRefresh}
+        onRefresh={retry}
         editor={editor}
         onNavigate={(href) => router.push(href as never)}
         onCreateFile={(path, content) => githubContentFiles.create(path, content)}

@@ -2,13 +2,24 @@ import AppIntents
 
 /// Phrases must contain the app name token; Siri needs it to route the utterance here.
 /// The system allows at most 10 App Shortcuts per app (src/ios-widget.test.ts counts them).
+///
+/// Adding a voice intent: append an `AppShortcut` below (phrases with `\(.applicationName)`,
+/// a `shortTitle`), give every phrase a German entry in AppShortcuts.xcstrings and the short and
+/// intent titles one in Localizable.xcstrings. Siri matches the phrase list of its own language
+/// only, so each wording to support needs its own key (e.g. "zu" and "in" below).
 struct KaihumanAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        // Siri asks for the text; a String parameter cannot appear in the phrase itself.
         AppShortcut(
             intent: AddTodoIntent(),
             phrases: [
                 "Add a todo in \(.applicationName)",
                 "New todo in \(.applicationName)",
+                "New todo for \(.applicationName)",
+                "Add a todo to \(.applicationName)",
+                "Add to \(.applicationName) inbox",
+                "Capture a todo in \(.applicationName)",
+                "Quick add to \(.applicationName) inbox",
             ],
             shortTitle: "Add todo",
             systemImageName: "plus.circle"
@@ -30,17 +41,6 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Complete todo",
             systemImageName: "checkmark.circle"
-        )
-        // Siri asks for the text; a String parameter cannot appear in the phrase itself.
-        AppShortcut(
-            intent: CaptureTodoIntent(),
-            phrases: [
-                "Add to \(.applicationName) inbox",
-                "Capture a todo in \(.applicationName)",
-                "Quick add to \(.applicationName) inbox",
-            ],
-            shortTitle: "Capture to inbox",
-            systemImageName: "tray.and.arrow.down"
         )
         AppShortcut(
             intent: AddNoteIntent(),
@@ -87,6 +87,24 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Open item",
             systemImageName: "doc.text.magnifyingglass"
+        )
+        AppShortcut(
+            intent: AddTodoToStreamIntent(),
+            phrases: [
+                "Add a todo to \(\.$stream) in \(.applicationName)",
+                "New todo for \(\.$stream) in \(.applicationName)",
+            ],
+            shortTitle: "Add to stream",
+            systemImageName: "text.badge.plus"
+        )
+        AppShortcut(
+            intent: NextBirthdayIntent(),
+            phrases: [
+                "What's the next birthday in \(.applicationName)",
+                "Next birthday in \(.applicationName)",
+            ],
+            shortTitle: "Next birthday",
+            systemImageName: "gift"
         )
     }
 }

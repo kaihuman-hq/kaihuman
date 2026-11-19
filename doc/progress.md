@@ -1,5 +1,39 @@
 # Progress
 
+## 2026-11-19 — Console: due-date picker gets Today / No date, stays on screen
+
+- The per-row reschedule popover on `/tasks` now offers Today, Tomorrow, Next Saturday, Next Monday (strictly after today), No date (clears the due) and the date input. A due time is kept when the task has one. "Day after tomorrow" dropped from this menu only.
+- The popover is clamped to the viewport after opening: shifted horizontally with an 8px margin, flipped above the trigger when it would overflow the bottom.
+- Date math: `today` added to `rescheduleDate`, new `QUICK_DUE_OPTIONS` in `packages/formats/src/reschedule.ts` (tests incl. year-end). Mobile keeps `RESCHEDULE_OPTIONS` unchanged; no other consumer of the picker.
+
+## 2026-11-19 — Mobile: habit tile catches up missed days
+
+- A habit tile that is behind on check-ins turns red-ish (danger tokens, light and dark) with "N days behind" and a row of day chips ("Tue ✓ Wed ✓"); a tap checks that day in with its own date through `toggleHabitDay`, the same write path as the detail screen. 0 days behind: unchanged.
+- Habits are daily (no schedule in the file). Days before the first check-in never count, so new habits stay normal. More than 2 days behind: the tile stays red and counts the real gap ("7 days behind"), but only the last 2 days are offered; older days are back-filled in the detail heatmap.
+- Pure logic in `glance/habit-behind.ts` (`habitBehind`), tests in `habit-behind.test.ts`, `trackers.test.ts`, `square-tile.test.tsx`. No `packages/core` change, so no console version bump. Needs a device check.
+
+## 2026-11-19 — Mobile: pull-down only opens search; Settings → Sync now
+
+- Pull-down on `Screen` (opt in with `pullSearch`) now only opens search past 36pt, decided on release. Pull-to-sync is gone: no `RefreshControl`, no spinner, `useRefresh` removed. Screens that relied on it now also re-read on `useSyncRevision` and refresh on focus (`useFocusRefresh`): wiki page, idea detail, todo analytics. Existing automatic sync (launch, foreground, tab focus when stale, 60 s poll, write, reconnect, background task) is unchanged.
+- Settings has a "Sync now" row (`useSyncNow` → `refreshAll`): disabled with "Syncing…" while running, then "Synced just now" or "Sync failed: …". Tests: `pull-search.test.ts`, `hooks.test.tsx`, `settings-views.test.tsx`, `ui.test.tsx`. Needs a device check.
+
+## 2026-11-18 — Mobile: pull-down always synced, never opened search (fix)
+
+- Root cause: UIKit's refresh control fires `onRefresh` as soon as its own threshold is crossed while still dragging, so sync always won before the release-offset check ran (which also assumed the offset from the header height). `Screen` now decides on release from the deepest pull of the drag, measured from the offset where the drag began (`createPullTracker`): <36pt nothing, 36–80pt search, ≥80pt sync. The native control only shows the spinner. Regression tests in `pull-search.test.ts`. Needs a device check.
+
+## 2026-11-18 — Mobile: Siri add todo (inbox, stream, due date), next birthday
+
+- Root cause of "Neues Todo zu kaihuman" failing: the only German phrase was "Neues Todo in kaihuman", and the intent only opened the app. New phrases "New todo for / Add a todo to kaihuman" (DE "Neues Todo zu … / Todo zu … hinzufügen"); the todo is saved without opening the app, with an optional due date (dated todos are queued and added on next app open).
+- "Add a todo to <stream> in kaihuman" (DE "Todo zu <stream> in kaihuman hinzufügen"): the stream is picked from the todo files in the widget snapshot; the todo is queued into that file (`StreamIntents.swift`, `save-capture.ts`).
+- "What's the next birthday in kaihuman" (DE "Wann ist der nächste Geburtstag in kaihuman"): answers name, date and days from the birthdays in the widget snapshot (`packages/core/src/widget-birthdays.ts`, `BirthdayIntent.swift`).
+- The three "Add to inbox" shortcuts were merged so the app stays at the iOS limit of 10 App Shortcuts. Swift not compiled here; needs a native rebuild and device check.
+
+## 2026-11-18 — Mobile: pull-down search, braindumps, scan crash, live clock
+
+- Pull-down on any `Screen` with refresh: a short pull (36–80pt) opens search, a longer pull still syncs. Threshold logic in `src/ui/pull-search.ts` with tests.
+- Braindumps: ＋ menu → Braindump creates one; More → Braindumps lists them (`app/braindumps.tsx`, `src/views/braindumps-view.tsx`).
+- Scan document no longer crashes: `app.json` gets `NSCameraUsageDescription`; the native scan call and scan view report errors instead of crashing. Needs a native rebuild.
+- Dashboard clock: `DashboardPager` ticks `now` every minute via `useLiveNow` instead of only on reload. Regression test added.
 ## 2026-11-18 — Vacation research file (`.vacation.json`)
 
 - New file kind for comparing vacation destinations, one file per search. Format and tolerant parser in `packages/formats/src/vacation.ts`; console `VacationWidget` with filter by status and sort by price, rating or name, plus add and edit forms. New File → Vacation research. Standalone: no link to `.travel.json`.

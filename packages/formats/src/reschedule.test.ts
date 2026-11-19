@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { RESCHEDULE_OPTIONS, rescheduleDate, rescheduleDue, withDate } from './reschedule.js';
+import {
+  QUICK_DUE_OPTIONS,
+  RESCHEDULE_OPTIONS,
+  rescheduleDate,
+  rescheduleDue,
+  withDate,
+} from './reschedule.js';
 
 const at = (s: string) => new Date(`${s}T12:00:00`).getTime();
 
 describe('rescheduleDate', () => {
+  it('today is the local date, QUICK_DUE_OPTIONS lists it first', () => {
+    expect(rescheduleDate('today', at('2026-12-31'))).toBe('2026-12-31');
+    expect(QUICK_DUE_OPTIONS.map((o) => o.id)).toEqual(['today', 'tomorrow', 'saturday', 'monday']);
+  });
+
   it('tomorrow and day after, across month and year ends', () => {
     expect(rescheduleDate('tomorrow', at('2026-11-12'))).toBe('2026-11-13');
     expect(rescheduleDate('day-after', at('2026-11-30'))).toBe('2026-12-02');

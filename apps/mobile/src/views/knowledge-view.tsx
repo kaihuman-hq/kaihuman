@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import type { KnowledgeScreenController } from '../screens/knowledge-screen.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Button,
@@ -24,7 +24,6 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
   const quiet = ios ? { iconBackground: colors.fill, iconColor: colors.secondaryLabel } : {};
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
   const [text, setText] = useState('');
@@ -94,7 +93,7 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
   const processed = controller.processed().length;
 
   return (
-    <Screen keyboard refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen keyboard pullSearch>
       <Section header="New raw note" footer="Notes land in the inbox until /kb-ingest files them.">
         <View style={{ padding: pad, gap: spacing.md }}>
           <TextField

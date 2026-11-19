@@ -53,9 +53,18 @@ export function ScanView({
   }, []);
 
   const scan = async () => {
-    const recognised = await appIntelligence()
-      .recognizeDocument(null)
-      .catch(() => null);
+    let recognised: string | null;
+    try {
+      recognised = await appIntelligence().recognizeDocument(null);
+    } catch (e) {
+      // A native failure (no camera, OCR error) must land here, not as an unhandled rejection.
+      setStatus({
+        ok: false,
+        text: e instanceof Error ? e.message : 'Could not scan the document.',
+      });
+      haptics.error();
+      return;
+    }
     if (!recognised) return;
     setText(recognised);
     await parse(recognised, kind);

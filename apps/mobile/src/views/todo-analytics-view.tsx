@@ -2,6 +2,7 @@ import type { TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import type { TimeFrame, TodoAnalyticsController } from '../screens/todo-analytics.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Card,
@@ -61,9 +62,11 @@ export function TodoAnalyticsView({ controller }: { controller: TodoAnalyticsCon
   const { spacing } = useTheme();
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [frame, setFrame] = useState<TimeFrame>('13W');
+  const rev = useSyncRevision();
+  useFocusRefresh();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a background sync
   const reload = useCallback(async () => {
     try {
       await controller.load();
@@ -71,7 +74,7 @@ export function TodoAnalyticsView({ controller }: { controller: TodoAnalyticsCon
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [controller]);
+  }, [controller, rev]);
 
   useEffect(() => {
     let live = true;
@@ -80,12 +83,6 @@ export function TodoAnalyticsView({ controller }: { controller: TodoAnalyticsCon
       live = false;
     };
   }, [reload]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await reload();
-    setRefreshing(false);
-  };
 
   if (!loaded) {
     return (
@@ -107,13 +104,13 @@ export function TodoAnalyticsView({ controller }: { controller: TodoAnalyticsCon
   const milestones = controller.milestoneProgress();
 
   return (
-    <Screen refreshing={refreshing} onRefresh={() => void refresh()}>
+    <Screen pullSearch>
       {error ? (
         <EmptyState
           icon="warning"
           title="Couldn't load analytics"
           message={error}
-          action={{ label: 'Try again', onPress: () => void refresh() }}
+          action={{ label: 'Try again', onPress: () => void reload() }}
         />
       ) : summary.total === 0 ? (
         <EmptyState

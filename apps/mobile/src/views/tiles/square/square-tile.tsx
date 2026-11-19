@@ -6,7 +6,7 @@ import { useTheme } from '../../../theme/theme.js';
 import { haptics, Icon, Text } from '../../../ui/index.js';
 import type { Glance, QuickAction } from '../glance/types.js';
 import { MiniViz, VIZ_HEIGHT } from './mini-viz.js';
-import { tintColors, toneColor } from './tone.js';
+import { tintColors, toneColor, withAlpha } from './tone.js';
 
 /** README decision 1: 2 columns, 13 pt gutters (174 pt tiles on a 393 pt screen). */
 export const TILE_GAP = 13;
@@ -69,6 +69,44 @@ function QuickButton({
     >
       <Icon name={action.icon} size={stop ? 11 : 15} color={fg} weight="bold" />
     </Pressable>
+  );
+}
+
+/** Two-at-most chips for missed past days; one tap checks that day in. */
+function CatchUp({
+  catchUp,
+  onPick,
+}: {
+  catchUp: NonNullable<Glance['catchUp']>;
+  onPick: (date: string) => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View testID="tile-catchup" style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+      {catchUp.days.map((d) => (
+        <Pressable
+          key={d.date}
+          accessibilityRole="button"
+          accessibilityLabel={`Check in ${d.label}`}
+          hitSlop={4}
+          onPress={() => onPick(d.date)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            height: 30,
+            paddingHorizontal: 10,
+            borderRadius: 15,
+            backgroundColor: colors.danger,
+          }}
+        >
+          <Text variant="caption1" weight="600" color="#FFFFFF">
+            {d.label}
+          </Text>
+          <Icon name="check" size={12} color="#FFFFFF" weight="bold" />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -226,6 +264,19 @@ export function SquareTile({
     void onWrite(path, result.content);
   };
 
+  const pickCatchUp = (date: string) => {
+    const result = glance.catchUp?.run(content, date, new Date());
+    if (!result) return;
+    if (!result.ok) {
+      setError(result.error);
+      haptics.error();
+      return;
+    }
+    setError(null);
+    haptics.success();
+    void onWrite(path, result.content);
+  };
+
   const shadow =
     platform === 'ios' && scheme === 'light'
       ? {
@@ -243,7 +294,10 @@ export function SquareTile({
         width: size,
         height: size,
         borderRadius: 24,
-        backgroundColor: colors.surface,
+        backgroundColor: glance.attention
+          ? withAlpha(colors.danger, scheme === 'dark' ? 0.22 : 0.12)
+          : colors.surface,
+        ...(glance.attention && { borderWidth: 1, borderColor: withAlpha(colors.danger, 0.5) }),
         ...shadow,
       }}
     >
@@ -288,7 +342,8 @@ export function SquareTile({
               {error}
             </Text>
           ) : null}
-          {glance.viz ? (
+          {glance.catchUp ? <CatchUp catchUp={glance.catchUp} onPick={pickCatchUp} /> : null}
+          {glance.viz && !glance.catchUp ? (
             <View
               style={{
                 marginTop: 8,

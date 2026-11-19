@@ -101,13 +101,22 @@ describe('TasksBoardPage', () => {
       act(() => (host.querySelector(`[aria-label="Reschedule ${label}"]`) as HTMLElement).click());
     open('Standup');
     const items = [...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
-    expect(items).toEqual(['Tomorrow', 'Day after tomorrow', 'Next Saturday', 'Next Monday']);
+    expect(items).toEqual(['Today', 'Tomorrow', 'Next Saturday', 'Next Monday', 'No date']);
     act(() => (host.querySelectorAll('[role="menuitem"]')[2] as HTMLElement).click());
     expect(store.updateFileContent).toHaveBeenCalledWith(
       WORK,
       expect.stringContaining('::due:: 2026-11-14T15:00'),
     );
     expect(host.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('clears the due date with "No date"', () => {
+    act(() => (host.querySelector('[aria-label="Reschedule Standup"]') as HTMLElement).click());
+    const items = [...host.querySelectorAll('[role="menuitem"]')];
+    act(() => (items[4] as HTMLElement).click());
+    const written = store.updateFileContent.mock.calls.at(-1)?.[1] as string;
+    expect(written).toContain('- [ ] Standup\n::updated::');
+    expect(written).not.toContain('T15:00');
   });
 
   it('reschedules to a custom date, date only when no time, and closes on Escape', () => {
