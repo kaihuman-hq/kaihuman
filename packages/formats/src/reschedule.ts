@@ -1,6 +1,14 @@
 import type { TodoDue, TodoItem } from './todos.js';
 
-export type RescheduleOption = 'tomorrow' | 'day-after' | 'saturday' | 'monday';
+export type RescheduleOption = 'today' | 'tomorrow' | 'day-after' | 'saturday' | 'monday';
+
+/** Console picker order: Today first. Mobile keeps RESCHEDULE_OPTIONS as is. */
+export const QUICK_DUE_OPTIONS: { id: RescheduleOption; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'tomorrow', label: 'Tomorrow' },
+  { id: 'saturday', label: 'Next Saturday' },
+  { id: 'monday', label: 'Next Monday' },
+];
 
 export const RESCHEDULE_OPTIONS: { id: RescheduleOption; label: string }[] = [
   { id: 'tomorrow', label: 'Tomorrow' },
@@ -25,6 +33,8 @@ const daysUntil = (now: number, weekday: number): number =>
 /** Date (YYYY-MM-DD, local) for a quick option, computed from the injected `now`. */
 export const rescheduleDate = (option: RescheduleOption, now: number): string => {
   switch (option) {
+    case 'today':
+      return addDays(now, 0);
     case 'tomorrow':
       return addDays(now, 1);
     case 'day-after':

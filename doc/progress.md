@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-19 — Console: due-date picker gets Today / No date, stays on screen
+
+- The per-row reschedule popover on `/tasks` now offers Today, Tomorrow, Next Saturday, Next Monday (strictly after today), No date (clears the due) and the date input. A due time is kept when the task has one. "Day after tomorrow" dropped from this menu only.
+- The popover is clamped to the viewport after opening: shifted horizontally with an 8px margin, flipped above the trigger when it would overflow the bottom.
+- Date math: `today` added to `rescheduleDate`, new `QUICK_DUE_OPTIONS` in `packages/formats/src/reschedule.ts` (tests incl. year-end). Mobile keeps `RESCHEDULE_OPTIONS` unchanged; no other consumer of the picker.
+
 ## 2026-11-19 — Mobile: habit tile catches up missed days
 
 - A habit tile that is behind on check-ins turns red-ish (danger tokens, light and dark) with "N days behind" and a row of day chips ("Tue ✓ Wed ✓"); a tap checks that day in with its own date through `toggleHabitDay`, the same write path as the detail screen. 0 days behind: unchanged.
