@@ -121,4 +121,28 @@ describe('SquareTile', () => {
     renderTile({ ...base, eyebrow: 'Deep work', live: true });
     expect(screen.getByTestId('tile-live-dot')).toBeTruthy();
   });
+
+  it('shows catch-up days on an attention tile and writes the tapped date', () => {
+    const run = vi.fn(() => ({ ok: true as const, content: 'new' }));
+    const { onWrite } = renderTile({
+      ...base,
+      attention: true,
+      catchUp: {
+        days: [
+          { date: '2026-11-03', label: 'Tue' },
+          { date: '2026-11-04', label: 'Wed' },
+        ],
+        run,
+      },
+    });
+    expect(screen.getByTestId('tile-catchup')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Check in Tue' }));
+    expect(run).toHaveBeenCalledWith('old', '2026-11-03', expect.any(Date));
+    expect(onWrite).toHaveBeenCalledWith('.kh/coffee.consumption.csv', 'new');
+  });
+
+  it('has no catch-up row on a normal tile', () => {
+    renderTile(base);
+    expect(screen.queryByTestId('tile-catchup')).toBeNull();
+  });
 });

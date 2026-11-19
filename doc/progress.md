@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-19 — Mobile: habit tile catches up missed days
+
+- A habit tile that is behind on check-ins turns red-ish (danger tokens, light and dark) with "N days behind" and a row of day chips ("Tue ✓ Wed ✓"); a tap checks that day in with its own date through `toggleHabitDay`, the same write path as the detail screen. 0 days behind: unchanged.
+- Habits are daily (no schedule in the file). Days before the first check-in never count, so new habits stay normal. More than 2 days behind: the tile stays red and counts the real gap ("7 days behind"), but only the last 2 days are offered; older days are back-filled in the detail heatmap.
+- Pure logic in `glance/habit-behind.ts` (`habitBehind`), tests in `habit-behind.test.ts`, `trackers.test.ts`, `square-tile.test.tsx`. No `packages/core` change, so no console version bump. Needs a device check.
+
 ## 2026-11-19 — Mobile: pull-down only opens search; Settings → Sync now
 
 - Pull-down on `Screen` (opt in with `pullSearch`) now only opens search past 36pt, decided on release. Pull-to-sync is gone: no `RefreshControl`, no spinner, `useRefresh` removed. Screens that relied on it now also re-read on `useSyncRevision` and refresh on focus (`useFocusRefresh`): wiki page, idea detail, todo analytics. Existing automatic sync (launch, foreground, tab focus when stale, 60 s poll, write, reconnect, background task) is unchanged.

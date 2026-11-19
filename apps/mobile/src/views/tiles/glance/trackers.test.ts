@@ -75,6 +75,41 @@ describe('habitGlance', () => {
   });
 });
 
+describe('habitGlance catch-up', () => {
+  const late = ['iso date;goal reached', '2026-11-01;x', '2026-11-02;x'].join('\n');
+  const gl = (c: string) => habitGlance(input('.kh/meditate.habit.csv', c), habitView(c, now));
+
+  it('is unchanged when nothing was missed', () => {
+    const ok = 'iso date;goal reached\n2026-11-04;x';
+    expect(gl(ok).attention).toBeUndefined();
+    expect(gl(ok).catchUp).toBeUndefined();
+  });
+
+  it('flags two missed days and checks them in on their own dates', () => {
+    const g = gl(late);
+    expect(g.attention).toBe(true);
+    expect(g.catchUp?.days).toEqual([
+      { date: '2026-11-03', label: 'Tue' },
+      { date: '2026-11-04', label: 'Wed' },
+    ]);
+    const r = g.catchUp?.run(late, '2026-11-03', now);
+    if (!r?.ok) throw new Error('ok');
+    expect(r.content).toContain('2026-11-03;x');
+    expect(r.content).not.toContain('2026-11-04');
+    const both = g.catchUp?.run(r.content, '2026-11-04', now);
+    if (!both?.ok) throw new Error('ok');
+    expect(gl(both.content).attention).toBeUndefined();
+  });
+
+  it('says how far behind, also past two days', () => {
+    expect(gl(late).label).toBe('2 days behind');
+    const old = 'iso date;goal reached\n2026-10-28;x';
+    expect(gl(old).label).toBe('7 days behind');
+    expect(gl(old).catchUp?.days).toHaveLength(2);
+    expect(gl('iso date;goal reached\n2026-11-03;x').label).toBe('1 day behind');
+  });
+});
+
 describe('timerGlance', () => {
   const idle = 'iso date;time\n2026-11-05;08:00,09:30\n2026-11-04;08:00,10:00\n';
   it('idle: today total, start action, 7 bars with today accented', () => {
