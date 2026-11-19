@@ -8,7 +8,7 @@ import { BusinessClientView } from '../../../src/views/business-client-view.js';
 export default function BusinessClient() {
   const { slug = '' } = useLocalSearchParams<{ slug?: string }>();
   const router = useRouter();
-  const { state, today, refreshing, onRefresh, act } = useBusiness();
+  const { state, today, act } = useBusiness();
   const name =
     state?.status === 'ready' ? state.repo.clients.find((c) => c.slug === slug)?.name : undefined;
   return (
@@ -18,8 +18,6 @@ export default function BusinessClient() {
         state={state}
         slug={slug}
         today={today}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
         onAddLine={(kind, text) => act((w) => w.addClientLine(kind, slug as Slug, text))}
         onStartTimer={(project) =>
           void act((w) => w.startTimer({ client: slug as Slug, ...(project ? { project } : {}) }))

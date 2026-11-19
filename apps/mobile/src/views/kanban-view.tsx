@@ -8,7 +8,7 @@ import {
 import type { BoardItem, KanbanBoardController } from '../screens/kanban-board.js';
 import { describeBoardFiles, TODO_STATUSES } from '../screens/kanban-board.js';
 import { completionNotice, dueBadge } from '../screens/todo-due.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -131,7 +131,6 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const [loadError, setLoadError] = useState<string | null>(null);
   // Cached cards paint at once; the spinner is only for a board with nothing cached yet.
   const [loading, setLoading] = useState(() => !controller.loadCached());
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
   const [status, setStatus] = useState<TodoStatus>('backlog');
@@ -427,7 +426,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen title="Board" refreshing={refreshing} onRefresh={onRefresh}>
+      <Screen title="Board" pullSearch>
         {loading || loadError ? null : <BoardFile paths={controller.paths} />}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <View style={{ flex: 1 }}>

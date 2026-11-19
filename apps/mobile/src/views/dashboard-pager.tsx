@@ -5,7 +5,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
-  RefreshControl,
   ScrollView,
   useWindowDimensions,
   View,
@@ -76,7 +75,6 @@ interface PageProps {
   defaulted: boolean;
   now: Date;
   loading: boolean;
-  refreshing: boolean;
   error?: string | null;
   onRefresh?: () => void;
   onWrite: (path: string, content: string) => void | Promise<void>;
@@ -94,7 +92,6 @@ function Page({
   defaulted,
   now,
   loading,
-  refreshing,
   error,
   onRefresh,
   onWrite,
@@ -103,7 +100,7 @@ function Page({
   onStartEdit,
   clone,
 }: PageProps) {
-  const { colors, spacing, metrics } = useTheme();
+  const { spacing, metrics } = useTheme();
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const insets = useInsets();
   // RSS tiles count unread items from fetched feeds, so fetch them here and redraw on arrival.
@@ -158,15 +155,6 @@ function Page({
         scrollEnabled={scrollEnabled}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
-        refreshControl={
-          onRefresh ? (
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.secondaryLabel}
-            />
-          ) : undefined
-        }
         contentContainerStyle={{
           paddingHorizontal: metrics.screenMargin,
           paddingTop: spacing.sm,
@@ -389,7 +377,6 @@ export interface DashboardPagerProps {
   defaulted?: boolean;
   now: Date;
   loading?: boolean;
-  refreshing?: boolean;
   /** Set when the last load failed; shown with a retry when there is nothing to show. */
   error?: string | null;
   /** Pull-to-refresh hook point for every page. */
@@ -408,7 +395,6 @@ export function DashboardPager({
   defaulted = false,
   now: loadedAt,
   loading = false,
-  refreshing = false,
   error,
   onRefresh,
   onWrite,
@@ -576,7 +562,6 @@ export function DashboardPager({
               defaulted={defaulted}
               now={now}
               loading={loading}
-              refreshing={refreshing}
               error={error}
               onRefresh={onRefresh}
               onWrite={onWrite}

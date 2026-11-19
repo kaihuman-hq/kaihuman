@@ -1,4 +1,4 @@
-export { useFocusRefresh, useRefresh, useSyncRevision, useSyncStatus } from './hooks.js';
+export { useFocusRefresh, useSyncNow, useSyncRevision, useSyncStatus } from './hooks.js';
 export { setRescheduleNotifications } from './notifications-hook.js';
 export { notifyLocalWrite, refreshAll, resolveConflict } from './runtime.js';
 export { type SyncStatus, type SyncTrigger, syncRevision, syncStatus } from './status.js';

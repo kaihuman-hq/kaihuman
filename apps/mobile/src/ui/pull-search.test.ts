@@ -1,24 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createPullTracker,
-  pullDistance,
-  pullIntent,
-  REFRESH_PULL,
-  SEARCH_PULL,
-} from './pull-search.js';
+import { createPullTracker, pullDistance, pullIntent, SEARCH_PULL } from './pull-search.js';
 
 describe('pullIntent', () => {
   it('ignores small bounces', () => {
     expect(pullIntent(0)).toBe('none');
     expect(pullIntent(SEARCH_PULL - 1)).toBe('none');
   });
-  it('opens search for a short pull', () => {
+  it('opens search past the threshold, however long the pull', () => {
     expect(pullIntent(SEARCH_PULL)).toBe('search');
-    expect(pullIntent(REFRESH_PULL - 1)).toBe('search');
-  });
-  it('leaves a long pull to refresh', () => {
-    expect(pullIntent(REFRESH_PULL)).toBe('refresh');
-    expect(pullIntent(300)).toBe('refresh');
+    expect(pullIntent(300)).toBe('search');
   });
 });
 
@@ -41,14 +31,11 @@ describe('createPullTracker', () => {
     t.move(-135); // finger drifting back must not lower the peak
     expect(t.end()).toBe('search');
   });
-  it('refreshes only after a long pull, and never mid-drag', () => {
+  it('never syncs: a long pull still only opens search', () => {
     const t = createPullTracker();
     t.begin(-100);
-    t.move(-100 - REFRESH_PULL + 1);
-    expect(t.end()).toBe('search'); // regression: native control used to sync here
-    t.begin(-100);
-    t.move(-100 - REFRESH_PULL);
-    expect(t.end()).toBe('refresh');
+    t.move(-400);
+    expect(t.end()).toBe('search');
   });
   it('ignores scroll events outside a drag (momentum bounce-back)', () => {
     const t = createPullTracker();

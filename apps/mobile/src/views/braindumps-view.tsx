@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { BraindumpsScreenController } from '../screens/braindumps-screen.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { EmptyState, ListRow, Screen, Section } from '../ui/index.js';
 
 /** Braindump list with a "New braindump" row on top (a Fab would be missing on iOS). */
@@ -16,7 +16,6 @@ export function BraindumpsView({
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
 
@@ -39,7 +38,7 @@ export function BraindumpsView({
 
   const items = controller.items();
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen pullSearch>
       <Section>
         <ListRow
           testID="braindump-new"

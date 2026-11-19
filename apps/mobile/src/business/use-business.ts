@@ -2,7 +2,7 @@ import { localDate } from '@kaihuman/formats';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { githubContentFiles } from '../screens/file-editor-screen.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { type BusinessState, loadBusiness } from './load.js';
 import { type BusinessWriter, businessWriter, type Outcome } from './write.js';
 
@@ -10,7 +10,6 @@ import { type BusinessWriter, businessWriter, type Outcome } from './write.js';
 export function useBusiness() {
   const [state, setState] = useState<BusinessState | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
 
@@ -52,7 +51,7 @@ export function useBusiness() {
     [writer, reload],
   );
 
-  return { state, now, today: localDate(now), refreshing, onRefresh, act };
+  return { state, now, today: localDate(now), act };
 }
 
 function showError(message: string) {

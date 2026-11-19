@@ -115,6 +115,16 @@ describe('Screen', () => {
     expect(screen.queryByRole('heading', { name: 'Repositories' })).toBeNull();
   });
 
+  it('renders with pullSearch and has no refresh control to sync from', () => {
+    const { container } = render(
+      <Screen pullSearch>
+        <Text>content</Text>
+      </Screen>,
+    );
+    expect(screen.getByText('content')).toBeTruthy();
+    expect(container.querySelector('[role="progressbar"], [aria-busy="true"]')).toBeNull();
+  });
+
   it('renders footer and non-scrolling content', () => {
     render(
       <Screen scroll={false} footer={<Text>footer</Text>}>

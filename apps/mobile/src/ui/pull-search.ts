@@ -4,17 +4,10 @@
  */
 export const SEARCH_PULL = 36;
 
-/**
- * Distance at which the native refresh control arms and syncs. Kept at the platform's own trigger
- * point so a longer pull still refreshes and a short one never does both.
- */
-export const REFRESH_PULL = 80;
+export type PullIntent = 'none' | 'search';
 
-export type PullIntent = 'none' | 'search' | 'refresh';
-
-/** What releasing a pull-down of `pull` points should do: short opens search, long refreshes. */
+/** What releasing a pull-down of `pull` points should do: past the threshold opens search. */
 export function pullIntent(pull: number): PullIntent {
-  if (pull >= REFRESH_PULL) return 'refresh';
   if (pull >= SEARCH_PULL) return 'search';
   return 'none';
 }
@@ -25,9 +18,8 @@ export function pullDistance(offsetY: number, restingY: number): number {
 }
 
 /**
- * Tracks one finger drag so the decision is made on release, from the deepest pull. The native
- * RefreshControl cannot be gated (UIKit fires it as soon as its own threshold is crossed), so the
- * screen runs refresh itself from this. The resting offset is read when the drag begins rather
+ * Tracks one finger drag so the decision is made on release, from the deepest pull. Nothing here syncs; sync is
+ * automatic (see src/sync/README.md) and manual from Settings. The resting offset is read when the drag begins rather
  * than computed from the header height, so it is right whatever inset iOS applied.
  */
 export function createPullTracker() {

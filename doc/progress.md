@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-19 — Mobile: pull-down only opens search; Settings → Sync now
+
+- Pull-down on `Screen` (opt in with `pullSearch`) now only opens search past 36pt, decided on release. Pull-to-sync is gone: no `RefreshControl`, no spinner, `useRefresh` removed. Screens that relied on it now also re-read on `useSyncRevision` and refresh on focus (`useFocusRefresh`): wiki page, idea detail, todo analytics. Existing automatic sync (launch, foreground, tab focus when stale, 60 s poll, write, reconnect, background task) is unchanged.
+- Settings has a "Sync now" row (`useSyncNow` → `refreshAll`): disabled with "Syncing…" while running, then "Synced just now" or "Sync failed: …". Tests: `pull-search.test.ts`, `hooks.test.tsx`, `settings-views.test.tsx`, `ui.test.tsx`. Needs a device check.
+
 ## 2026-11-18 — Mobile: pull-down always synced, never opened search (fix)
 
 - Root cause: UIKit's refresh control fires `onRefresh` as soon as its own threshold is crossed while still dragging, so sync always won before the release-offset check ran (which also assumed the offset from the header height). `Screen` now decides on release from the deepest pull of the drag, measured from the offset where the drag began (`createPullTracker`): <36pt nothing, 36–80pt search, ≥80pt sync. The native control only shows the spinner. Regression tests in `pull-search.test.ts`. Needs a device check.

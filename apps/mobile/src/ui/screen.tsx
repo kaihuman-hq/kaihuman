@@ -5,7 +5,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
-  RefreshControl,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -44,8 +43,8 @@ export interface ScreenProps {
   scroll?: boolean;
   title?: string;
   inset?: ScreenInset;
-  refreshing?: boolean;
-  onRefresh?: () => void;
+  /** iOS: a pull-down past a small threshold, decided on release, opens search. Never syncs. */
+  pullSearch?: boolean;
   /** Pinned below the content (e.g. a primary action). */
   footer?: ReactNode;
   /**
@@ -67,8 +66,7 @@ export function Screen({
   scroll = true,
   title,
   inset = 'grouped',
-  refreshing = false,
-  onRefresh,
+  pullSearch: pullSearchProp = false,
   footer,
   keyboard,
   syncStatus = true,
@@ -89,9 +87,8 @@ export function Screen({
       animated: false,
     });
   }, [scrollToTopKey]);
-  // A short pull-down opens search; a long one syncs. iOS only: it is
-  // the platform with a rubber-band overscroll and the search-under-header convention.
-  const pullSearch = Platform.OS === 'ios' && scroll && onRefresh !== undefined;
+  // iOS only: it is the platform with a rubber-band overscroll and the search-under-header convention.
+  const pullSearch = Platform.OS === 'ios' && scroll && pullSearchProp;
   const tracker = useRef(createPullTracker()).current;
   const pullHandlers = pullSearch
     ? {
@@ -101,10 +98,7 @@ export function Screen({
         onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) =>
           tracker.move(e.nativeEvent.contentOffset.y),
         onScrollEndDrag: () => {
-          const intent = tracker.end();
-          if (refreshing) return;
-          if (intent === 'search') router.push('/search');
-          else if (intent === 'refresh') onRefresh?.();
+          if (tracker.end() === 'search') router.push('/search');
         },
       }
     : undefined;
@@ -126,17 +120,6 @@ export function Screen({
       {...keyboardScrollProps(lifted)}
       keyboardDismissMode="interactive"
       {...pullHandlers}
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            refreshing={refreshing}
-            // On iOS the release handler above starts the sync; the native control would fire
-            // mid-drag, so it only shows the spinner while `refreshing`.
-            onRefresh={pullSearch ? noop : onRefresh}
-            tintColor={pullSearch && !refreshing ? 'transparent' : colors.secondaryLabel}
-          />
-        ) : undefined
-      }
       contentContainerStyle={{
         paddingHorizontal: margin,
         paddingTop: spacing.sm,
@@ -194,7 +177,5 @@ export function Screen({
 export function useScreenInset(): ScreenInset {
   return useContext(ScreenInsetContext);
 }
-
-function noop() {}
 
 const styles = StyleSheet.create({ flex: { flex: 1 } });

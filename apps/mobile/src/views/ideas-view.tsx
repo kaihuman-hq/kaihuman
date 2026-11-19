@@ -3,7 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import type { IdeaStatusFilter, IdeasScreenController } from '../screens/ideas-screen.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -110,8 +110,8 @@ export function IdeaDetailView({
   // Optimistic edits (and rollbacks) show before the save settles.
   useEffect(() => controller.subscribe(rerender), [controller, rerender]);
   const [loaded, setLoaded] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
+  useFocusRefresh();
   const [text, setText] = useState('');
 
   const load = useCallback(async () => {
@@ -166,7 +166,7 @@ export function IdeaDetailView({
     if (await run(() => controller.log(slug, note))) setText('');
   };
   return (
-    <Screen keyboard refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen keyboard pullSearch>
       <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
         <Text variant="title1" accessibilityRole="header">
           {idea.title}
@@ -235,7 +235,6 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
   // Optimistic edits (and rollbacks) show before the save settles.
   useEffect(() => controller.subscribe(rerender), [controller, rerender]);
   const [loaded, setLoaded] = useState(false);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
   const [composing, setComposing] = useState(false);
@@ -338,7 +337,7 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen title="Ideas" keyboard refreshing={refreshing} onRefresh={onRefresh}>
+      <Screen title="Ideas" keyboard pullSearch>
         <TextField
           label="Search ideas"
           value={controller.filters.query}

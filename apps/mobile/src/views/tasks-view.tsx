@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import type { KanbanBoardController } from '../screens/kanban-board.js';
 import { TASK_VIEW_OPTIONS, type TaskEntry, taskSections } from '../screens/tasks.js';
 import { completionNotice, dueBadge, rescheduleChoices } from '../screens/todo-due.js';
-import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
+import { useFocusRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -30,7 +30,6 @@ export function TasksView({ controller }: { controller: KanbanBoardController })
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => !controller.loadCached());
   const [dueFor, setDueFor] = useState<TaskEntry | null>(null);
-  const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
 
@@ -76,7 +75,7 @@ export function TasksView({ controller }: { controller: KanbanBoardController })
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen title="Tasks" refreshing={refreshing} onRefresh={onRefresh}>
+      <Screen title="Tasks" pullSearch>
         <SegmentedControl
           testID="tasks-view"
           options={TASK_VIEW_OPTIONS}

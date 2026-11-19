@@ -15,7 +15,7 @@ vi.mock('expo-router', () => ({
 }));
 
 import { haptics } from '../ui/haptics.js';
-import { useFocusRefresh, useRefresh, useSyncRevision, useSyncStatus } from './hooks.js';
+import { useFocusRefresh, useSyncNow, useSyncRevision, useSyncStatus } from './hooks.js';
 import { initialSyncStatus, syncRevision, syncStatus } from './status.js';
 
 beforeEach(() => {
@@ -24,8 +24,8 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe('useRefresh', () => {
-  it('pulls with haptic, toggles refreshing and ignores a double pull', async () => {
+describe('useSyncNow', () => {
+  it('syncs with haptic, reports running and ignores a double tap', async () => {
     const light = vi.spyOn(haptics, 'light');
     let done!: () => void;
     runtime.refreshAll.mockImplementationOnce(
@@ -34,16 +34,29 @@ describe('useRefresh', () => {
           done = r;
         }),
     );
-    const { result } = renderHook(() => useRefresh());
-    expect(result.current.refreshing).toBe(false);
-    act(() => result.current.onRefresh());
-    act(() => result.current.onRefresh());
-    expect(result.current.refreshing).toBe(true);
+    syncStatus.value = initialSyncStatus;
+    const { result } = renderHook(() => useSyncNow());
+    expect(result.current.running).toBe(false);
+    act(() => result.current.syncNow());
+    act(() => result.current.syncNow());
+    expect(result.current.running).toBe(true);
     expect(runtime.refreshAll).toHaveBeenCalledTimes(1);
     expect(runtime.refreshAll).toHaveBeenCalledWith({ reason: 'pull' });
     expect(light).toHaveBeenCalledTimes(1);
     await act(async () => done());
-    await waitFor(() => expect(result.current.refreshing).toBe(false));
+    await waitFor(() => expect(result.current.running).toBe(false));
+    expect(result.current.result?.ok).toBe(true);
+  });
+
+  it('reports the error the run left in the status', async () => {
+    runtime.refreshAll.mockImplementationOnce(async () => {
+      syncStatus.value = { ...initialSyncStatus, phase: 'error', error: 'Offline' };
+    });
+    const { result } = renderHook(() => useSyncNow());
+    act(() => result.current.syncNow());
+    await waitFor(() => expect(result.current.running).toBe(false));
+    expect(result.current.result).toEqual({ ok: false, error: 'Offline' });
+    syncStatus.value = initialSyncStatus;
   });
 
   it('does not set state after unmount', async () => {
@@ -55,8 +68,8 @@ describe('useRefresh', () => {
         }),
     );
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { result, unmount } = renderHook(() => useRefresh());
-    act(() => result.current.onRefresh());
+    const { result, unmount } = renderHook(() => useSyncNow());
+    act(() => result.current.syncNow());
     unmount();
     await act(async () => done());
     expect(err).not.toHaveBeenCalled();

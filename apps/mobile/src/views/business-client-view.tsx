@@ -28,8 +28,6 @@ export interface BusinessClientViewProps {
   onLogTime: (project?: Slug) => void;
   onOpenInvoice: (number: string) => void;
   onOpenFile: (path: string) => void;
-  refreshing?: boolean;
-  onRefresh?: () => void;
 }
 
 const FILE_TITLE = { notes: 'Notes', todos: 'Todos', log: 'Log' } as const;
@@ -37,7 +35,7 @@ const FILE_ICON = { notes: 'note', todos: 'todo', log: 'log' } as const;
 const LINE_KINDS = ['todo', 'log'] as const;
 
 export function BusinessClientView(props: BusinessClientViewProps) {
-  const { state, slug, today, refreshing, onRefresh } = props;
+  const { state, slug, today } = props;
   const { spacing, colors } = useTheme();
   const [kind, setKind] = useState<'todo' | 'log'>('todo');
   const [text, setText] = useState('');
@@ -56,7 +54,7 @@ export function BusinessClientView(props: BusinessClientViewProps) {
   const detail = state.status === 'ready' ? clientDetail(state.repo, slug, today) : null;
   if (state.status !== 'ready' || !detail) {
     return (
-      <Screen refreshing={refreshing} onRefresh={onRefresh}>
+      <Screen pullSearch>
         <EmptyState
           icon="empty"
           title="Client not found"
@@ -80,7 +78,7 @@ export function BusinessClientView(props: BusinessClientViewProps) {
   };
 
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh} keyboard>
+    <Screen pullSearch keyboard>
       <FailedNotice failed={state.failed} />
       <View style={{ gap: spacing.xs, paddingHorizontal: spacing.xs }}>
         <Text variant="title1" accessibilityRole="header">
