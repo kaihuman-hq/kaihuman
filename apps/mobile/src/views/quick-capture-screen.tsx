@@ -1,10 +1,8 @@
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 import type { QuickKind } from '../navigation/routes.js';
 import { QuickCaptureController } from '../screens/quick-capture.js';
-import { useTheme } from '../theme/theme.js';
-import { Button, ErrorBoundary } from '../ui/index.js';
+import { ErrorBoundary, HeaderButton } from '../ui/index.js';
 import { CAPTURE_TITLES, type CaptureHeaderState, QuickCaptureView } from './quick-capture-view.js';
 
 /**
@@ -27,10 +25,9 @@ export function QuickCaptureScreen({
     return c;
   }, [idea]);
   const router = useRouter();
-  const { platform } = useTheme();
   const [header, setHeader] = useState<CaptureHeaderState | null>(null);
-  // The iOS sheet puts its primary action in the navigation bar; Android and web use a footer button.
-  const headerAction = platform === 'ios' && Platform.OS !== 'web';
+  // HIG: the primary action sits in the navigation bar on every platform.
+  const headerAction = true;
   const dismiss = useCallback(
     () => (router.canGoBack() ? router.back() : router.replace('/dashboard')),
     [router],
@@ -41,20 +38,16 @@ export function QuickCaptureScreen({
       <Stack.Screen
         options={{
           title: CAPTURE_TITLES[kind],
-          // Android and web keep the close control the root layout supplies.
-          ...(headerAction && {
-            headerRight: () => (
-              <Button
-                label="Save"
-                variant="plain"
-                size="small"
-                testID="capture-header-save"
-                disabled={!header?.canSubmit}
-                loading={header?.busy}
-                onPress={() => header?.submit()}
-              />
-            ),
-          }),
+          // The close control (Cancel) comes from the root layout.
+          headerRight: () => (
+            <HeaderButton
+              label="Save"
+              testID="capture-header-save"
+              disabled={!header?.canSubmit}
+              loading={header?.busy ?? false}
+              onPress={() => header?.submit()}
+            />
+          ),
         }}
       />
       {/* A capture that fails to render shows an error card instead of closing the app. */}

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import type { TileFile } from '../screens/dashboards.js';
 import type { ContentFiles } from '../screens/file-editor-screen.js';
 import { useTheme } from '../theme/theme.js';
-import { Button, EmptyState, haptics, Text, TextField } from '../ui/index.js';
+import { Button, EmptyState, type HeaderAction, haptics, Text, TextField } from '../ui/index.js';
 import type { Glance, QuickAction } from './tiles/glance/types.js';
 
 type FieldAction = Extract<QuickAction, { kind: 'field' }>;
@@ -20,6 +20,8 @@ export interface QuickEntryViewProps {
   /** Called after a successful write with the new text. */
   onSaved: (path: string, content: string) => void;
   onDone: () => void;
+  /** When set, the confirm action is reported here for the navigation bar instead of a bottom button. */
+  onHeaderAction?: (action: HeaderAction) => void;
   now?: () => Date;
 }
 
@@ -33,6 +35,7 @@ export function QuickEntryView({
   glanceFor,
   onSaved,
   onDone,
+  onHeaderAction,
   now = () => new Date(),
 }: QuickEntryViewProps) {
   const { spacing } = useTheme();
@@ -67,6 +70,18 @@ export function QuickEntryView({
     };
   }, [path, files]);
 
+  const submitRef = useRef<() => void>(() => {});
+  const canSubmit = loaded.state === 'ready' && value.trim().length > 0;
+  useEffect(() => {
+    onHeaderAction?.({
+      label: 'Add',
+      testID: 'quick-entry-save',
+      disabled: !canSubmit,
+      loading: busy,
+      onPress: () => submitRef.current(),
+    });
+  }, [onHeaderAction, canSubmit, busy]);
+
   if (loaded.state === 'loading') return null;
   if (loaded.state === 'missing') {
     return <EmptyState icon="warning" title="Nothing to add" message={loaded.message} />;
@@ -91,6 +106,7 @@ export function QuickEntryView({
       setBusy(false);
     }
   };
+  submitRef.current = () => void submit();
   return (
     <View style={{ padding: spacing.lg, gap: spacing.md }}>
       <Text variant="headline" accessibilityRole="header">
@@ -112,14 +128,16 @@ export function QuickEntryView({
         autoFocus
         {...(error && { error })}
       />
-      <Button
-        testID="quick-entry-save"
-        label="Add"
-        fullWidth
-        loading={busy}
-        disabled={!value.trim()}
-        onPress={() => void submit()}
-      />
+      {onHeaderAction ? null : (
+        <Button
+          testID="quick-entry-save"
+          label="Add"
+          fullWidth
+          loading={busy}
+          disabled={!value.trim()}
+          onPress={() => void submit()}
+        />
+      )}
     </View>
   );
 }

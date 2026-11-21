@@ -145,7 +145,9 @@ describe('tiles', () => {
     expect(onWrite.mock.calls[0]?.[0]).toBe(f.path);
     expect(onWrite.mock.calls[0]?.[1]).not.toBe(f.content);
     press('New todo');
-    press('Add task');
+    // The header's confirm stays disabled until there is a task; the keyboard still validates.
+    expect(screen.getByTestId('form-header-action').hasAttribute('disabled')).toBe(true);
+    fireEvent.keyDown(screen.getByLabelText('New task'), { key: 'Enter', keyCode: 13 });
     expect(within(screen.getByTestId('add-entry-sheet')).getByRole('alert').textContent).toBe(
       'Enter a task',
     );

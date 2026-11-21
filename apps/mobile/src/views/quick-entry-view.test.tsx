@@ -69,3 +69,31 @@ describe('QuickEntryView', () => {
     expect(await screen.findByText('This tile has no quick entry.')).toBeTruthy();
   });
 });
+
+describe('QuickEntryView in the navigation bar', () => {
+  it('reports Add to the header, disabled until typed, and drops the bottom button', async () => {
+    const files = { read: vi.fn(async () => 'head'), write: vi.fn(async () => {}) };
+    const onDone = vi.fn();
+    const onHeaderAction = vi.fn();
+    render(
+      <QuickEntryView
+        path="b.budget.csv"
+        files={files}
+        glanceFor={() => glance()}
+        onSaved={vi.fn()}
+        onDone={onDone}
+        onHeaderAction={onHeaderAction}
+        now={() => NOW}
+      />,
+    );
+    const field = await screen.findByPlaceholderText('Amount');
+    expect(screen.queryByTestId('quick-entry-save')).toBeNull();
+    const last = () => onHeaderAction.mock.calls.at(-1)?.[0];
+    expect(last()).toMatchObject({ label: 'Add', disabled: true });
+    fireEvent.change(field, { target: { value: '7' } });
+    await waitFor(() => expect(last()).toMatchObject({ disabled: false }));
+    last().onPress();
+    await waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+    expect(files.write).toHaveBeenCalledWith('b.budget.csv', 'head\n7');
+  });
+});

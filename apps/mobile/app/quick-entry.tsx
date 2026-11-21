@@ -1,7 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { githubContentFiles } from '../src/screens/file-editor-screen.js';
 import { updateLoadedTile } from '../src/screens/loaded-tiles.js';
+import { formHeaderOptions, type HeaderAction } from '../src/ui/index.js';
 import { glanceForFile } from '../src/views/glance-for-file.js';
 import { QuickEntryView } from '../src/views/quick-entry-view.js';
 
@@ -13,9 +14,17 @@ export default function QuickEntry() {
     () => (router.canGoBack() ? router.back() : router.replace('/dashboard')),
     [router],
   );
+  const [action, setAction] = useState<HeaderAction | null>(null);
   return (
     <>
-      <Stack.Screen options={{ title: 'Quick entry' }} />
+      {/* HIG: Cancel top-left, Add top-right; the view reports its validity and submit. */}
+      <Stack.Screen
+        options={formHeaderOptions({
+          title: 'Quick entry',
+          onCancel: dismiss,
+          action: action ?? { label: 'Add', disabled: true, onPress: () => {} },
+        })}
+      />
       {path ? (
         <QuickEntryView
           key={path}
@@ -24,6 +33,7 @@ export default function QuickEntry() {
           glanceFor={glanceForFile}
           onSaved={updateLoadedTile}
           onDone={dismiss}
+          onHeaderAction={setAction}
         />
       ) : null}
     </>
