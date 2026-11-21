@@ -2,7 +2,16 @@ import { appFolderFor } from '@kaihuman/core';
 import { useState } from 'react';
 import { normalizeFolder, rememberFolder } from '../files/create-target.js';
 import { NEW_FILE_KINDS, type NewFileKind, newFile } from '../screens/new-file.js';
-import { Button, ErrorBoundary, errorMessage, ListRow, Section } from '../ui/index.js';
+import {
+  Button,
+  ErrorBoundary,
+  errorMessage,
+  FormHeader,
+  ListRow,
+  Section,
+  SheetActionProvider,
+  useSheetAction,
+} from '../ui/index.js';
 import { CreateTargetRow, useCreateTarget } from './create-target-row.js';
 import { TILE_META } from './tile-view.js';
 import { TileSheet } from './tiles/tile-sheet.js';
@@ -25,44 +34,53 @@ export interface NewFileSheetProps {
 export function NewFileSheet({ folder, paths, onCreate, onCreated, onClose }: NewFileSheetProps) {
   const [kind, setKind] = useState<NewFileKind | null>(null);
   return (
-    <TileSheet
-      title={kind ? `New ${labelOf(kind)}` : 'New file'}
-      onClose={onClose}
-      testID="new-file-sheet"
-    >
-      {/* A failing form must not take the browser (or the app) down with it. */}
-      <ErrorBoundary what="the new file form" resetKey={kind}>
-        {kind ? (
-          <NewFileForm
-            key={kind.id}
-            kind={kind}
-            folder={folder}
-            paths={paths}
-            onCreate={onCreate}
-            onCreated={onCreated}
-            onBack={() => setKind(null)}
-          />
-        ) : (
-          <Section>
-            {NEW_FILE_KINDS.map((k) => (
-              <ListRow
-                key={k.id}
-                title={labelOf(k)}
-                subtitle={k.spec.suffix}
-                icon={
-                  k.id === 'note'
-                    ? 'document'
-                    : (TILE_META[k.id as keyof typeof TILE_META]?.icon ?? 'document')
-                }
-                accessory="chevron"
-                testID={`new-file-kind-${k.id}`}
-                onPress={() => setKind(k)}
-              />
-            ))}
-          </Section>
-        )}
-      </ErrorBoundary>
-    </TileSheet>
+    <SheetActionProvider>
+      {(action) => {
+        const title = kind ? `New ${labelOf(kind)}` : 'New file';
+        return (
+          <TileSheet
+            title={title}
+            // The kind picker has no confirm; the form's Create sits top-right.
+            header={<FormHeader title={title} onCancel={onClose} action={action} />}
+            onClose={onClose}
+            testID="new-file-sheet"
+          >
+            {/* A failing form must not take the browser (or the app) down with it. */}
+            <ErrorBoundary what="the new file form" resetKey={kind}>
+              {kind ? (
+                <NewFileForm
+                  key={kind.id}
+                  kind={kind}
+                  folder={folder}
+                  paths={paths}
+                  onCreate={onCreate}
+                  onCreated={onCreated}
+                  onBack={() => setKind(null)}
+                />
+              ) : (
+                <Section>
+                  {NEW_FILE_KINDS.map((k) => (
+                    <ListRow
+                      key={k.id}
+                      title={labelOf(k)}
+                      subtitle={k.spec.suffix}
+                      icon={
+                        k.id === 'note'
+                          ? 'document'
+                          : (TILE_META[k.id as keyof typeof TILE_META]?.icon ?? 'document')
+                      }
+                      accessory="chevron"
+                      testID={`new-file-kind-${k.id}`}
+                      onPress={() => setKind(k)}
+                    />
+                  ))}
+                </Section>
+              )}
+            </ErrorBoundary>
+          </TileSheet>
+        );
+      }}
+    </SheetActionProvider>
   );
 }
 
@@ -95,6 +113,14 @@ function NewFileForm({
     }
   };
 
+  useSheetAction({
+    label: 'Create',
+    testID: 'new-file-create',
+    disabled: busy,
+    loading: busy,
+    onPress: () => void create(),
+  });
+
   return (
     <>
       <CreateTargetRow
@@ -111,13 +137,6 @@ function NewFileForm({
         initiallyOpen
         error={error}
         onSubmit={() => void create()}
-      />
-      <Button
-        label="Create"
-        loading={busy}
-        disabled={busy}
-        onPress={() => void create()}
-        testID="new-file-create"
       />
       <Button label="Back" variant="plain" onPress={onBack} />
     </>

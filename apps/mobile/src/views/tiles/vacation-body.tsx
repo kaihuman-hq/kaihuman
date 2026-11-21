@@ -47,7 +47,12 @@ export function DestinationAddForm({ ctx, onDone }: AddFormProps) {
         returnKeyType="done"
         onSubmitEditing={save}
       />
-      <FormButtons saveLabel="Save destination" onSave={save} onCancel={onDone} />
+      <FormButtons
+        saveLabel="Save destination"
+        onSave={save}
+        onCancel={onDone}
+        disabled={!name.trim()}
+      />
     </>
   );
 }

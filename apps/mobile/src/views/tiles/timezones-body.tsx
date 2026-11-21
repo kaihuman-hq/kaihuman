@@ -9,7 +9,7 @@ import {
   worldClocksView,
   yearProgress,
 } from '../../components/widgets/tile-controllers.js';
-import { Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
+import { Button, haptics, Icon, Text, TextField, useInSheetHeader } from '../../ui/index.js';
 import type { AddFormProps, Ctx } from './bodies.js';
 import { EmptyLine, ItemRow, Meter, Rows, Stat, StatRow } from './parts.js';
 import { useLiveNow } from './use-live-now.js';
@@ -19,6 +19,8 @@ const newId = (): string => `${Date.now().toString(36)}-${Math.random().toString
 
 export function ZoneAddForm({ ctx, onDone }: AddFormProps) {
   const [query, setQuery] = useState('');
+  // In an add sheet the header's Cancel replaces the button below.
+  const inSheet = useInSheetHeader();
   const choices = searchZones(query);
   return (
     <View style={{ gap: 8 }}>
@@ -47,7 +49,7 @@ export function ZoneAddForm({ ctx, onDone }: AddFormProps) {
           />
         ))}
       </Rows>
-      <Button label="Cancel" size="medium" variant="plain" onPress={onDone} />
+      {inSheet ? null : <Button label="Cancel" size="medium" variant="plain" onPress={onDone} />}
     </View>
   );
 }

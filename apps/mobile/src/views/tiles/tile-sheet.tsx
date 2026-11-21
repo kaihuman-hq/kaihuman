@@ -9,12 +9,15 @@ import { ErrorBoundary, KeyboardLift, Text } from '../../ui/index.js';
  */
 export function TileSheet({
   title,
+  header,
   onClose,
   children,
   footer,
   testID,
 }: {
   title: string;
+  /** Replaces the plain title, e.g. a `FormHeader` with Cancel and a confirm action. */
+  header?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -42,9 +45,11 @@ export function TileSheet({
               borderTopRightRadius: shape.lg,
             }}
           >
-            <Text variant="headline" accessibilityRole="header" numberOfLines={2}>
-              {title}
-            </Text>
+            {header ?? (
+              <Text variant="headline" accessibilityRole="header" numberOfLines={2}>
+                {title}
+              </Text>
+            )}
             <ScrollView
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}

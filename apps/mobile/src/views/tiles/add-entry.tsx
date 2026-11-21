@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { TileKind } from '../../components/widgets/tile-controllers.js';
+import { FormHeader, SheetActionProvider } from '../../ui/index.js';
 import { ActionLogAddForm } from './actionlog-body.js';
 import { type AddFormProps, type Ctx, EventAddForm } from './bodies.js';
 import { BookmarkAddForm } from './bookmarks-body.js';
@@ -83,10 +84,20 @@ export function AddEntrySheet({
   onClose: () => void;
 }) {
   const { Form } = entry;
+  // HIG: Cancel top-left, the confirm action top-right; the form registers it via `useSheetAction`.
   return (
-    <TileSheet title={entry.title} onClose={onClose} testID="add-entry-sheet">
-      <Form ctx={ctx} onDone={onClose} />
-      <Err error={ctx.error} />
-    </TileSheet>
+    <SheetActionProvider>
+      {(action) => (
+        <TileSheet
+          title={entry.title}
+          header={<FormHeader title={entry.title} onCancel={onClose} action={action} />}
+          onClose={onClose}
+          testID="add-entry-sheet"
+        >
+          <Form ctx={ctx} onDone={onClose} />
+          <Err error={ctx.error} />
+        </TileSheet>
+      )}
+    </SheetActionProvider>
   );
 }

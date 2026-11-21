@@ -51,7 +51,12 @@ export function TemplateAddForm({ ctx, onDone, kind }: AddFormProps & { kind: Ki
         autoCapitalize="none"
         helper="Separate with spaces or commas"
       />
-      <FormButtons saveLabel={`Save ${kind}`} onSave={save} onCancel={onDone} />
+      <FormButtons
+        saveLabel={`Save ${kind}`}
+        onSave={save}
+        onCancel={onDone}
+        disabled={!title.trim()}
+      />
     </>
   );
 }

@@ -16,7 +16,7 @@ import {
 import { useTheme } from '../../theme/theme.js';
 import { Button, Chip, haptics, Icon, Text, TextField } from '../../ui/index.js';
 import type { AddFormProps, Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, Rows } from './parts.js';
+import { EmptyLine, FormButtons, ItemRow, Rows } from './parts.js';
 
 const COLLAPSED = 5;
 const SORTS: readonly { value: BookmarkSort; label: string }[] = [
@@ -84,17 +84,15 @@ function BookmarkForm({
         autoCapitalize="none"
         helper="Separate tags with commas"
       />
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button
-          label={submitLabel}
-          variant="filled"
-          onPress={() => {
-            if (onSubmit({ url, title, tags: parseTagInput(tags) })) haptics.success();
-            else haptics.error();
-          }}
-        />
-        <Button label="Cancel" variant="plain" onPress={onCancel} />
-      </View>
+      <FormButtons
+        saveLabel={submitLabel}
+        onSave={() => {
+          if (onSubmit({ url, title, tags: parseTagInput(tags) })) haptics.success();
+          else haptics.error();
+        }}
+        onCancel={onCancel}
+        disabled={!url.trim()}
+      />
     </View>
   );
 }

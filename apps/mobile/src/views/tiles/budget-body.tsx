@@ -142,6 +142,7 @@ export function BudgetAddForm({ ctx, onDone }: AddFormProps) {
         onSave={save}
         onCancel={onDone}
         cancelLabel="Done"
+        disabled={!value.trim()}
       />
     </>
   );
