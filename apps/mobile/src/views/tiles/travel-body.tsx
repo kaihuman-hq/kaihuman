@@ -89,7 +89,7 @@ export function TripAddForm({ ctx, onDone }: AddFormProps) {
         returnKeyType="done"
         onSubmitEditing={save}
       />
-      <FormButtons saveLabel="Save trip" onSave={save} onCancel={onDone} />
+      <FormButtons saveLabel="Save trip" onSave={save} onCancel={onDone} disabled={!name.trim()} />
     </>
   );
 }

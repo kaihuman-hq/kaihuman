@@ -35,6 +35,13 @@ describe('expo-router route files', () => {
     for (const kind of Object.keys(quickKinds)) expect(root).toContain(`'quick-${kind}'`);
   });
 
+  it('draws the detail tab bar under the root stack, not over the quick-capture routes', () => {
+    const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
+    expect(root).toContain('<DetailTabBar />');
+    // A modal sheet would cover the bar.
+    expect(root).not.toMatch(/presentation: 'modal',\s+sheetGrabberVisible: true,\s+\/\/ The iOS/);
+  });
+
   it('uses no partial dynamic segments, which expo-router never matches', () => {
     const partial = readdirSync(appDir, { recursive: true, encoding: 'utf8' }).filter((f) =>
       /(^|\/)[^/[]+\[[^\]]+\]/.test(f),

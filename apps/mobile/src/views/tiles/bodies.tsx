@@ -62,7 +62,7 @@ export function EventAddForm({ ctx, onDone }: AddFormProps) {
         returnKeyType="done"
         onSubmitEditing={save}
       />
-      <FormButtons saveLabel="Save event" onSave={save} onCancel={onDone} />
+      <FormButtons saveLabel="Save event" onSave={save} onCancel={onDone} disabled={!name.trim()} />
     </>
   );
 }

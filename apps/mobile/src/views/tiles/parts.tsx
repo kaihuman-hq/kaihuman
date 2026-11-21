@@ -11,6 +11,8 @@ import {
   SwipeReveal,
   Text,
   TextField,
+  useInSheetHeader,
+  useSheetAction,
 } from '../../ui/index.js';
 
 export interface RowAction {
@@ -341,22 +343,28 @@ export function QuickAdd({
   );
 }
 
-/** Save and Cancel under an add form; every add sheet ends the same way. */
+/** Save and Cancel under an add form; in an add sheet they move to the header instead. */
 export function FormButtons({
   saveLabel,
   onSave,
   onCancel,
   cancelLabel = 'Cancel',
+  disabled,
 }: {
   saveLabel: string;
   onSave: () => void;
   onCancel: () => void;
   cancelLabel?: string;
+  /** Form invalid; the confirm action stays disabled until it is not. */
+  disabled?: boolean;
 }) {
+  // Inside an add sheet the confirm action lives in the sheet's header, Cancel on its left.
+  useSheetAction({ label: saveLabel, onPress: onSave, disabled });
+  if (useInSheetHeader()) return null;
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
       <View style={{ flex: 1 }}>
-        <Button label={saveLabel} onPress={onSave} fullWidth />
+        <Button label={saveLabel} onPress={onSave} disabled={disabled} fullWidth />
       </View>
       <Button label={cancelLabel} variant="plain" onPress={onCancel} />
     </View>
@@ -397,7 +405,12 @@ export function FieldAddForm({
         returnKeyType="done"
         onSubmitEditing={save}
       />
-      <FormButtons saveLabel={saveLabel} onSave={save} onCancel={onCancel} />
+      <FormButtons
+        saveLabel={saveLabel}
+        onSave={save}
+        onCancel={onCancel}
+        disabled={!value.trim()}
+      />
     </>
   );
 }

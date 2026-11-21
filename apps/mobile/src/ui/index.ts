@@ -13,6 +13,15 @@ export {
   RouteErrorBoundary,
 } from './error-boundary.js';
 export { Fab, type FabProps } from './fab.js';
+export {
+  FormHeader,
+  formHeaderOptions,
+  type HeaderAction,
+  HeaderButton,
+  SheetActionProvider,
+  useInSheetHeader,
+  useSheetAction,
+} from './form-header.js';
 export { GithubMark, type GithubMarkProps } from './github-mark.js';
 export { haptics } from './haptics.js';
 export { Icon, type IconName, type IconProps } from './icon.js';

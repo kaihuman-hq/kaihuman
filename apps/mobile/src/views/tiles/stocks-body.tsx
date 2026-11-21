@@ -204,7 +204,12 @@ export function StockAddForm({ ctx, onDone }: AddFormProps) {
         placeholder="Today"
         autoCapitalize="none"
       />
-      <FormButtons saveLabel="Save value" onSave={save} onCancel={onDone} />
+      <FormButtons
+        saveLabel="Save value"
+        onSave={save}
+        onCancel={onDone}
+        disabled={!value.trim()}
+      />
     </>
   );
 }
