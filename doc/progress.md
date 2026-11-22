@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-21 — Mobile: tab bar on detail views, iOS-style header actions
+
+- The bottom tab bar now stays visible on every pushed detail screen of the root stack (business, wiki, files, knowledge, braindumps, repos, analytics, weekly review, search, scan, quick-entry screens). It sits below the stack, not over the content. A tab tap goes to that tab's root; the ＋ menu works there too. Login, onboarding, reminders, auth, demo and the business time/payment form sheets stay full-screen. Quick-entry routes are now pushed cards instead of modal sheets, so the bar is not covered. Logic: `src/navigation/detail-tab-bar.tsx` (`showsDetailTabBar`), tests in `detail-tab-bar.test.tsx`, `route-files.test.ts`.
+- New-entry forms follow the iOS HIG: Cancel top-left, the confirm action (Add / Save / Done) top-right in the navigation bar or sheet header, disabled while the form is invalid; the big bottom button is gone. Applies to the widget add sheets (consumption, bookmarks, stocks, templates, timezones, vacation, action log, budget, todos, travel), new-file sheet, quick capture and quick entry. Shared helper: `src/ui/form-header.tsx` (`HeaderButton`, `formHeaderOptions`). Tests: `add-entry.test.tsx`, `quick-entry-view.test.tsx`, `views-content.test.tsx`. Mobile only, so no console version bump. Needs a device check.
+
 ## 2026-11-19 — Console: due-date picker gets Today / No date, stays on screen
 
 - The per-row reschedule popover on `/tasks` now offers Today, Tomorrow, Next Saturday, Next Monday (strictly after today), No date (clears the due) and the date input. A due time is kept when the task has one. "Day after tomorrow" dropped from this menu only.

@@ -20,7 +20,7 @@ import { useTheme } from '../../theme/theme.js';
 import { Button, Chip, haptics, SegmentedControl, Text, TextField } from '../../ui/index.js';
 import type { AddFormProps, Ctx } from './bodies.js';
 import { LineChart, Swatch } from './chart-parts.js';
-import { EmptyLine, ItemRow, Meter, Rows } from './parts.js';
+import { EmptyLine, FormButtons, ItemRow, Meter, Rows } from './parts.js';
 
 const fmt = (n: number) =>
   Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1);
@@ -85,12 +85,12 @@ function AddReadingForm({ ctx, onDone }: AddFormProps) {
           autoFocus={i === 0}
         />
       ))}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button variant="plain" label="Cancel" onPress={onDone} />
-        <View style={{ flex: 1 }}>
-          <Button label="Save reading" onPress={save} fullWidth />
-        </View>
-      </View>
+      <FormButtons
+        saveLabel="Save reading"
+        onSave={save}
+        onCancel={onDone}
+        disabled={!Object.values(values).some((v) => v.trim())}
+      />
     </View>
   );
 }
@@ -122,12 +122,7 @@ function AddMeterForm({ ctx, onDone }: AddFormProps) {
         keyboardType="decimal-pad"
         placeholder="Optional"
       />
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button variant="plain" label="Cancel" onPress={onDone} />
-        <View style={{ flex: 1 }}>
-          <Button label="Save meter" onPress={save} fullWidth />
-        </View>
-      </View>
+      <FormButtons saveLabel="Save meter" onSave={save} onCancel={onDone} disabled={!name.trim()} />
     </View>
   );
 }

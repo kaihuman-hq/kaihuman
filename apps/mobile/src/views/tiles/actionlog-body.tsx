@@ -60,7 +60,12 @@ export function ActionLogAddForm({ ctx, onDone }: AddFormProps) {
         autoCapitalize="none"
         helper="Optional; #tags in the text work too"
       />
-      <FormButtons saveLabel="Log action" onSave={submit} onCancel={onDone} />
+      <FormButtons
+        saveLabel="Log action"
+        onSave={submit}
+        onCancel={onDone}
+        disabled={!text.trim()}
+      />
     </>
   );
 }

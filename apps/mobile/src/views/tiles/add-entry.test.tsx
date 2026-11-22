@@ -124,3 +124,46 @@ describe('AddEntrySheet', () => {
     spy.mockRestore();
   });
 });
+
+describe('add sheet header (iOS HIG)', () => {
+  const NOW2 = new Date(2026, 10, 9, 12);
+  const open = (kind: TileKind, content: string, apply = vi.fn(() => true)) => {
+    const entry = addEntryFor(kind, content, NOW2);
+    if (!entry) throw new Error('no entry');
+    const onClose = vi.fn();
+    render(
+      <AddEntrySheet
+        entry={entry}
+        ctx={{ content, now: NOW2, apply, error: null }}
+        onClose={onClose}
+      />,
+    );
+    return { apply, onClose };
+  };
+
+  it('puts Cancel left and a disabled confirm right, with no bottom Save button', () => {
+    open('consumption', 'created,Gas[unit:m³]\n2026-11-01,10');
+    const action = screen.getByTestId('form-header-action');
+    expect(action.textContent).toBe('Save reading');
+    expect(action.hasAttribute('disabled')).toBe(true);
+    expect(screen.getAllByRole('button', { name: 'Save reading' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1);
+  });
+
+  it('enables the confirm once the form is valid and saves through it', () => {
+    const { apply, onClose } = open('consumption', 'created,Gas[unit:m³]\n2026-11-01,10');
+    fireEvent.change(screen.getByLabelText(/Gas/), { target: { value: '12' } });
+    const action = screen.getByTestId('form-header-action');
+    expect(action.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(action);
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('Cancel closes the sheet without writing', () => {
+    const { apply, onClose } = open('consumption', 'created,Gas[unit:m³]\n2026-11-01,10');
+    fireEvent.click(screen.getByTestId('form-header-cancel'));
+    expect(onClose).toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+  });
+});

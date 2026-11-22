@@ -569,7 +569,7 @@ export function TodoAddForm({ ctx, onDone }: AddFormProps) {
           {fileError}
         </Text>
       ) : null}
-      <FormButtons saveLabel="Add task" onSave={add} onCancel={onDone} />
+      <FormButtons saveLabel="Add task" onSave={add} onCancel={onDone} disabled={!text.trim()} />
     </>
   );
 }
