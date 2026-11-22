@@ -96,6 +96,7 @@ export function StreamsList({
           placeholder="Jump to list…"
           autoCapitalize="none"
           returnKeyType="go"
+          clearable
           value={query}
           onChangeText={(text) => {
             setQuery(text);

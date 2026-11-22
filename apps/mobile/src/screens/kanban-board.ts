@@ -240,8 +240,9 @@ export class KanbanBoardController {
 
   /** Streams view: every todo file as a stream, busiest or newest first, high priority leading. */
   streams(mode: StreamMode, sort: StreamSort): Stream[] {
-    const query = this.filter.search ?? '';
-    return sortStreams(this.loaded, sort, mode, query).map(({ path, data }) => ({
+    const { search: query = '', files } = this.filter;
+    const loaded = files?.length ? this.loaded.filter((f) => files.includes(f.path)) : this.loaded;
+    return sortStreams(loaded, sort, mode, query).map(({ path, data }) => ({
       path,
       data,
       rows: streamItems(data, mode, query),
