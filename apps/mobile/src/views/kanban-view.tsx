@@ -36,7 +36,7 @@ import {
   KanbanFilterSheet,
   toBoardFilter,
 } from './kanban-filter-sheet.js';
-import { StreamsList } from './kanban-streams.js';
+import { StreamsList, streamName } from './kanban-streams.js';
 
 const LABEL: Record<TodoStatus, string> = {
   backlog: 'Backlog',
@@ -188,6 +188,15 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     setVersion((v) => v + 1);
   };
   const pickTag = (next: string | undefined) => applyFilter({ tag: next });
+  const toggleFile = (path: string) =>
+    applyFilter({
+      options: {
+        ...options,
+        files: options.files.includes(path)
+          ? options.files.filter((p) => p !== path)
+          : [...options.files, path],
+      },
+    });
 
   const streamStatus = async (path: string, index: number, to: TodoStatus) => {
     const res = await controller.setStatus(path, index, to);
@@ -479,6 +488,34 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
             {filterCount > 0 ? <Badge tone="accent" count={filterCount} /> : null}
           </Pressable>
         </View>
+        {loading || loadError || controller.paths.length < 2 ? null : (
+          <ScrollView
+            testID="stream-chips"
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, marginHorizontal: -metrics.screenMargin }}
+            contentContainerStyle={{ paddingHorizontal: metrics.screenMargin, gap: spacing.sm }}
+          >
+            {options.files.length > 0 ? (
+              <Chip
+                testID="stream-filter-reset"
+                label="Reset"
+                icon="close"
+                accessibilityLabel="Reset stream filter"
+                onPress={() => applyFilter({ options: { ...options, files: [] } })}
+              />
+            ) : null}
+            {controller.paths.map((p) => (
+              <Chip
+                key={p}
+                testID={`stream-chip-${streamName(p)}`}
+                label={streamName(p)}
+                selected={options.files.includes(p)}
+                onPress={() => toggleFile(p)}
+              />
+            ))}
+          </ScrollView>
+        )}
         {showFilters ? (
           <View style={{ gap: spacing.sm }}>
             <TextField
@@ -488,6 +525,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
               value={search}
               onChangeText={(text) => applyFilter({ search: text })}
               returnKeyType="search"
+              clearable
             />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               <Chip

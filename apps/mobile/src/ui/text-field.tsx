@@ -1,6 +1,13 @@
 import { useState } from 'react';
-import { type KeyboardTypeOptions, type ReturnKeyTypeOptions, TextInput, View } from 'react-native';
+import {
+  type KeyboardTypeOptions,
+  Pressable,
+  type ReturnKeyTypeOptions,
+  TextInput,
+  View,
+} from 'react-native';
 import { useTheme } from '../theme/theme.js';
+import { Icon } from './icon.js';
 import { Text } from './text.js';
 
 export interface TextFieldProps {
@@ -22,6 +29,8 @@ export interface TextFieldProps {
   autoFocus?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** Shows a one-tap clear button while the field has text. */
+  clearable?: boolean;
   testID?: string;
 }
 
@@ -42,6 +51,7 @@ export function TextField({
   autoFocus,
   onFocus,
   onBlur,
+  clearable,
   testID,
 }: TextFieldProps) {
   const theme = useTheme();
@@ -79,6 +89,7 @@ export function TextField({
       style={[
         theme.type.body,
         {
+          flex: clearable ? 1 : undefined,
           color: colors.label,
           fontFamily: theme.fontFamily.system,
           paddingVertical: ios ? spacing.sm + 2 : spacing.xs,
@@ -90,6 +101,26 @@ export function TextField({
         },
       ]}
     />
+  );
+
+  const field = clearable ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      {input}
+      {value ? (
+        <Pressable
+          testID={testID ? `${testID}-clear` : undefined}
+          accessibilityRole="button"
+          accessibilityLabel={`Clear ${label}`}
+          hitSlop={14}
+          onPress={() => onChangeText('')}
+          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+        >
+          <Icon name="close" size={16} color={colors.secondaryLabel} />
+        </Pressable>
+      ) : null}
+    </View>
+  ) : (
+    input
   );
 
   const indicator = error ? colors.danger : focused ? colors.accent : colors.secondaryLabel;
@@ -112,7 +143,7 @@ export function TextField({
               borderColor: colors.danger,
             }}
           >
-            {input}
+            {field}
           </View>
         </>
       ) : (
@@ -134,7 +165,7 @@ export function TextField({
           >
             {label}
           </Text>
-          {input}
+          {field}
         </View>
       )}
       {error ? (

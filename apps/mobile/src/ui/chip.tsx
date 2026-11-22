@@ -11,9 +11,17 @@ export interface ChipProps {
   icon?: IconName;
   /** Overrides the spoken label, e.g. "Remove tag x" for a chip that reads "#x". */
   accessibilityLabel?: string;
+  testID?: string;
 }
 
-export function Chip({ label, selected = false, onPress, icon, accessibilityLabel }: ChipProps) {
+export function Chip({
+  label,
+  selected = false,
+  onPress,
+  icon,
+  accessibilityLabel,
+  testID,
+}: ChipProps) {
   const theme = useTheme();
   const press = usePressScale();
   const { colors, spacing } = theme;
@@ -43,11 +51,17 @@ export function Chip({ label, selected = false, onPress, icon, accessibilityLabe
     </>
   );
 
-  if (!onPress) return <View style={style}>{content}</View>;
+  if (!onPress)
+    return (
+      <View testID={testID} style={style}>
+        {content}
+      </View>
+    );
   return (
     <Animated.View style={[{ alignSelf: 'flex-start' }, press.style]}>
       <Pressable
         {...press.handlers}
+        testID={testID}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ selected }}

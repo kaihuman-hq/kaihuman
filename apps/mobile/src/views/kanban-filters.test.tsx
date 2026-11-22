@@ -297,3 +297,55 @@ describe('KanbanView chrome', () => {
     expect(title.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('KanbanView stream chips', () => {
+  it('filters streams from the controller by file', async () => {
+    const { c } = await loaded();
+    c.setFilter({ files: ['.kh/side.todos.md'] });
+    expect(c.streams('active', 'count').map((s) => s.path)).toEqual(['.kh/side.todos.md']);
+  });
+
+  it('toggles a stream chip on the board and resets with one tap', async () => {
+    render(<KanbanView controller={new KanbanBoardController(files())} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    expect(screen.getByTestId('stream-chip-inbox')).toBeTruthy();
+    expect(screen.queryByTestId('stream-filter-reset')).toBeNull();
+    fireEvent.click(screen.getByTestId('stream-chip-side'));
+    await waitFor(() => expect(screen.queryByText('write docs')).toBeNull());
+    expect(screen.getByText('side quest')).toBeTruthy();
+    expect(screen.getByLabelText('Filters, 1 active')).toBeTruthy();
+    expect(screen.getByTestId('stream-chip-side').getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(screen.getByLabelText('Reset stream filter'));
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    expect(screen.queryByTestId('stream-filter-reset')).toBeNull();
+  });
+
+  it('filters streams mode by chip', async () => {
+    render(<KanbanView controller={new KanbanBoardController(files())} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
+    await waitFor(() => expect(screen.getByText('side quest')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('stream-chip-inbox'));
+    await waitFor(() => expect(screen.queryByText('side quest')).toBeNull());
+    expect(screen.getByText('write docs')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('stream-filter-reset'));
+    await waitFor(() => expect(screen.getByText('side quest')).toBeTruthy());
+  });
+
+  it('clears search and jump fields with one tap', async () => {
+    render(<KanbanView controller={new KanbanBoardController(files())} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('board-filters-toggle'));
+    expect(screen.queryByTestId('board-search-clear')).toBeNull();
+    fireEvent.change(screen.getByTestId('board-search'), { target: { value: 'rent' } });
+    await waitFor(() => expect(screen.queryByText('write docs')).toBeNull());
+    fireEvent.click(screen.getByTestId('board-search-clear'));
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('board-view-toggle'));
+    const jump = await screen.findByTestId('stream-jump');
+    fireEvent.change(jump, { target: { value: 'zzz' } });
+    expect(screen.getByText('No matching list')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('stream-jump-clear'));
+    expect(screen.queryByText('No matching list')).toBeNull();
+  });
+});
