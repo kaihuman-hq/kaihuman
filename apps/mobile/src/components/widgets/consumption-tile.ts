@@ -16,6 +16,7 @@ import {
   type MonthlyStats,
   monthPctChange,
   parseConsumption,
+  readingDelta,
   sameDayLastYear,
   serializeConsumption,
 } from '@kaihuman/formats/consumption';
@@ -92,7 +93,7 @@ export const consumptionView = (content: string, now: Date): ConsumptionView => 
       yearlyTarget: col.yearlyTarget > 0 ? col.yearlyTarget : undefined,
       latestReading,
       latestDate: last.date,
-      lastPeriodUse: prev ? latestReading - (prev.readings[col.key] as number) : null,
+      lastPeriodUse: prev ? readingDelta(prev.readings[col.key] as number, latestReading) : null,
       yearUse,
       targetProgress: col.yearlyTarget > 0 ? yearUse / col.yearlyTarget : null,
     });

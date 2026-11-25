@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-25 — Consumption: meter reset handling
+
+- A reading lower than the previous one is a meter swap: usage is the new reading (new meter started at 0), not a negative diff and not 0. One shared helper `readingDelta` in `packages/formats/src/consumption.ts`, used by `parseConsumption`, `addConsumptionEntry` and the mobile tile (`lastPeriodUse`). Across an interpolated gap containing a reset the new meter is interpolated 0 → r1, so the gap days sum to r1 (was: hold r0, usage lost). Tests in `consumption.test.ts` and `consumption-tile.test.ts`. Console version bumped.
+
 ## 2026-11-21 — Mobile: tab bar on detail views, iOS-style header actions
 
 - The bottom tab bar now stays visible on every pushed detail screen of the root stack (business, wiki, files, knowledge, braindumps, repos, analytics, weekly review, search, scan, quick-entry screens). It sits below the stack, not over the content. A tab tap goes to that tab's root; the ＋ menu works there too. Login, onboarding, reminders, auth, demo and the business time/payment form sheets stay full-screen. Quick-entry routes are now pushed cards instead of modal sheets, so the bar is not covered. Logic: `src/navigation/detail-tab-bar.tsx` (`showsDetailTabBar`), tests in `detail-tab-bar.test.tsx`, `route-files.test.ts`.

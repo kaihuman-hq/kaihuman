@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addConsumptionEntry,
   compareYearData,
   getMonthlyStats,
   monthPctChange,
@@ -59,5 +60,34 @@ describe('monthly comparison helpers', () => {
     expect([...toggleCompareYear(new Set([2025]), years, 2025)]).toEqual(years);
     expect([...toggleCompareYear(new Set([2025]), years, 2026)].sort()).toEqual([2025, 2026]);
     expect(toggleCompareYear(new Set([2025, 2026]), years, 2025).has(2025)).toBe(false);
+  });
+});
+
+describe('meter reset', () => {
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+  it('counts the new reading as usage when a reading drops mid-series', () => {
+    const { data } = parseConsumption(
+      ['created,Gas[unit:m3]', '2025-01-01,100', '2025-01-02,110', '2025-01-03,4'].join('\n'),
+    );
+    expect(data.entries.map((e) => e.deltas.Gas)).toEqual([0, 10, 4]);
+  });
+
+  it('spreads the new meter from 0 over an interpolated gap containing a reset', () => {
+    const { data } = parseConsumption(
+      ['created,Gas[unit:m3]', '2025-01-01,100', '2025-01-05,8'].join('\n'),
+    );
+    const deltas = data.entries.slice(1).map((e) => e.deltas.Gas as number);
+    expect(deltas).toHaveLength(4);
+    expect(deltas.every((d) => d > 0)).toBe(true);
+    expect(sum(deltas)).toBeCloseTo(8);
+  });
+
+  it('addConsumptionEntry counts the new reading after a reset', () => {
+    const { data } = parseConsumption(
+      ['created,Gas[unit:m3]', '2025-01-01,100', '2025-01-02,110'].join('\n'),
+    );
+    const next = addConsumptionEntry(data, '2025-01-03', { Gas: 3 });
+    expect(next.entries.at(-1)?.deltas.Gas).toBe(3);
   });
 });
