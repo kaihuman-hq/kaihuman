@@ -147,6 +147,14 @@ function daysBetween(a: Date, b: Date): number {
 
 // --- Core functions ---
 
+/**
+ * Usage between two cumulative readings. A drop means the meter was replaced and the new one
+ * started at 0, so the new reading itself is the usage (never a negative diff).
+ */
+export function readingDelta(prev: number, curr: number): number {
+  return curr < prev ? curr : curr - prev;
+}
+
 export function parseConsumption(raw: string): { data: ConsumptionData; modified: boolean } {
   const lines = raw.split('\n').filter((l) => l.trim());
   const empty: ConsumptionData = {
@@ -238,8 +246,8 @@ export function parseConsumption(raw: string): { data: ConsumptionData; modified
             const r0 = curr.readings[col.key];
             const r1 = next.readings[col.key];
             if (r0 !== undefined && !Number.isNaN(r0) && r1 !== undefined && !Number.isNaN(r1)) {
-              // On meter reset (r1 < r0) hold the previous value so delta = 0
-              readings[col.key] = r1 < r0 ? r0 : r0 + (r1 - r0) * t;
+              // On meter reset (r1 < r0) the new meter runs 0 -> r1 so the gap days sum to r1
+              readings[col.key] = r1 < r0 ? r1 * t : r0 + (r1 - r0) * t;
             } else {
               readings[col.key] = NaN;
             }
@@ -268,11 +276,8 @@ export function parseConsumption(raw: string): { data: ConsumptionData; modified
         Number.isNaN(prevVal)
       ) {
         deltas[col.key] = 0;
-      } else if (curr < prevVal) {
-        // Meter reset — can't calculate meaningful delta
-        deltas[col.key] = 0;
       } else {
-        deltas[col.key] = curr - prevVal;
+        deltas[col.key] = readingDelta(prevVal, curr);
       }
     }
     return {
@@ -428,10 +433,8 @@ export function addConsumptionEntry(
       Number.isNaN(prevVal)
     ) {
       deltas[col.key] = 0;
-    } else if (curr < prevVal) {
-      deltas[col.key] = 0;
     } else {
-      deltas[col.key] = curr - prevVal;
+      deltas[col.key] = readingDelta(prevVal, curr);
     }
   }
 

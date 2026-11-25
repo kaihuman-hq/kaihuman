@@ -93,3 +93,13 @@ describe('removeConsumptionMeter', () => {
     expect(removeConsumptionMeter('', 'Gas').ok).toBe(false);
   });
 });
+
+describe('meter reset', () => {
+  it('reports the new reading as last period use, never a negative diff', () => {
+    const csv = ['created,Gas[unit:m³]', '2026-01-01,100', '2026-01-02,110', '2026-01-03,4'].join(
+      '\n',
+    );
+    const view = consumptionView(csv, new Date('2026-01-03'));
+    expect(view.meters[0]?.lastPeriodUse).toBe(4);
+  });
+});
