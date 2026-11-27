@@ -22,6 +22,7 @@ import {
   taskDueLabel,
   taskListName,
   taskRows,
+  updateTodoText,
   withDate,
 } from '@kaihuman/formats';
 import { StatusBar } from '@kaihuman/ui';
@@ -68,6 +69,43 @@ const withLinks = (text: string) => {
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts;
+};
+
+const EditText = ({
+  value,
+  onSave,
+  onCancel,
+}: {
+  value: string;
+  onSave: (text: string) => void;
+  onCancel: () => void;
+}) => {
+  const ref = useRef<HTMLInputElement>(null);
+  // Enter/Escape unmount the input, which can fire blur again; settle only once.
+  const settled = useRef(false);
+  useEffect(() => ref.current?.select(), []);
+  const finish = (save: boolean) => {
+    if (settled.current) return;
+    settled.current = true;
+    if (save) onSave(ref.current?.value ?? value);
+    else onCancel();
+  };
+  return (
+    <input
+      ref={ref}
+      type="text"
+      // biome-ignore lint/a11y/noAutofocus: focus follows the user's explicit edit action
+      autoFocus
+      value={value}
+      aria-label="Edit task text"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') finish(true);
+        else if (e.key === 'Escape') finish(false);
+      }}
+      onBlur={() => finish(true)}
+      class="flex-1 min-w-0 rounded bg-[var(--los-border)]/40 px-2 py-0.5 text-sm"
+    />
+  );
 };
 
 // Tags carry no colour in the file format, so each tag gets a stable one from the todo palette.
@@ -241,6 +279,7 @@ export const TasksBoardPage = () => {
   const [draft, setDraft] = useState('');
   const [draftDue, setDraftDue] = useState('');
   const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState<string>();
 
   useEffect(() => {
     if (githubFileStore.tree.peek().length === 0) githubFileStore.loadTree();
@@ -315,6 +354,15 @@ export const TasksBoardPage = () => {
     const item = data.items.find((it) => it.id === id);
     if (!item) return;
     write(path, serializeTodos(setTodoDue(data, id, date ? withDate(item, date) : undefined)));
+  };
+
+  const saveText = (path: string, id: string, text: string) => {
+    setEditing(undefined);
+    const next = text.trim();
+    const data = parseTodos(openFiles[path]?.content ?? '');
+    const index = data.items.findIndex((it) => it.id === id);
+    if (!next || index < 0 || data.items[index]?.text === next) return;
+    write(path, serializeTodos(updateTodoText(data, index, next)));
   };
 
   const add = (e: Event) => {
@@ -517,8 +565,20 @@ export const TasksBoardPage = () => {
                 const done = item.status === 'done';
                 const overdue = dueStatus(item, now) === 'overdue';
                 const due = taskDueLabel(item, now);
+                const rowKey = `${list.path}:${item.id}`;
                 return (
-                  <li key={`${list.path}:${item.id}`} class="flex items-center gap-3 py-2 min-w-0">
+                  <li
+                    key={rowKey}
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: the row takes Enter/F2 to edit its text
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === 'F2')) {
+                        e.preventDefault();
+                        setEditing(rowKey);
+                      }
+                    }}
+                    class="flex items-center gap-3 py-2 min-w-0"
+                  >
                     <input
                       type="checkbox"
                       checked={done}
@@ -526,11 +586,23 @@ export const TasksBoardPage = () => {
                       onChange={() => toggle(list.path, item.id, done)}
                       class="shrink-0 w-4 h-4 accent-[var(--los-accent)] cursor-pointer"
                     />
-                    <span
-                      class={`flex-1 min-w-0 truncate text-sm ${done ? 'line-through text-[var(--los-muted)]' : ''}`}
-                    >
-                      {withLinks(item.text)}
-                    </span>
+                    {editing === rowKey ? (
+                      <EditText
+                        value={item.text}
+                        onSave={(text) => saveText(list.path, item.id, text)}
+                        onCancel={() => setEditing(undefined)}
+                      />
+                    ) : (
+                      // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard edit lives on the row (Enter/F2)
+                      <span
+                        class={`flex-1 min-w-0 truncate text-sm cursor-text ${done ? 'line-through text-[var(--los-muted)]' : ''}`}
+                        onClick={(e) => {
+                          if (!(e.target as HTMLElement).closest('a')) setEditing(rowKey);
+                        }}
+                      >
+                        {withLinks(item.text)}
+                      </span>
+                    )}
                     <span class="shrink-0 flex items-center gap-1.5 text-xs text-[var(--los-muted)]">
                       <span class="max-w-24 truncate">{list.name}</span>
                       {item.repeat && <Repeat size={12} aria-label="Repeats" />}
