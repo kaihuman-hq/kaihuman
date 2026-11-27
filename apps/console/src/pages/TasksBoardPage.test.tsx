@@ -154,16 +154,23 @@ describe('TasksBoardPage', () => {
     expect(store.updateFileContent).toHaveBeenCalledWith(WORK, expect.stringContaining('New one'));
   });
 
-  it('sets a due date when creating a task', () => {
+  it('sets a due date when creating a task via the shared menu', () => {
     act(() => button('work')?.click());
     const input = host.querySelector('input[type="text"]') as HTMLInputElement;
-    const due = host.querySelector('input[aria-label="New task due date"]') as HTMLInputElement;
     act(() => {
       input.value = 'Dated one';
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      due.value = '2026-12-01';
-      due.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    const trigger = host.querySelector('[aria-label="New task due date"]') as HTMLElement;
+    act(() => trigger.click());
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
+    expect(items).toEqual(['Today', 'Tomorrow', 'Next Saturday', 'Next Monday', 'No date']);
+    const date = host.querySelector('input[aria-label="Custom due date"]') as HTMLInputElement;
+    act(() => {
+      date.value = '2026-12-01';
+      date.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(trigger.textContent).toContain('2026-12-01');
     act(() => {
       input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
@@ -171,7 +178,24 @@ describe('TasksBoardPage', () => {
       WORK,
       expect.stringMatching(/Dated one[\s\S]*::due:: 2026-12-01/),
     );
-    expect(due.value).toBe('');
+    expect(trigger.textContent).toBe('');
+  });
+
+  it('positions the popover fixed, opening rightwards and clamped inside the viewport', () => {
+    const rect = (r: Partial<DOMRect>) => () =>
+      ({ left: 0, top: 0, right: 0, bottom: 0, ...r }) as DOMRect;
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    spy.mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute('role') === 'menu'
+        ? rect({ width: 200, height: 150 })()
+        : rect({ left: window.innerWidth - 20, top: 100, bottom: 120 })();
+    });
+    act(() => (host.querySelector('[aria-label="Reschedule Standup"]') as HTMLElement).click());
+    const menu = host.querySelector('[role="menu"]') as HTMLElement;
+    expect(menu.className).toContain('fixed');
+    expect(Number.parseFloat(menu.style.left)).toBe(window.innerWidth - 8 - 200);
+    expect(menu.style.top).toBe('124px');
+    spy.mockRestore();
   });
 
   it('opens the sidebar behind the header icon at mobile width', () => {
@@ -213,5 +237,72 @@ describe('TasksBoardPage', () => {
     expect(host.querySelectorAll('li')).toHaveLength(0);
     type('');
     expect(host.querySelectorAll('li')).toHaveLength(2);
+  });
+
+  describe('inline edit', () => {
+    const textOf = (label: string) =>
+      [...host.querySelectorAll('li span.truncate')].find((s) =>
+        s.textContent?.startsWith(label),
+      ) as HTMLElement;
+    const editor = () =>
+      host.querySelector('input[aria-label="Edit task text"]') as HTMLInputElement;
+    const key = (el: Element, k: string) =>
+      act(() => {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+      });
+    const type = (v: string) =>
+      act(() => {
+        editor().value = v;
+      });
+
+    it('saves on Enter', () => {
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('Standup moved');
+      key(editor(), 'Enter');
+      expect(store.updateFileContent).toHaveBeenCalledWith(
+        WORK,
+        expect.stringContaining('Standup moved'),
+      );
+      expect(editor()).toBeNull();
+    });
+
+    it('saves on blur', () => {
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('Blurred');
+      act(() => {
+        editor().dispatchEvent(new FocusEvent('blur'));
+      });
+      expect(store.updateFileContent).toHaveBeenCalledWith(
+        WORK,
+        expect.stringContaining('Blurred'),
+      );
+    });
+
+    it('cancels on Escape and ignores empty text', () => {
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('Nope');
+      key(editor(), 'Escape');
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('   ');
+      key(editor(), 'Enter');
+      expect(store.updateFileContent).not.toHaveBeenCalled();
+    });
+
+    it('opens from Enter/F2 on the row but not when clicking a link', () => {
+      act(() => {
+        (host.querySelector('a') as HTMLElement).click();
+      });
+      expect(editor()).toBeNull();
+      key(host.querySelectorAll('li')[1] as Element, 'F2');
+      expect(editor().value).toBe('Standup');
+    });
   });
 });
