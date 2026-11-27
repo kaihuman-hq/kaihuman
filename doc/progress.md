@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-27 — Console tasks: due picker on new tasks, picker stays visible, inline text edit
+
+- `/tasks` add form: the bare date input is replaced by the same due menu rows use (quick options, No date, date picker); the chosen date shows on the trigger. `RescheduleMenu` generalised to `DueMenu`.
+- The due popover is `position: fixed`, opens rightwards from its trigger and is clamped into the viewport, so scroll containers no longer cut it off.
+- Task text is editable in place: click the text (links stay clickable) or Enter/F2 on a focused row; Enter or blur saves, Escape cancels, empty keeps the old text. Uses `updateTodoText`. Tests in `TasksBoardPage.test.tsx`. Console version bumped.
+
 ## 2026-11-25 — Consumption: meter reset handling
 
 - A reading lower than the previous one is a meter swap: usage is the new reading (new meter started at 0), not a negative diff and not 0. One shared helper `readingDelta` in `packages/formats/src/consumption.ts`, used by `parseConsumption`, `addConsumptionEntry` and the mobile tile (`lastPeriodUse`). Across an interpolated gap containing a reset the new meter is interpolated 0 → r1, so the gap days sum to r1 (was: hold r0, usage lost). Tests in `consumption.test.ts` and `consumption-tile.test.ts`. Console version bumped.

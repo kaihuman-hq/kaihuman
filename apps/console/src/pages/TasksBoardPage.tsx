@@ -96,7 +96,7 @@ const EditText = ({
       type="text"
       // biome-ignore lint/a11y/noAutofocus: focus follows the user's explicit edit action
       autoFocus
-      value={value}
+      defaultValue={value}
       aria-label="Edit task text"
       onKeyDown={(e) => {
         if (e.key === 'Enter') finish(true);
