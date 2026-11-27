@@ -214,4 +214,71 @@ describe('TasksBoardPage', () => {
     type('');
     expect(host.querySelectorAll('li')).toHaveLength(2);
   });
+
+  describe('inline edit', () => {
+    const textOf = (label: string) =>
+      [...host.querySelectorAll('li span.truncate')].find((s) =>
+        s.textContent?.startsWith(label),
+      ) as HTMLElement;
+    const editor = () =>
+      host.querySelector('input[aria-label="Edit task text"]') as HTMLInputElement;
+    const key = (el: Element, k: string) =>
+      act(() => {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+      });
+    const type = (v: string) =>
+      act(() => {
+        editor().value = v;
+      });
+
+    it('saves on Enter', () => {
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('Standup moved');
+      key(editor(), 'Enter');
+      expect(store.updateFileContent).toHaveBeenCalledWith(
+        WORK,
+        expect.stringContaining('Standup moved'),
+      );
+      expect(editor()).toBeNull();
+    });
+
+    it('saves on blur', () => {
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('Blurred');
+      act(() => {
+        editor().dispatchEvent(new FocusEvent('blur'));
+      });
+      expect(store.updateFileContent).toHaveBeenCalledWith(
+        WORK,
+        expect.stringContaining('Blurred'),
+      );
+    });
+
+    it('cancels on Escape and ignores empty text', () => {
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('Nope');
+      key(editor(), 'Escape');
+      act(() => {
+        textOf('Standup').click();
+      });
+      type('   ');
+      key(editor(), 'Enter');
+      expect(store.updateFileContent).not.toHaveBeenCalled();
+    });
+
+    it('opens from Enter/F2 on the row but not when clicking a link', () => {
+      act(() => {
+        (host.querySelector('a') as HTMLElement).click();
+      });
+      expect(editor()).toBeNull();
+      key(host.querySelectorAll('li')[1] as Element, 'F2');
+      expect(editor().value).toBe('Standup');
+    });
+  });
 });
