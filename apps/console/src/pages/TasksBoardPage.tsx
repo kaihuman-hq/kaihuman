@@ -86,37 +86,41 @@ const SMART_ICONS: Record<TaskSmartView, typeof Sun> = {
   completed: CheckSquare,
 };
 
-const RescheduleMenu = ({
-  title,
+const DueMenu = ({
+  label,
   now,
   onPick,
+  children,
+  triggerClass = 'flex text-[var(--los-muted)] hover:text-[var(--los-fg)]',
 }: {
-  title: string;
+  label: string;
   now: number;
   onPick: (date: string | undefined) => void;
+  children: ComponentChildren;
+  triggerClass?: string;
 }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const pick = (date: string | undefined) => {
     setOpen(false);
     onPick(date);
   };
-  // Keep the popover inside the viewport: nudge it horizontally and flip above when it would
-  // overflow the bottom, since the trigger sits at the far right of narrow windows.
+  // Fixed positioning escapes the scroll containers that clipped the old right-anchored popover.
+  // It opens rightwards from the trigger, then is clamped into the viewport (flipping above if
+  // it would overflow the bottom).
   useLayoutEffect(() => {
     const el = menuRef.current;
-    if (!open || !el) return;
-    el.style.transform = '';
-    el.style.top = '';
-    el.style.bottom = '';
-    const r = el.getBoundingClientRect();
+    const t = triggerRef.current;
+    if (!open || !el || !t) return;
+    const tr = t.getBoundingClientRect();
+    const { width, height } = el.getBoundingClientRect();
     const m = 8;
-    const dx = Math.min(0, window.innerWidth - m - r.right) + Math.max(0, m - r.left);
-    if (dx) el.style.transform = `translateX(${dx}px)`;
-    if (r.bottom > window.innerHeight - m && r.top - r.height - 32 > m) {
-      el.style.top = 'auto';
-      el.style.bottom = '1.5rem';
-    }
+    const left = Math.max(m, Math.min(tr.left, window.innerWidth - m - width));
+    const below = tr.bottom + 4;
+    const top = below + height > window.innerHeight - m ? Math.max(m, tr.top - 4 - height) : below;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
   }, [open]);
   const itemClass = 'block w-full text-left px-3 py-1.5 hover:bg-[var(--los-border)]';
   return (
@@ -134,20 +138,21 @@ const RescheduleMenu = ({
     >
       <button
         type="button"
-        aria-label={`Reschedule ${title}`}
+        ref={triggerRef}
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        class="flex text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+        class={triggerClass}
       >
-        <CalendarClock size={14} />
+        {children}
       </button>
       {open && (
         <div
           ref={menuRef}
           role="menu"
           aria-label="Reschedule"
-          class="absolute right-0 top-6 z-30 min-w-44 py-1 rounded border border-[var(--los-border)] bg-[var(--los-bg)] shadow-lg text-sm text-[var(--los-fg)]"
+          class="fixed left-0 top-0 z-30 min-w-44 py-1 rounded border border-[var(--los-border)] bg-[var(--los-bg)] shadow-lg text-sm text-[var(--los-fg)]"
         >
           {QUICK_DUE_OPTIONS.map((o) => (
             <button
@@ -490,13 +495,15 @@ export const TasksBoardPage = () => {
                   aria-label={`Add task to ${targetName}`}
                   class="flex-1 min-w-0 rounded bg-[var(--los-border)]/40 px-3 py-2 text-sm placeholder:text-[var(--los-muted)] outline-none focus:ring-1 focus:ring-[var(--los-accent)]"
                 />
-                <input
-                  type="date"
-                  value={draftDue}
-                  onInput={(e) => setDraftDue((e.target as HTMLInputElement).value)}
-                  aria-label="New task due date"
-                  class="shrink-0 rounded bg-[var(--los-border)]/40 px-2 py-2 text-xs"
-                />
+                <DueMenu
+                  label="New task due date"
+                  now={now}
+                  onPick={(d) => setDraftDue(d ?? '')}
+                  triggerClass="flex items-center gap-1 shrink-0 rounded bg-[var(--los-border)]/40 px-2 py-2 text-xs"
+                >
+                  <CalendarClock size={14} />
+                  {draftDue && <span>{draftDue}</span>}
+                </DueMenu>
               </form>
             ) : null}
             {loading && rows.length === 0 && (
@@ -540,11 +547,13 @@ export const TasksBoardPage = () => {
                       )}
                     </span>
                     {!done && (
-                      <RescheduleMenu
-                        title={item.text}
+                      <DueMenu
+                        label={`Reschedule ${item.text}`}
                         now={now}
                         onPick={(date) => reschedule(list.path, item.id, date)}
-                      />
+                      >
+                        <CalendarClock size={14} />
+                      </DueMenu>
                     )}
                   </li>
                 );

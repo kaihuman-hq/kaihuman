@@ -154,16 +154,23 @@ describe('TasksBoardPage', () => {
     expect(store.updateFileContent).toHaveBeenCalledWith(WORK, expect.stringContaining('New one'));
   });
 
-  it('sets a due date when creating a task', () => {
+  it('sets a due date when creating a task via the shared menu', () => {
     act(() => button('work')?.click());
     const input = host.querySelector('input[type="text"]') as HTMLInputElement;
-    const due = host.querySelector('input[aria-label="New task due date"]') as HTMLInputElement;
     act(() => {
       input.value = 'Dated one';
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      due.value = '2026-12-01';
-      due.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    const trigger = host.querySelector('[aria-label="New task due date"]') as HTMLElement;
+    act(() => trigger.click());
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
+    expect(items).toEqual(['Today', 'Tomorrow', 'Next Saturday', 'Next Monday', 'No date']);
+    const date = host.querySelector('input[aria-label="Custom due date"]') as HTMLInputElement;
+    act(() => {
+      date.value = '2026-12-01';
+      date.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(trigger.textContent).toContain('2026-12-01');
     act(() => {
       input.form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
@@ -171,7 +178,24 @@ describe('TasksBoardPage', () => {
       WORK,
       expect.stringMatching(/Dated one[\s\S]*::due:: 2026-12-01/),
     );
-    expect(due.value).toBe('');
+    expect(trigger.textContent).toBe('');
+  });
+
+  it('positions the popover fixed, opening rightwards and clamped inside the viewport', () => {
+    const rect = (r: Partial<DOMRect>) => () =>
+      ({ left: 0, top: 0, right: 0, bottom: 0, ...r }) as DOMRect;
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    spy.mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute('role') === 'menu'
+        ? rect({ width: 200, height: 150 })()
+        : rect({ left: window.innerWidth - 20, top: 100, bottom: 120 })();
+    });
+    act(() => (host.querySelector('[aria-label="Reschedule Standup"]') as HTMLElement).click());
+    const menu = host.querySelector('[role="menu"]') as HTMLElement;
+    expect(menu.className).toContain('fixed');
+    expect(Number.parseFloat(menu.style.left)).toBe(window.innerWidth - 8 - 200);
+    expect(menu.style.top).toBe('124px');
+    spy.mockRestore();
   });
 
   it('opens the sidebar behind the header icon at mobile width', () => {
